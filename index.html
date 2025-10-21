@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Flow Planner</title>
+    <style>
+        :root {
+            color-scheme: light dark;
+            --bg: #f4f5f9;
+            --panel: #ffffff;
+            --panel-dark: #f0f1f5;
+            --accent: #635bff;
+            --accent-soft: rgba(99, 91, 255, 0.12);
+            --accent-strong: rgba(99, 91, 255, 0.25);
+            --text: #1b1d29;
+            --text-muted: #5f6379;
+            --border: #d8dbe8;
+            --success: #36b37e;
+            --warning: #ffab00;
+            --danger: #ff5630;
+            font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            padding: 24px 28px 12px;
+        }
+
+        .app-shell {
+            flex: 1;
+            display: grid;
+            grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.1fr) minmax(220px, 0.9fr);
+            gap: 20px;
+            padding: 0 28px 24px;
+        }
+
+        .panel {
+            background: var(--panel);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 18px 40px rgba(31, 41, 55, 0.08);
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(1.8rem, 2.2vw + 1rem, 2.8rem);
+            font-weight: 700;
+        }
+
+        h2 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        h3 {
+            margin: 0;
+            font-size: 0.95rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+        }
+
+        .agenda-day {
+            background: var(--panel-dark);
+            border-radius: 16px;
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .agenda-day header {
+            padding: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .agenda-day header span {
+            font-weight: 600;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        ul.task-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .task-item {
+            background: var(--panel);
+            border: 1px solid transparent;
+            border-radius: 14px;
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            transition: border-color 0.2s ease, transform 0.2s ease;
+        }
+
+        .task-item:hover {
+            border-color: var(--accent-strong);
+            transform: translateY(-1px);
+        }
+
+        .task-main {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .task-title {
+            font-weight: 600;
+        }
+
+        .task-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-pill {
+            font-size: 0.75rem;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+        }
+
+        .status-pill[data-status="todo"] {
+            background: var(--accent-soft);
+            color: var(--accent);
+        }
+
+        .status-pill[data-status="in-progress"] {
+            background: rgba(255, 171, 0, 0.15);
+            color: var(--warning);
+        }
+
+        .status-pill[data-status="done"] {
+            background: rgba(54, 179, 126, 0.16);
+            color: var(--success);
+        }
+
+        .task-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        button, select {
+            font: inherit;
+        }
+
+        .ghost-btn {
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text);
+            border-radius: 12px;
+            padding: 6px 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s ease, color 0.2s ease;
+        }
+
+        .ghost-btn:hover {
+            background: var(--panel-dark);
+        }
+
+        .primary-btn {
+            border: none;
+            background: var(--accent);
+            color: white;
+            border-radius: 12px;
+            padding: 10px 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .primary-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 12px 24px rgba(99, 91, 255, 0.25);
+        }
+
+        .status-card {
+            background: linear-gradient(135deg, #ecebff, #f8f7ff);
+            border-radius: 24px;
+            padding: 28px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .metric-grid {
+            display: grid;
+            gap: 16px;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        }
+
+        .metric {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 16px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .metric span:first-child {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .metric span:last-child {
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+
+        .progress-track {
+            width: 100%;
+            height: 12px;
+            border-radius: 999px;
+            background: rgba(99, 91, 255, 0.15);
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .status-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 16px;
+        }
+
+        .status-summary .card {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .status-summary .card h4 {
+            margin: 0;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        form.task-form {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .field label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .field input,
+        .field textarea,
+        .field select {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 10px 12px;
+            background: var(--panel);
+            color: inherit;
+            resize: vertical;
+        }
+
+        .field textarea {
+            min-height: 88px;
+        }
+
+        .inline-options {
+            display: flex;
+            gap: 12px;
+        }
+
+        .inline-options label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .empty-state {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            text-align: center;
+            padding: 18px 0;
+        }
+
+        nav.bottom-nav {
+            background: white;
+            border-top: 1px solid var(--border);
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            bottom: 0;
+        }
+
+        nav.bottom-nav .nav-group {
+            display: flex;
+            gap: 12px;
+        }
+
+        nav.bottom-nav button {
+            border: none;
+            background: transparent;
+            padding: 10px 16px;
+            border-radius: 999px;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: background 0.2s ease, color 0.2s ease;
+        }
+
+        nav.bottom-nav button.is-active {
+            background: var(--accent-soft);
+            color: var(--accent);
+        }
+
+        nav.bottom-nav button:hover {
+            background: var(--panel-dark);
+            color: var(--text);
+        }
+
+        @media (max-width: 1080px) {
+            .app-shell {
+                grid-template-columns: minmax(200px, 1fr) minmax(200px, 1fr);
+                grid-template-areas:
+                    "agenda status"
+                    "create create";
+            }
+
+            .agenda-panel {
+                grid-area: agenda;
+            }
+
+            .status-panel {
+                grid-area: status;
+            }
+
+            .create-panel {
+                grid-area: create;
+            }
+        }
+
+        @media (max-width: 720px) {
+            header {
+                padding: 20px 20px 12px;
+            }
+
+            .app-shell {
+                padding: 0 20px 20px;
+                grid-template-columns: 1fr;
+            }
+
+            nav.bottom-nav {
+                flex-direction: column;
+                gap: 10px;
+                align-items: stretch;
+            }
+
+            nav.bottom-nav .nav-group {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Daily Flow Planner</h1>
+    </header>
+    <main class="app-shell">
+        <section class="panel agenda-panel">
+            <div>
+                <h2>Agenda</h2>
+                <p style="margin: 4px 0 0; color: var(--text-muted);">Focus on what matters today and tomorrow.</p>
+            </div>
+            <div class="agenda-day" data-day="today">
+                <header>
+                    <h3>Today</h3>
+                    <span id="today-count">0 Tasks</span>
+                </header>
+                <ul class="task-list" id="today-list"></ul>
+                <div class="empty-state" data-empty="today">No tasks lined up for today.</div>
+            </div>
+            <div class="agenda-day" data-day="tomorrow">
+                <header>
+                    <h3>Tomorrow</h3>
+                    <span id="tomorrow-count">0 Tasks</span>
+                </header>
+                <ul class="task-list" id="tomorrow-list"></ul>
+                <div class="empty-state" data-empty="tomorrow">Plan ahead for tomorrow's wins.</div>
+            </div>
+        </section>
+
+        <section class="panel status-panel">
+            <div class="status-card">
+                <div>
+                    <h2>Status Snapshot</h2>
+                    <p style="margin: 4px 0 0; color: var(--text-muted);">Keep momentum with real-time progress.</p>
+                </div>
+                <div>
+                    <div class="progress-track" aria-hidden="true">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <div style="display:flex; justify-content: space-between; margin-top: 8px; font-weight: 600;">
+                        <span>Completion</span>
+                        <span id="progress-label">0%</span>
+                    </div>
+                </div>
+                <div class="metric-grid">
+                    <div class="metric">
+                        <span>Total Tasks</span>
+                        <span id="metric-total">0</span>
+                    </div>
+                    <div class="metric">
+                        <span>In Progress</span>
+                        <span id="metric-progress">0</span>
+                    </div>
+                    <div class="metric">
+                        <span>Completed</span>
+                        <span id="metric-done">0</span>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <h2>Quick Actions</h2>
+                <div class="status-summary">
+                    <div class="card">
+                        <h4>Today Focus</h4>
+                        <p style="margin:0; font-size: 1.1rem; font-weight: 700;" id="card-today">0 due</p>
+                        <button class="ghost-btn" data-jump="today">Jump to Today</button>
+                    </div>
+                    <div class="card">
+                        <h4>Tomorrow Prep</h4>
+                        <p style="margin:0; font-size: 1.1rem; font-weight: 700;" id="card-tomorrow">0 queued</p>
+                        <button class="ghost-btn" data-jump="tomorrow">Review Tomorrow</button>
+                    </div>
+                    <div class="card">
+                        <h4>Clear Done</h4>
+                        <p style="margin:0; font-size: 1.1rem; font-weight: 700;" id="card-done">0 archived</p>
+                        <button class="ghost-btn" id="clear-completed">Archive Completed</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel create-panel">
+            <div>
+                <h2>Create Task</h2>
+                <p style="margin: 4px 0 0; color: var(--text-muted);">Add new tasks and keep your pipeline active.</p>
+            </div>
+            <form class="task-form" id="task-form">
+                <div class="field">
+                    <label for="task-title">Title</label>
+                    <input type="text" id="task-title" name="title" placeholder="Design review" required>
+                </div>
+                <div class="field">
+                    <label for="task-notes">Notes</label>
+                    <textarea id="task-notes" name="notes" placeholder="Add a quick description or context"></textarea>
+                </div>
+                <div class="field">
+                    <label>Schedule</label>
+                    <div class="inline-options">
+                        <label>
+                            <input type="radio" name="day" value="today" checked>
+                            Today
+                        </label>
+                        <label>
+                            <input type="radio" name="day" value="tomorrow">
+                            Tomorrow
+                        </label>
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="task-status">Status</label>
+                    <select id="task-status" name="status">
+                        <option value="todo">To Do</option>
+                        <option value="in-progress">In Progress</option>
+                        <option value="done">Completed</option>
+                    </select>
+                </div>
+                <button type="submit" class="primary-btn">Add Task</button>
+            </form>
+            <div style="margin-top: auto; display:flex; flex-direction: column; gap: 12px;">
+                <button class="ghost-btn" id="reset-board">Reset Board</button>
+                <small style="color: var(--text-muted);">Tasks are automatically saved on this device.</small>
+            </div>
+        </section>
+    </main>
+    <nav class="bottom-nav" aria-label="Primary">
+        <div class="nav-group">
+            <button class="is-active">Agenda</button>
+            <button>Timeline</button>
+            <button>Analytics</button>
+        </div>
+        <div class="nav-group">
+            <button>Settings</button>
+            <button>Support</button>
+        </div>
+    </nav>
+
+    <template id="task-item-template">
+        <li class="task-item">
+            <div class="task-main">
+                <div>
+                    <div class="task-title"></div>
+                    <div class="task-notes" style="color: var(--text-muted); font-size: 0.85rem;"></div>
+                </div>
+                <div class="task-controls">
+                    <span class="status-pill" data-status="todo"></span>
+                </div>
+            </div>
+            <div class="task-actions">
+                <button class="ghost-btn" data-action="progress">Mark In Progress</button>
+                <button class="primary-btn" data-action="complete">Mark Complete</button>
+            </div>
+        </li>
+    </template>
+
+    <script>
+        (function () {
+            const storageKey = "taskPlannerTasks";
+            const todayList = document.getElementById("today-list");
+            const tomorrowList = document.getElementById("tomorrow-list");
+            const todayCount = document.getElementById("today-count");
+            const tomorrowCount = document.getElementById("tomorrow-count");
+            const emptyStates = {
+                today: document.querySelector('[data-empty="today"]'),
+                tomorrow: document.querySelector('[data-empty="tomorrow"]')
+            };
+            const metrics = {
+                total: document.getElementById("metric-total"),
+                progress: document.getElementById("metric-progress"),
+                done: document.getElementById("metric-done"),
+                today: document.getElementById("card-today"),
+                tomorrow: document.getElementById("card-tomorrow"),
+                doneCard: document.getElementById("card-done")
+            };
+            const progressFill = document.getElementById("progress-fill");
+            const progressLabel = document.getElementById("progress-label");
+            const form = document.getElementById("task-form");
+            const resetBtn = document.getElementById("reset-board");
+            const clearBtn = document.getElementById("clear-completed");
+            const template = document.getElementById("task-item-template");
+            const uuid = () => {
+                try {
+                    if (typeof crypto !== "undefined" && crypto.randomUUID) {
+                        return crypto.randomUUID();
+                    }
+                } catch (error) {
+                    console.warn("Falling back to pseudo-random id", error);
+                }
+                return `task-${Math.random().toString(36).slice(2, 10)}`;
+            };
+
+            let tasks = loadTasks();
+            render();
+
+            form.addEventListener("submit", (event) => {
+                event.preventDefault();
+                const data = new FormData(form);
+                const title = data.get("title").trim();
+                if (!title) {
+                    return;
+                }
+                const notes = data.get("notes").trim();
+                const day = data.get("day");
+                const status = data.get("status");
+                tasks.push({
+                    id: uuid(),
+                    title,
+                    notes,
+                    day,
+                    status,
+                    createdAt: Date.now()
+                });
+                saveTasks();
+                form.reset();
+                form.querySelector('input[name="day"][value="today"]').checked = true;
+                render();
+            });
+
+            resetBtn.addEventListener("click", () => {
+                if (confirm("Reset all tasks? This will clear your board.")) {
+                    tasks = [];
+                    saveTasks();
+                    render();
+                }
+            });
+
+            clearBtn.addEventListener("click", () => {
+                tasks = tasks.filter((task) => task.status !== "done");
+                saveTasks();
+                render();
+            });
+
+            document.querySelectorAll('[data-jump]').forEach((button) => {
+                button.addEventListener("click", () => {
+                    const target = button.dataset.jump;
+                    const section = document.querySelector(`[data-day="${target}"]`);
+                    section?.scrollIntoView({ behavior: "smooth", block: "center" });
+                });
+            });
+
+            function loadTasks() {
+                try {
+                    const raw = localStorage.getItem(storageKey);
+                    if (!raw) {
+                        const seeded = seedTasks();
+                        localStorage.setItem(storageKey, JSON.stringify(seeded));
+                        return seeded;
+                    }
+                    const parsed = JSON.parse(raw);
+                    if (!Array.isArray(parsed)) return seedTasks();
+                    return parsed;
+                } catch (error) {
+                    console.error("Failed to load tasks", error);
+                    return seedTasks();
+                }
+            }
+
+            function seedTasks() {
+                return [
+                    {
+                        id: uuid(),
+                        title: "Stand-up notes",
+                        notes: "Summarize blockers and key wins.",
+                        day: "today",
+                        status: "todo",
+                        createdAt: Date.now() - 3600_000
+                    },
+                    {
+                        id: uuid(),
+                        title: "Client follow-up",
+                        notes: "Send revised proposal deck.",
+                        day: "today",
+                        status: "in-progress",
+                        createdAt: Date.now() - 7200_000
+                    },
+                    {
+                        id: uuid(),
+                        title: "Sprint planning",
+                        notes: "Draft agenda for tomorrow's session.",
+                        day: "tomorrow",
+                        status: "todo",
+                        createdAt: Date.now() - 10800_000
+                    }
+                ];
+            }
+
+            function saveTasks() {
+                localStorage.setItem(storageKey, JSON.stringify(tasks));
+            }
+
+            function render() {
+                renderList("today", todayList, todayCount);
+                renderList("tomorrow", tomorrowList, tomorrowCount);
+                updateMetrics();
+            }
+
+            function renderList(day, list, counter) {
+                list.innerHTML = "";
+                const dayTasks = tasks
+                    .filter((task) => task.day === day)
+                    .sort((a, b) => a.createdAt - b.createdAt);
+
+                if (!dayTasks.length) {
+                    emptyStates[day].style.display = "block";
+                } else {
+                    emptyStates[day].style.display = "none";
+                }
+
+                dayTasks.forEach((task) => {
+                    const node = template.content.firstElementChild.cloneNode(true);
+                    const titleEl = node.querySelector(".task-title");
+                    const notesEl = node.querySelector(".task-notes");
+                    const statusPill = node.querySelector(".status-pill");
+                    const progressBtn = node.querySelector('[data-action="progress"]');
+                    const completeBtn = node.querySelector('[data-action="complete"]');
+
+                    titleEl.textContent = task.title;
+                    notesEl.textContent = task.notes;
+                    notesEl.style.display = task.notes ? "block" : "none";
+                    statusPill.dataset.status = task.status;
+                    statusPill.textContent = formatStatus(task.status);
+
+                    progressBtn.textContent = task.status === "in-progress" ? "Mark To Do" : "Mark In Progress";
+                    completeBtn.textContent = task.status === "done" ? "Mark To Do" : "Mark Complete";
+
+                    progressBtn.addEventListener("click", () => {
+                        task.status = task.status === "in-progress" ? "todo" : "in-progress";
+                        saveTasks();
+                        render();
+                    });
+
+                    completeBtn.addEventListener("click", () => {
+                        task.status = task.status === "done" ? "todo" : "done";
+                        saveTasks();
+                        render();
+                    });
+
+                    list.appendChild(node);
+                });
+
+                counter.textContent = `${dayTasks.length} ${dayTasks.length === 1 ? "Task" : "Tasks"}`;
+            }
+
+            function updateMetrics() {
+                const total = tasks.length;
+                const inProgress = tasks.filter((task) => task.status === "in-progress").length;
+                const done = tasks.filter((task) => task.status === "done").length;
+                const todayCount = tasks.filter((task) => task.day === "today").length;
+                const tomorrowCount = tasks.filter((task) => task.day === "tomorrow").length;
+
+                metrics.total.textContent = total;
+                metrics.progress.textContent = inProgress;
+                metrics.done.textContent = done;
+                metrics.today.textContent = `${todayCount} due`;
+                metrics.tomorrow.textContent = `${tomorrowCount} queued`;
+                metrics.doneCard.textContent = `${done} archived`;
+
+                const percent = total ? Math.round((done / total) * 100) : 0;
+                progressFill.style.width = `${percent}%`;
+                progressLabel.textContent = `${percent}%`;
+            }
+
+            function formatStatus(status) {
+                switch (status) {
+                    case "in-progress":
+                        return "In Progress";
+                    case "done":
+                        return "Completed";
+                    default:
+                        return "To Do";
+                }
+            }
+        })();
+    </script>
+</body>
+</html>
