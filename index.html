@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zone Task Manager</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>Zone Task Manager</h1>
+      <div class="header-actions">
+        <button id="new-zone-btn" class="primary">New Zone</button>
+        <div class="points-display">
+          <span>Total Points:</span>
+          <strong id="total-points">0</strong>
+        </div>
+      </div>
+    </header>
+
+    <div class="app-layout">
+      <aside id="zone-editor" class="zone-editor hidden" aria-hidden="true">
+        <form id="zone-form">
+          <div class="form-header">
+            <h2 id="zone-form-title">Create Zone</h2>
+            <button type="button" id="close-editor" class="icon-btn" aria-label="Close zone editor">×</button>
+          </div>
+          <label class="field">
+            <span>Name</span>
+            <input id="zone-name" name="name" type="text" required />
+          </label>
+
+          <div class="field-inline">
+            <label class="field">
+              <span>Per-task Points</span>
+              <input id="zone-task-points" name="taskPoints" type="number" min="0" step="1" required />
+            </label>
+            <label class="field">
+              <span>Completion Bonus</span>
+              <input id="zone-completion-bonus" name="completionBonus" type="number" min="0" step="1" value="0" />
+            </label>
+          </div>
+
+          <label class="field">
+            <span>Penalty per Skipped Task</span>
+            <input id="zone-penalty" name="penalty" type="number" min="0" step="1" value="0" />
+          </label>
+
+          <fieldset class="field">
+            <legend>Repeat Cadence</legend>
+            <label class="radio">
+              <input type="radio" name="cadence" value="daily" checked />
+              <span>Daily</span>
+            </label>
+            <label class="radio">
+              <input type="radio" name="cadence" value="weekly" />
+              <span>Specific Weekdays</span>
+            </label>
+            <div id="weekday-picker" class="weekday-picker hidden" aria-hidden="true">
+              <label><input type="checkbox" value="1" />Mon</label>
+              <label><input type="checkbox" value="2" />Tue</label>
+              <label><input type="checkbox" value="3" />Wed</label>
+              <label><input type="checkbox" value="4" />Thu</label>
+              <label><input type="checkbox" value="5" />Fri</label>
+              <label><input type="checkbox" value="6" />Sat</label>
+              <label><input type="checkbox" value="0" />Sun</label>
+            </div>
+          </fieldset>
+
+          <section class="field">
+            <div class="section-header">
+              <span>Tasks</span>
+              <div class="task-add">
+                <input id="task-name-input" type="text" placeholder="Add task name" />
+                <button type="button" id="add-task-btn">Add</button>
+              </div>
+            </div>
+            <ul id="zone-task-list" class="task-template-list"></ul>
+          </section>
+
+          <div class="form-footer">
+            <button type="submit" class="primary">Save Zone</button>
+          </div>
+        </form>
+      </aside>
+
+      <main id="zones-container" class="zones-container">
+        <p class="empty-state">Create a zone to begin planning your tasks.</p>
+      </main>
+    </div>
+
+    <template id="task-row-template">
+      <div class="task-row">
+        <span class="task-name"></span>
+        <select class="task-status">
+          <option value="pending">Pending</option>
+          <option value="completed">Completed</option>
+          <option value="skipped">Skipped</option>
+        </select>
+      </div>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>
