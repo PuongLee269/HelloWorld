@@ -1,0 +1,194 @@
+:root {
+  color-scheme: light dark;
+  --page-bg: #0f172a;
+  --page-fg: #f8fafc;
+  --card-bg: rgba(15, 23, 42, 0.75);
+  --card-border: rgba(148, 163, 184, 0.2);
+  --tick-color: rgba(148, 163, 184, 0.4);
+  --label-color: #cbd5f5;
+  --score-color: #f1f5f9;
+  --bar-bg: rgba(148, 163, 184, 0.25);
+  font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at top, #1e293b 0%, var(--page-bg) 55%);
+  color: var(--page-fg);
+}
+
+.page {
+  width: min(920px, 90vw);
+}
+
+.hud {
+  background: var(--card-bg);
+  backdrop-filter: blur(14px);
+  border-radius: 24px;
+  border: 1px solid var(--card-border);
+  padding: 32px;
+  box-shadow: 0 32px 80px rgba(15, 23, 42, 0.55);
+}
+
+.hud__title {
+  margin: 0 0 24px;
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+.level-progress {
+  display: grid;
+  gap: 24px;
+}
+
+.level-progress__header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.level-progress__avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  font-size: 32px;
+  background: rgba(148, 163, 184, 0.2);
+  transition: transform 200ms ease, background-color 200ms ease, color 200ms ease;
+}
+
+.level-progress[data-level-transition="true"] .level-progress__avatar {
+  transform: scale(1.08) rotate(-2deg);
+}
+
+.level-progress__meta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.level-progress__label {
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  color: var(--label-color);
+}
+
+.level-progress__name {
+  font-size: clamp(22px, 4vw, 30px);
+  font-weight: 700;
+}
+
+.level-progress__score {
+  font-size: clamp(24px, 4vw, 32px);
+  font-weight: 700;
+  color: var(--score-color);
+  min-width: 3ch;
+  text-align: right;
+}
+
+.level-progress__bar {
+  position: relative;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--bar-bg);
+  overflow: hidden;
+}
+
+.level-progress__fill {
+  --fill-width: 0%;
+  width: var(--fill-width);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0));
+  transition: width 280ms ease, background-color 200ms ease;
+}
+
+.level-progress__ticks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.level-progress__ticks li {
+  position: absolute;
+  top: -10px;
+  width: 2px;
+  height: 42px;
+  background: var(--tick-color);
+  transform: translateX(-1px);
+}
+
+.level-progress__ticks li::after {
+  content: attr(data-label);
+  position: absolute;
+  top: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: rgba(226, 232, 240, 0.65);
+  white-space: nowrap;
+}
+
+.level-progress__legend {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  color: rgba(226, 232, 240, 0.8);
+}
+
+.level-progress__legend dt {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.level-progress__legend dt::before {
+  content: attr(data-icon);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--level-color, rgba(148, 163, 184, 0.2));
+  color: #0f172a;
+}
+
+.level-progress__legend dd {
+  margin: 0 0 0 30px;
+  font-size: 13px;
+  color: rgba(226, 232, 240, 0.65);
+}
+
+@media (max-width: 600px) {
+  .hud {
+    padding: 24px 18px;
+  }
+
+  .level-progress__header {
+    align-items: flex-start;
+  }
+
+  .level-progress__avatar {
+    width: 56px;
+    height: 56px;
+    font-size: 28px;
+  }
+}

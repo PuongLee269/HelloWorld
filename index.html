@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Quest Tracker</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="hud">
+        <h1 class="hud__title">Adventurer Status</h1>
+
+        <article class="level-progress" data-level-progress>
+          <header class="level-progress__header">
+            <div class="level-progress__avatar" data-level-avatar aria-hidden="true">🎒</div>
+            <div class="level-progress__meta">
+              <span class="level-progress__label">Current tier</span>
+              <span class="level-progress__name" data-level-name>Rookie</span>
+            </div>
+            <output class="level-progress__score" data-total-points aria-live="polite">0</output>
+          </header>
+
+          <div
+            class="level-progress__bar"
+            role="progressbar"
+            aria-valuemin="0"
+            aria-valuenow="0"
+            aria-valuemax="0"
+            aria-valuetext="0 points"
+          >
+            <div class="level-progress__fill" data-level-fill></div>
+            <ul class="level-progress__ticks" data-threshold-markers></ul>
+          </div>
+
+          <dl class="level-progress__legend" data-threshold-list></dl>
+        </article>
+      </section>
+    </main>
+
+    <script type="module" src="scripts/score-progress.js"></script>
+  </body>
+</html>
