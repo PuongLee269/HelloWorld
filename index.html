@@ -37,6 +37,46 @@
           <span>Thêm việc cần làm</span>
           <input type="text" id="todo-input" name="todo" autocomplete="off" placeholder="Nhập việc cần làm" required />
         </label>
+        <fieldset class="recurrence-group">
+          <legend>Lặp lại</legend>
+          <label class="recurrence-option">
+            <input type="checkbox" id="repeat-daily" name="repeat-daily" />
+            <span>Lặp hàng ngày</span>
+          </label>
+          <div class="weekday-select">
+            <span>Chọn ngày trong tuần</span>
+            <div class="weekday-options">
+              <label>
+                <input type="checkbox" class="weekday-checkbox" name="weekday" value="1" />
+                <span>Th 2</span>
+              </label>
+              <label>
+                <input type="checkbox" class="weekday-checkbox" name="weekday" value="2" />
+                <span>Th 3</span>
+              </label>
+              <label>
+                <input type="checkbox" class="weekday-checkbox" name="weekday" value="3" />
+                <span>Th 4</span>
+              </label>
+              <label>
+                <input type="checkbox" class="weekday-checkbox" name="weekday" value="4" />
+                <span>Th 5</span>
+              </label>
+              <label>
+                <input type="checkbox" class="weekday-checkbox" name="weekday" value="5" />
+                <span>Th 6</span>
+              </label>
+              <label>
+                <input type="checkbox" class="weekday-checkbox" name="weekday" value="6" />
+                <span>Th 7</span>
+              </label>
+              <label>
+                <input type="checkbox" class="weekday-checkbox" name="weekday" value="0" />
+                <span>CN</span>
+              </label>
+            </div>
+          </div>
+        </fieldset>
         <button type="submit">Thêm</button>
       </form>
       <ul class="todo-list" id="todo-list"></ul>

@@ -14,6 +14,35 @@ document.addEventListener("DOMContentLoaded", () => {
   const todoInput = document.getElementById("todo-input");
   const todoList = document.getElementById("todo-list");
   const emptyState = document.getElementById("empty-state");
+  const repeatDailyCheckbox = document.getElementById("repeat-daily");
+  const weekdayCheckboxes = Array.from(
+    document.querySelectorAll(".weekday-checkbox")
+  );
+
+  const WEEKDAY_LABELS = [
+    "CN",
+    "Th 2",
+    "Th 3",
+    "Th 4",
+    "Th 5",
+    "Th 6",
+    "Th 7",
+  ];
+  const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
+  const sortWeekdays = (days) =>
+    [...days].sort(
+      (a, b) => WEEKDAY_ORDER.indexOf(a) - WEEKDAY_ORDER.indexOf(b)
+    );
+
+  const getTodayKey = () => {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${now.getFullYear()}-${month}-${day}`;
+  };
+
+  const getTodayWeekday = () => new Date().getDay();
 
   const readTodos = () => {
     try {
@@ -33,8 +62,97 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
+  const refreshRecurringTodos = (todos) => {
+    const todayKey = getTodayKey();
+    const todayWeekday = getTodayWeekday();
+    let changed = false;
+
+    const updatedTodos = todos.map((todo) => {
+      const recurrence = todo.recurrence || {
+        frequency: "none",
+        weekdays: [],
+      };
+      if (recurrence.frequency === "none") {
+        return { ...todo, recurrence };
+      }
+
+      const weekdays = Array.isArray(recurrence.weekdays)
+        ? sortWeekdays(recurrence.weekdays)
+        : [];
+      const lastOccurrence = todo.lastOccurrence || null;
+
+      if (recurrence.frequency === "daily") {
+        if (lastOccurrence !== todayKey) {
+          changed = true;
+          return {
+            ...todo,
+            completed: false,
+            lastOccurrence: todayKey,
+            recurrence: { ...recurrence, weekdays: [] },
+          };
+        }
+        return { ...todo, recurrence: { ...recurrence, weekdays: [] } };
+      }
+
+      if (recurrence.frequency === "weekly") {
+        if (weekdays.includes(todayWeekday) && lastOccurrence !== todayKey) {
+          changed = true;
+          return {
+            ...todo,
+            completed: false,
+            lastOccurrence: todayKey,
+            recurrence: { ...recurrence, weekdays },
+          };
+        }
+        return {
+          ...todo,
+          recurrence: { ...recurrence, weekdays },
+        };
+      }
+
+      return { ...todo, recurrence };
+    });
+
+    return { todos: updatedTodos, changed };
+  };
+
+  const getTodos = () => {
+    const stored = readTodos();
+    const { todos, changed } = refreshRecurringTodos(stored);
+    if (changed) {
+      writeTodos(todos);
+    }
+    return todos;
+  };
+
+  const formatRecurrence = (todo) => {
+    if (!todo.recurrence || todo.recurrence.frequency === "none") {
+      return "";
+    }
+
+    if (todo.recurrence.frequency === "daily") {
+      return "Lặp hàng ngày";
+    }
+
+    if (todo.recurrence.frequency === "weekly") {
+      const weekdays = Array.isArray(todo.recurrence.weekdays)
+        ? sortWeekdays(todo.recurrence.weekdays)
+        : [];
+      if (!weekdays.length) {
+        return "Lặp hàng tuần";
+      }
+      const names = weekdays.map((day) => WEEKDAY_LABELS[day] || day);
+      const todayWeekday = getTodayWeekday();
+      const todayIncluded = weekdays.includes(todayWeekday);
+      const summary = `Lặp hàng tuần: ${names.join(", ")}`;
+      return todayIncluded ? summary : `${summary} (không diễn ra hôm nay)`;
+    }
+
+    return "";
+  };
+
   const renderTodos = () => {
-    const todos = readTodos();
+    const todos = getTodos();
     todoList.innerHTML = "";
 
     if (!todos.length) {
@@ -54,9 +172,21 @@ document.addEventListener("DOMContentLoaded", () => {
       checkbox.checked = todo.completed;
       checkbox.addEventListener("change", () => toggleTodo(todo.id));
 
+      const details = document.createElement("span");
+      details.className = "todo-details";
+
       const text = document.createElement("span");
       text.className = "todo-text";
       text.textContent = todo.text;
+      details.appendChild(text);
+
+      const recurrenceText = formatRecurrence(todo);
+      if (recurrenceText) {
+        const recurrenceTag = document.createElement("span");
+        recurrenceTag.className = "todo-meta";
+        recurrenceTag.textContent = recurrenceText;
+        details.appendChild(recurrenceTag);
+      }
 
       const deleteBtn = document.createElement("button");
       deleteBtn.type = "button";
@@ -66,10 +196,34 @@ document.addEventListener("DOMContentLoaded", () => {
       deleteBtn.addEventListener("click", () => removeTodo(todo.id));
 
       label.appendChild(checkbox);
-      label.appendChild(text);
+      label.appendChild(details);
       item.appendChild(label);
       item.appendChild(deleteBtn);
       todoList.appendChild(item);
+    });
+  };
+
+  const buildRecurrenceFromForm = () => {
+    const selectedWeekdays = weekdayCheckboxes
+      .filter((checkbox) => checkbox.checked)
+      .map((checkbox) => Number(checkbox.value));
+
+    if (repeatDailyCheckbox.checked) {
+      return { frequency: "daily", weekdays: [] };
+    }
+
+    if (selectedWeekdays.length) {
+      const orderedWeekdays = sortWeekdays(selectedWeekdays);
+      return { frequency: "weekly", weekdays: orderedWeekdays };
+    }
+
+    return { frequency: "none", weekdays: [] };
+  };
+
+  const resetRecurrenceControls = () => {
+    repeatDailyCheckbox.checked = false;
+    weekdayCheckboxes.forEach((checkbox) => {
+      checkbox.checked = false;
     });
   };
 
@@ -79,11 +233,27 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const todos = readTodos();
+    const todos = getTodos();
+    const recurrence = buildRecurrenceFromForm();
+    const todayKey = getTodayKey();
+    const todayWeekday = getTodayWeekday();
+    let lastOccurrence = null;
+
+    if (recurrence.frequency === "daily") {
+      lastOccurrence = todayKey;
+    } else if (
+      recurrence.frequency === "weekly" &&
+      recurrence.weekdays.includes(todayWeekday)
+    ) {
+      lastOccurrence = todayKey;
+    }
+
     const newTodo = {
       id: crypto.randomUUID(),
       text: trimmed,
       completed: false,
+      recurrence,
+      lastOccurrence,
     };
 
     todos.push(newTodo);
@@ -92,7 +262,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const toggleTodo = (id) => {
-    const todos = readTodos();
+    const todos = getTodos();
     const updated = todos.map((todo) =>
       todo.id === id ? { ...todo, completed: !todo.completed } : todo
     );
@@ -101,7 +271,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const removeTodo = (id) => {
-    const todos = readTodos().filter((todo) => todo.id !== id);
+    const todos = getTodos().filter((todo) => todo.id !== id);
     writeTodos(todos);
     renderTodos();
   };
@@ -156,6 +326,7 @@ document.addEventListener("DOMContentLoaded", () => {
     addTodo(todoInput.value);
     todoInput.value = "";
     todoInput.focus();
+    resetRecurrenceControls();
   });
 
   renderTodos();
