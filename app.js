@@ -4,9 +4,12 @@ document.addEventListener("DOMContentLoaded", () => {
     todos: "heloGlowTodos",
   };
 
+  const body = document.body;
   const nameForm = document.getElementById("name-form");
   const nameInput = document.getElementById("player-name");
+  const nameModal = document.getElementById("name-modal");
   const greeting = document.getElementById("greeting");
+  const appHeader = document.getElementById("app-header");
   const todoForm = document.getElementById("todo-form");
   const todoInput = document.getElementById("todo-input");
   const todoList = document.getElementById("todo-list");
@@ -103,20 +106,37 @@ document.addEventListener("DOMContentLoaded", () => {
     renderTodos();
   };
 
-  const setGreeting = (name) => {
+  const updateGreeting = (name) => {
     if (name) {
       greeting.textContent = `Xin chào, ${name}`;
-      greeting.hidden = false;
-      nameForm.hidden = true;
+      appHeader.hidden = false;
     } else {
-      greeting.hidden = true;
-      nameForm.hidden = false;
+      greeting.textContent = "";
+      appHeader.hidden = true;
     }
+  };
+
+  const showNameModal = () => {
+    nameModal.classList.add("is-visible");
+    nameModal.setAttribute("aria-hidden", "false");
+    body.classList.add("modal-open");
+    requestAnimationFrame(() => {
+      nameInput.focus();
+    });
+  };
+
+  const hideNameModal = () => {
+    nameModal.classList.remove("is-visible");
+    nameModal.setAttribute("aria-hidden", "true");
+    body.classList.remove("modal-open");
   };
 
   const storedName = localStorage.getItem(STORAGE_KEYS.name);
   if (storedName) {
-    setGreeting(storedName);
+    updateGreeting(storedName);
+    hideNameModal();
+  } else {
+    showNameModal();
   }
 
   nameForm.addEventListener("submit", (event) => {
@@ -126,7 +146,9 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     localStorage.setItem(STORAGE_KEYS.name, nameValue);
-    setGreeting(nameValue);
+    updateGreeting(nameValue);
+    hideNameModal();
+    nameForm.reset();
   });
 
   todoForm.addEventListener("submit", (event) => {

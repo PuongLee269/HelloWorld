@@ -7,19 +7,29 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <div class="modal-overlay" id="name-modal" aria-hidden="true">
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h2 class="modal-title" id="modal-title">Xin chào! Bạn tên gì?</h2>
+      <form id="name-form" class="modal-form">
+        <label for="player-name">Tên của bạn</label>
+        <input
+          type="text"
+          id="player-name"
+          name="player-name"
+          autocomplete="off"
+          placeholder="Nhập tên của bạn"
+          required
+        />
+        <button type="submit">Lưu tên</button>
+      </form>
+    </div>
+  </div>
   <main class="app">
     <h1>Helo Glow</h1>
 
-    <section class="panel" id="player-panel">
-      <form id="name-form">
-        <label>
-          <span>Nhập tên người chơi</span>
-          <input type="text" id="player-name" name="player-name" autocomplete="off" placeholder="Bạn tên gì?" required />
-        </label>
-        <button type="submit">Lưu tên</button>
-      </form>
-      <p class="name-display" id="greeting" hidden></p>
-    </section>
+    <header class="app-header" id="app-header" hidden>
+      <p class="greeting" id="greeting"></p>
+    </header>
 
     <section class="panel todos">
       <form id="todo-form">
