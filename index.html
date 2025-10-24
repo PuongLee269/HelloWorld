@@ -137,27 +137,32 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js"></script>
 
-    <script>
-        // TODO: Thay bằng Firebase config của bạn từ Firebase Console
+    <script type="module">
+        // Import Firebase modular APIs
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js';
+        import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js';
+        import { getFirestore, collection, doc, getDoc, setDoc, addDoc, updateDoc, onSnapshot, query, orderBy, limit, runTransaction, writeBatch, serverTimestamp } from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js';
+
+        // Firebase Config
         const firebaseConfig = {
-          apiKey: "AIzaSyAEcuO05o6LGiWvVF6c8k1yUj8l_a4VqUc",
-          authDomain: "hello-f5c5a.firebaseapp.com",
-          projectId: "hello-f5c5a",
-          storageBucket: "hello-f5c5a.firebasestorage.app",
-          messagingSenderId: "766606826615",
-          appId: "1:766606826615:web:783077344649c7f8113a72",
-          measurementId: "G-W0SCHMJPW5"
-};
+            apiKey: "AIzaSyAEcuO05o6LGiWvVF6c8k1yUj8l_a4VqUc",
+            authDomain: "hello-f5c5a.firebaseapp.com",
+            projectId: "hello-f5c5a",
+            storageBucket: "hello-f5c5a.firebasestorage.app",
+            messagingSenderId: "766606826615",
+            appId: "1:766606826615:web:783077344649c7f8113a72",
+            measurementId: "G-W0SCHMJPW5"
+        };
 
         // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
         db.enablePersistence().catch(err => console.error('Persistence failed:', err));
 
         // Auth State Listener
         let currentUser = null;
-        auth.onAuthStateChanged(user => {
+        onAuthStateChanged(auth, user => {
             if (user) {
                 currentUser = user;
                 document.getElementById('login').classList.add('hidden');
@@ -175,44 +180,52 @@
 
         // Sign In with Google
         document.getElementById('signInBtn').addEventListener('click', async () => {
-            const provider = new firebase.auth.GoogleAuthProvider();
+            const provider = new GoogleAuthProvider();
             try {
-                await auth.signInWithPopup(provider);
+                await signInWithPopup(auth, provider);
+                showToast('Đăng nhập thành công!');
             } catch (error) {
+                console.error('Sign-in error:', error);
                 showToast('Lỗi đăng nhập: ' + error.message);
             }
         });
 
         // Sign Out
-        function signOut() {
-            auth.signOut().catch(err => showToast('Lỗi đăng xuất: ' + err.message));
+        async function signOutUser() {
+            try {
+                await signOut(auth);
+                showToast('Đã đăng xuất');
+            } catch (error) {
+                console.error('Sign-out error:', error);
+                showToast('Lỗi đăng xuất: ' + error.message);
+            }
         }
 
         // Initialize User Data in Firestore
         async function initUserData(user) {
-            const userRef = db.collection('users').doc(user.uid);
+            const userRef = doc(db, 'users', user.uid);
             try {
-                const doc = await userRef.get();
-                if (!doc.exists) {
-                    await userRef.set({
+                const docSnap = await getDoc(userRef);
+                if (!docSnap.exists()) {
+                    await setDoc(userRef, {
                         displayName: user.displayName || 'Người chơi',
                         photoURL: user.photoURL || 'https://via.placeholder.com/40',
                         email: user.email,
                         score: 0,
                         dailyClosedKey: '',
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        createdAt: serverTimestamp(),
+                        updatedAt: serverTimestamp()
                     });
-                    // Initialize leaderboard entry
-                    await db.collection('leaderboard').doc(user.uid).set({
+                    await setDoc(doc(db, 'leaderboard', user.uid), {
                         uid: user.uid,
                         displayName: user.displayName || 'Người chơi',
                         photoURL: user.photoURL || 'https://via.placeholder.com/40',
                         score: 0,
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        updatedAt: serverTimestamp()
                     });
                 }
             } catch (error) {
+                console.error('Init user data error:', error);
                 showToast('Lỗi khởi tạo dữ liệu: ' + error.message);
             }
         }
@@ -224,9 +237,8 @@
                 <img src="${currentUser.photoURL || 'https://via.placeholder.com/40'}" alt="Avatar">
                 <span>${currentUser.displayName} - Điểm: <span id="userScore">0</span></span>
             `;
-            // Fetch and update score
-            db.collection('users').doc(currentUser.uid).onSnapshot(doc => {
-                if (doc.exists) {
+            onSnapshot(doc(db, 'users', currentUser.uid), doc => {
+                if (doc.exists()) {
                     document.getElementById('userScore').textContent = doc.data().score || 0;
                 }
             });
@@ -245,52 +257,267 @@
             document.getElementById('addZoneForm').classList.toggle('hidden');
         }
 
-        // TODO: Implement addZone()
+        // Add Zone
         async function addZone() {
-            // Lấy input từ form, lưu vào Firestore (users/{uid}/zones)
-            // Cập nhật UI bằng renderZones()
-            showToast('Chức năng thêm Zone chưa được triển khai');
+            const name = document.getElementById('zoneName').value.trim();
+            const pointPerTask = parseInt(document.getElementById('pointPerTask').value) || 10;
+            const bonusCompleteAll = parseInt(document.getElementById('bonusCompleteAll').value) || 50;
+            const penaltyNotComplete = parseInt(document.getElementById('penaltyNotComplete').value) || 20;
+            if (!name) return showToast('Vui lòng nhập tên Zone!');
+            try {
+                await addDoc(collection(db, `users/${currentUser.uid}/zones`), {
+                    name,
+                    pointPerTask,
+                    bonusCompleteAll,
+                    penaltyNotComplete,
+                    repeatPolicy: 'inherit',
+                    createdAt: serverTimestamp()
+                });
+                showToast('Thêm Zone thành công!');
+                document.getElementById('addZoneForm').classList.add('hidden');
+                document.getElementById('zoneName').value = '';
+            } catch (error) {
+                console.error('Add zone error:', error);
+                showToast('Lỗi thêm Zone: ' + error.message);
+            }
         }
 
-        // TODO: Implement renderZones()
+        // Render Zones
         function renderZones() {
             const zonesDiv = document.getElementById('zones');
-            zonesDiv.innerHTML = '<p>Chưa có Zone nào</p>';
-            // Lắng nghe Firestore snapshot (users/{uid}/zones)
-            // Render danh sách zones, mỗi zone có form thêm task
+            zonesDiv.innerHTML = '';
+            onSnapshot(collection(db, `users/${currentUser.uid}/zones`), snapshot => {
+                zonesDiv.innerHTML = snapshot.empty ? '<p>Chưa có Zone nào</p>' : '';
+                snapshot.forEach(doc => {
+                    const zone = { id: doc.id, ...doc.data() };
+                    const zoneDiv = document.createElement('div');
+                    zoneDiv.className = 'zone';
+                    zoneDiv.innerHTML = `
+                        <h3>${zone.name} (Điểm/task: ${zone.pointPerTask}, Bonus: ${zone.bonusCompleteAll}, Penalty: ${zone.penaltyNotComplete})</h3>
+                        <button onclick="showAddTaskForm('${zone.id}')">Thêm Task</button>
+                        <div id="addTaskForm_${zone.id}" class="hidden form">
+                            <input type="text" id="taskDesc_${zone.id}" placeholder="Mô tả task">
+                            <select id="repeatType_${zone.id}">
+                                <option value="none">Không lặp</option>
+                                <option value="daily">Mỗi ngày</option>
+                                <option value="weekly">Theo tuần</option>
+                            </select>
+                            <div id="weeklyDays_${zone.id}" class="hidden">
+                                <label><input type="checkbox" value="1"> T2</label>
+                                <label><input type="checkbox" value="2"> T3</label>
+                                <label><input type="checkbox" value="3"> T4</label>
+                                <label><input type="checkbox" value="4"> T5</label>
+                                <label><input type="checkbox" value="5"> T6</label>
+                                <label><input type="checkbox" value="6"> T7</label>
+                                <label><input type="checkbox" value="0"> CN</label>
+                            </div>
+                            <button onclick="addTask('${zone.id}')">Thêm Task</button>
+                        </div>
+                        <div id="tasks_${zone.id}"></div>
+                    `;
+                    zonesDiv.appendChild(zoneDiv);
+                    renderTasks(zone.id);
+                    document.getElementById(`repeatType_${zone.id}`).addEventListener('change', e => {
+                        document.getElementById(`weeklyDays_${zone.id}`).classList.toggle('hidden', e.target.value !== 'weekly');
+                    });
+                });
+            });
         }
 
-        // TODO: Implement addTask(zoneId)
+        // Show Add Task Form
+        function showAddTaskForm(zoneId) {
+            document.getElementById(`addTaskForm_${zoneId}`).classList.toggle('hidden');
+        }
+
+        // Add Task
         async function addTask(zoneId) {
-            // Lưu task vào Firestore (users/{uid}/zones/{zoneId}/tasks)
-            // Cập nhật UI
+            const desc = document.getElementById(`taskDesc_${zoneId}`).value.trim();
+            const repeatType = document.getElementById(`repeatType_${zoneId}`).value;
+            const weeklyDays = repeatType === 'weekly' ? Array.from(document.querySelectorAll(`#weeklyDays_${zoneId} input:checked`)).map(cb => parseInt(cb.value)) : [];
+            if (!desc) return showToast('Vui lòng nhập mô tả task!');
+            try {
+                const dayKey = getDayKey();
+                await addDoc(collection(db, `users/${currentUser.uid}/zones/${zoneId}/tasks`), {
+                    text: desc,
+                    completed: false,
+                    repeatType,
+                    weeklyDays,
+                    lastResetKey: dayKey,
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp()
+                });
+                showToast('Thêm Task thành công!');
+                document.getElementById(`addTaskForm_${zoneId}`).classList.add('hidden');
+                document.getElementById(`taskDesc_${zoneId}`).value = '';
+            } catch (error) {
+                console.error('Add task error:', error);
+                showToast('Lỗi thêm Task: ' + error.message);
+            }
         }
 
-        // TODO: Implement completeTask(zoneId, taskId)
+        // Render Tasks
+        function renderTasks(zoneId) {
+            const tasksDiv = document.getElementById(`tasks_${zoneId}`);
+            tasksDiv.innerHTML = '';
+            onSnapshot(collection(db, `users/${currentUser.uid}/zones/${zoneId}/tasks`), async snapshot => {
+                tasksDiv.innerHTML = snapshot.empty ? '<p>Chưa có Task nào</p>' : '';
+                const zoneRef = doc(db, `users/${currentUser.uid}/zones/${zoneId}`);
+                const zoneDoc = await getDoc(zoneRef);
+                const zone = zoneDoc.data();
+                const dayKey = getDayKey();
+                const batch = writeBatch(db);
+                snapshot.forEach(doc => {
+                    const task = { id: doc.id, ...doc.data() };
+                    // Auto-reset tasks if needed
+                    let shouldReset = false;
+                    if (task.repeatType === 'daily' && task.lastResetKey !== dayKey) {
+                        shouldReset = true;
+                    } else if (task.repeatType === 'weekly' && task.lastResetKey !== dayKey && task.weeklyDays.includes(new Date().getDay())) {
+                        shouldReset = true;
+                    }
+                    if (shouldReset) {
+                        batch.update(doc.ref, { completed: false, lastResetKey: dayKey, updatedAt: serverTimestamp() });
+                    }
+                    const taskDiv = document.createElement('div');
+                    taskDiv.className = 'task';
+                    const repeatInfo = task.repeatType === 'none' ? '' : ` <span class="chip">${task.repeatType}${task.repeatType === 'weekly' ? ' - ' + task.weeklyDays.map(d => ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][d]).join(',') : ''}</span>`;
+                    taskDiv.innerHTML = `
+                        <input type="checkbox" ${task.completed ? 'checked' : ''} onchange="completeTask('${zoneId}', '${task.id}', this.checked)">
+                        ${task.text}${repeatInfo}
+                    `;
+                    tasksDiv.appendChild(taskDiv);
+                });
+                if (batch._mutations.length > 0) await batch.commit();
+            });
+        }
+
+        // Complete Task
         async function completeTask(zoneId, taskId, checked) {
-            // Transaction: Cập nhật task.completed, tăng/giảm score
-            // Check bonusCompleteAll nếu cần
+            try {
+                await runTransaction(db, async transaction => {
+                    const userRef = doc(db, 'users', currentUser.uid);
+                    const zoneRef = doc(db, `users/${currentUser.uid}/zones/${zoneId}`);
+                    const taskRef = doc(db, `users/${currentUser.uid}/zones/${zoneId}/tasks/${taskId}`);
+                    const userDoc = await transaction.get(userRef);
+                    const zoneDoc = await transaction.get(zoneRef);
+                    const tasksSnap = await getDocs(collection(db, `users/${currentUser.uid}/zones/${zoneId}/tasks`));
+                    if (!userDoc.exists() || !zoneDoc.exists()) throw new Error('Dữ liệu không tồn tại');
+                    let score = userDoc.data().score || 0;
+                    const zone = zoneDoc.data();
+                    if (checked) {
+                        score += zone.pointPerTask;
+                        const allCompleted = tasksSnap.docs.every(t => t.id === taskId ? checked : t.data().completed);
+                        if (allCompleted && tasksSnap.size > 0) {
+                            const dayKey = getDayKey();
+                            if (zoneDoc.data().zoneDailyBonusKey !== dayKey) {
+                                score += zone.bonusCompleteAll;
+                                transaction.update(zoneRef, { zoneDailyBonusKey: dayKey, updatedAt: serverTimestamp() });
+                                showToast(`Bonus +${zone.bonusCompleteAll} điểm cho Zone ${zone.name}`);
+                            }
+                        }
+                    } else {
+                        score -= zone.pointPerTask;
+                    }
+                    transaction.update(userRef, { score, updatedAt: serverTimestamp() });
+                    transaction.update(doc(db, 'leaderboard', currentUser.uid), { score, updatedAt: serverTimestamp() });
+                    transaction.update(taskRef, { completed: checked, updatedAt: serverTimestamp() });
+                });
+                showToast('Cập nhật task thành công!');
+            } catch (error) {
+                console.error('Complete task error:', error);
+                showToast('Lỗi cập nhật task: ' + error.message);
+            }
         }
 
-        // TODO: Implement closeDay()
+        // Close Day
         async function closeDay() {
-            // Transaction: Tính penalty/bonus per zone, update score
-            // Reset tasks lặp (daily/weekly) dựa trên dayKey (YYYY-MM-DD, UTC+7)
-            // Ghi log vào audit/{dateKey}/closes/{uid}
+            const dayKey = getDayKey();
+            try {
+                await runTransaction(db, async transaction => {
+                    const userRef = doc(db, 'users', currentUser.uid);
+                    const userDoc = await transaction.get(userRef);
+                    if (!userDoc.exists()) throw new Error('User không tồn tại');
+                    if (userDoc.data().dailyClosedKey === dayKey) throw new Error('Hôm nay đã đóng!');
+                    let score = userDoc.data().score || 0;
+                    const zonesSnap = await getDocs(collection(db, `users/${currentUser.uid}/zones`));
+                    const batch = writeBatch(db);
+                    let deltaScore = 0;
+                    for (const zoneDoc of zonesSnap.docs) {
+                        const zone = zoneDoc.data();
+                        const tasksSnap = await getDocs(collection(db, `users/${currentUser.uid}/zones/${zoneDoc.id}/tasks`));
+                        if (tasksSnap.size > 0 && !tasksSnap.docs.every(t => t.data().completed)) {
+                            deltaScore -= zone.penaltyNotComplete;
+                            showToast(`Penalty -${zone.penaltyNotComplete} điểm cho Zone ${zone.name}`);
+                        }
+                    }
+                    score += deltaScore;
+                    transaction.update(userRef, { score, dailyClosedKey: dayKey, updatedAt: serverTimestamp() });
+                    transaction.update(doc(db, 'leaderboard', currentUser.uid), { score, updatedAt: serverTimestamp() });
+                    await setDoc(doc(db, `audit/${dayKey}/closes`, currentUser.uid), {
+                        uid: currentUser.uid,
+                        dateKey: dayKey,
+                        closedAt: serverTimestamp(),
+                        deltaScore
+                    });
+                    for (const zoneDoc of zonesSnap.docs) {
+                        const tasksSnap = await getDocs(collection(db, `users/${currentUser.uid}/zones/${zoneDoc.id}/tasks`));
+                        tasksSnap.forEach(taskDoc => {
+                            const task = taskDoc.data();
+                            let shouldReset = false;
+                            if (task.repeatType === 'daily' && task.lastResetKey !== dayKey) {
+                                shouldReset = true;
+                            } else if (task.repeatType === 'weekly' && task.lastResetKey !== dayKey && task.weeklyDays.includes(new Date().getDay())) {
+                                shouldReset = true;
+                            }
+                            if (shouldReset) {
+                                batch.update(taskDoc.ref, { completed: false, lastResetKey: dayKey, updatedAt: serverTimestamp() });
+                            }
+                        });
+                    }
+                    if (batch._mutations.length > 0) await batch.commit();
+                });
+                showToast('Đã kết thúc ngày!');
+            } catch (error) {
+                console.error('Close day error:', error);
+                showToast('Lỗi kết thúc ngày: ' + error.message);
+            }
         }
 
-        // TODO: Implement showLeaderboard() and renderLeaderboard()
+        // Get Day Key (UTC+7)
+        function getDayKey() {
+            const date = new Date();
+            const offset = 7 * 60; // UTC+7
+            const localTime = date.getTime() + (date.getTimezoneOffset() * 60000) + (offset * 60000);
+            const localDate = new Date(localTime);
+            return localDate.toISOString().split('T')[0]; // YYYY-MM-DD
+        }
+
+        // Show Leaderboard
         function showLeaderboard() {
             document.getElementById('app').classList.add('hidden');
             document.getElementById('leaderboard').classList.remove('hidden');
             renderLeaderboard();
         }
 
+        // Render Leaderboard
         function renderLeaderboard() {
             const table = document.getElementById('leaderboardTable');
             table.innerHTML = '<tr><th>Icon</th><th>Tên</th><th>Điểm</th></tr>';
-            // Query Firestore leaderboard/*, orderBy score desc, limit 10
-            showToast('Chức năng leaderboard chưa được triển khai');
+            onSnapshot(query(collection(db, 'leaderboard'), orderBy('score', 'desc'), limit(10)), snapshot => {
+                snapshot.forEach(doc => {
+                    const user = doc.data();
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><img src="${user.photoURL}" width="30" height="30" style="border-radius: 50%;"></td>
+                        <td>${user.displayName}</td>
+                        <td>${user.score}</td>
+                    `;
+                    table.appendChild(row);
+                });
+            }, error => {
+                console.error('Leaderboard error:', error);
+                showToast('Lỗi tải leaderboard: ' + error.message);
+            });
         }
 
         function backToApp() {
