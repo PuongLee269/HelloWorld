@@ -1,88 +1,557 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Helo Glow</title>
-  <link rel="stylesheet" href="styles.css" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Todo Quest — Firebase (GH Pages)</title>
+  <style>
+    :root{
+      --bg:#0f1220; --panel:#171a2b; --accent:#7c9cff; --ok:#2be9d4; --warn:#ffd76a; --bad:#ff6a8e; --muted:#9aa4bf;
+      --text:#e8ecff; --border:#2a2f4a;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";background:var(--bg);color:var(--text)}
+    a{color:var(--accent)}
+    .wrap{max-width:1100px;margin:0 auto;padding:16px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+    .brand{display:flex;align-items:center;gap:10px}
+    .logo{width:28px;height:28px;border-radius:6px;background:linear-gradient(135deg,#7c9cff,#a087ff)}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:14px}
+    .grid{display:grid;grid-template-columns:320px 1fr;gap:14px}
+    @media (max-width:880px){.grid{grid-template-columns:1fr}}
+
+    .row{display:flex;align-items:center;gap:8px}
+    .space{flex:1}
+    .btn{appearance:none;border:1px solid var(--border);background:#1e2340;color:var(--text);padding:8px 12px;border-radius:10px;cursor:pointer}
+    .btn:hover{border-color:#3a4170}
+    .btn.primary{background:var(--accent);border-color:transparent;color:#0c0f1e;font-weight:600}
+    .btn.ghost{background:transparent}
+    .btn.danger{background:#3a1830}
+
+    input,select{background:#0f1328;color:var(--text);border:1px solid var(--border);border-radius:10px;padding:8px 10px}
+    input[type=number]{width:90px}
+    label{font-size:12px;color:var(--muted)}
+    .muted{color:var(--muted)}
+    .pill{font-size:12px;border:1px solid var(--border);padding:2px 8px;border-radius:999px;color:var(--muted)}
+
+    /* Zones */
+    .zones header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .zone-list{display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow:auto}
+    .zone-item{display:flex;flex-direction:column;gap:8px;border:1px solid var(--border);border-radius:12px;padding:10px;background:#12162e}
+    .zone-head{display:flex;align-items:center;gap:8px}
+    .zone-name{font-weight:600}
+
+    /* Tasks */
+    .tasks header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+    .task-list{display:flex;flex-direction:column;gap:8px}
+    .task{display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:12px;padding:10px;background:#101632}
+    .task.done{opacity:.6}
+
+    /* Leaderboard */
+    .lb-list{display:grid;grid-template-columns:56px 1fr 100px;gap:8px;align-items:center}
+    .avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;border:1px solid var(--border)}
+    .me{outline:2px solid var(--ok);outline-offset:2px;border-radius:12px}
+
+    .tabs{display:flex;gap:8px;margin:12px 0}
+    .tab{padding:8px 12px;border-radius:999px;border:1px solid var(--border);color:var(--muted);cursor:pointer}
+    .tab.active{background:var(--accent);color:#0c0f1e;border-color:transparent}
+
+    .toast{position:fixed;bottom:16px;right:16px;background:#0f1328;border:1px solid var(--border);padding:10px 12px;border-radius:10px;opacity:0;transform:translateY(10px);transition:.25s}
+    .toast.show{opacity:1;transform:translateY(0)}
+
+    .chip{font-size:12px;border:1px solid var(--border);padding:2px 6px;border-radius:6px}
+    .chip.ok{border-color:#11483f;color:var(--ok)}
+    .chip.bad{border-color:#5a2a3f;color:var(--bad)}
+    .chip.warn{border-color:#5a5130;color:var(--warn)}
+  </style>
 </head>
 <body>
-  <div class="modal-overlay" id="name-modal" aria-hidden="true">
-    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-      <h2 class="modal-title" id="modal-title">Xin chào! Bạn tên gì?</h2>
-      <form id="name-form" class="modal-form">
-        <label for="player-name">Tên của bạn</label>
-        <input
-          type="text"
-          id="player-name"
-          name="player-name"
-          autocomplete="off"
-          placeholder="Nhập tên của bạn"
-          required
-        />
-        <button type="submit">Lưu tên</button>
-      </form>
-    </div>
-  </div>
-  <main class="app">
-    <h1>Helo Glow</h1>
-
-    <header class="app-header" id="app-header" hidden>
-      <p class="greeting" id="greeting"></p>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          <div style="font-weight:800">Todo Quest</div>
+          <div class="muted" style="font-size:12px">Google Sign‑In · Firestore realtime · GH Pages</div>
+        </div>
+      </div>
+      <div class="row" id="authBar">
+        <!-- filled by JS -->
+      </div>
     </header>
 
-    <section class="panel todos">
-      <form id="todo-form">
-        <label>
-          <span>Thêm việc cần làm</span>
-          <input type="text" id="todo-input" name="todo" autocomplete="off" placeholder="Nhập việc cần làm" required />
-        </label>
-        <fieldset class="recurrence-group">
-          <legend>Lặp lại</legend>
-          <label class="recurrence-option">
-            <input type="checkbox" id="repeat-daily" name="repeat-daily" />
-            <span>Lặp hàng ngày</span>
-          </label>
-          <div class="weekday-select">
-            <span>Chọn ngày trong tuần</span>
-            <div class="weekday-options">
-              <label>
-                <input type="checkbox" class="weekday-checkbox" name="weekday" value="1" />
-                <span>Th 2</span>
-              </label>
-              <label>
-                <input type="checkbox" class="weekday-checkbox" name="weekday" value="2" />
-                <span>Th 3</span>
-              </label>
-              <label>
-                <input type="checkbox" class="weekday-checkbox" name="weekday" value="3" />
-                <span>Th 4</span>
-              </label>
-              <label>
-                <input type="checkbox" class="weekday-checkbox" name="weekday" value="4" />
-                <span>Th 5</span>
-              </label>
-              <label>
-                <input type="checkbox" class="weekday-checkbox" name="weekday" value="5" />
-                <span>Th 6</span>
-              </label>
-              <label>
-                <input type="checkbox" class="weekday-checkbox" name="weekday" value="6" />
-                <span>Th 7</span>
-              </label>
-              <label>
-                <input type="checkbox" class="weekday-checkbox" name="weekday" value="0" />
-                <span>CN</span>
-              </label>
+    <!-- Tabs -->
+    <div class="tabs">
+      <div class="tab active" data-view="app">Nhiệm vụ</div>
+      <div class="tab" data-view="leaderboard">Bảng xếp hạng</div>
+      <div class="tab" data-view="about">Giới thiệu</div>
+    </div>
+
+    <!-- Login Gate -->
+    <div id="gate" class="card">
+      <p>Đăng nhập bằng Google để bắt đầu chấm điểm công việc, đồng bộ giữa các thiết bị qua Firebase.</p>
+      <button class="btn primary" id="btnLogin">Đăng nhập với Google</button>
+    </div>
+
+    <!-- Main App -->
+    <div id="main" style="display:none">
+      <div class="grid">
+        <!-- ZONES -->
+        <section class="card zones">
+          <header>
+            <div class="row">
+              <strong>Hạng mục (Zones)</strong>
+              <span class="pill" id="zoneCount">0</span>
+            </div>
+            <button class="btn ghost" id="btnAddZone">+ Thêm Zone</button>
+          </header>
+
+          <div class="zone-list" id="zoneList"></div>
+        </section>
+
+        <!-- TASKS -->
+        <section class="card tasks">
+          <header>
+            <div class="row">
+              <strong id="currentZoneName">Chọn một Zone</strong>
+              <span class="pill" id="taskCount">0</span>
+            </div>
+            <div class="row">
+              <button class="btn" id="btnEndDay">Kết thúc ngày</button>
+            </div>
+          </header>
+
+          <div class="card" style="margin-bottom:10px">
+            <div class="row" style="flex-wrap:wrap;gap:8px">
+              <input id="taskText" placeholder="Mô tả task…" style="flex:1;min-width:220px"/>
+              <select id="repeatType">
+                <option value="none">1 lần</option>
+                <option value="daily">Hàng ngày</option>
+                <option value="weekly">Hàng tuần</option>
+              </select>
+              <select id="weeklyDays" multiple size="1" title="Ngày lặp (thứ)" style="min-width:120px">
+                <option value="1">Thứ 2</option>
+                <option value="2">Thứ 3</option>
+                <option value="3">Thứ 4</option>
+                <option value="4">Thứ 5</option>
+                <option value="5">Thứ 6</option>
+                <option value="6">Thứ 7</option>
+                <option value="7">Chủ nhật</option>
+              </select>
+              <button class="btn" id="btnAddTask">+ Thêm Task</button>
             </div>
           </div>
-        </fieldset>
-        <button type="submit">Thêm</button>
-      </form>
-      <ul class="todo-list" id="todo-list"></ul>
-      <p class="empty-state" id="empty-state">Chưa có việc nào. Hãy thêm việc đầu tiên!</p>
-    </section>
-  </main>
-  <script src="app.js"></script>
+
+          <div class="task-list" id="taskList"></div>
+        </section>
+      </div>
+
+      <!-- Leaderboard View -->
+      <section id="leaderboardView" class="card" style="display:none;margin-top:14px">
+        <div class="row" style="justify-content:space-between">
+          <strong>Bảng xếp hạng (Top 50)</strong>
+          <span class="pill" id="lbUpdated">—</span>
+        </div>
+        <div id="lbList" class="lb-list" style="margin-top:10px"></div>
+      </section>
+
+      <!-- About View -->
+      <section id="aboutView" class="card" style="display:none;margin-top:14px">
+        <p>Ứng dụng mẫu: Todo Quest. Không có backend riêng — chỉ dùng Firebase (Auth + Firestore). Offline sync bật sẵn.</p>
+        <ul>
+          <li>Điểm cộng khi tick xong task · Bonus khi hoàn thành tất cả task trong Zone</li>
+          <li>Penalty nếu cuối ngày (UTC+7) còn task chưa xong</li>
+          <li>Leaderboard lấy từ <code>users</code> theo tổng điểm</li>
+        </ul>
+        <p class="muted">Gợi ý triển khai: bật App Check & rules chặt (ở bản thật). Bản demo này <strong>không dùng captcha</strong> theo yêu cầu.</p>
+      </section>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script type="module">
+    // ===== Firebase (v11) — CDN Modular SDK =====
+    // 👉 Điền cấu hình của dự án Firebase của anh vào đây
+    const firebaseConfig = {
+  apiKey: "AIzaSyAEcuO05o6LGiWvVF6c8k1yUj8l_a4VqUc",
+  authDomain: "hello-f5c5a.firebaseapp.com",
+  projectId: "hello-f5c5a",
+  storageBucket: "hello-f5c5a.firebasestorage.app",
+  messagingSenderId: "766606826615",
+  appId: "1:766606826615:web:783077344649c7f8113a72",
+  measurementId: "G-W0SCHMJPW5"
+};
+
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js';
+    import { 
+      getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut,
+      setPersistence, browserLocalPersistence
+    } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js';
+    import {
+      getFirestore, collection, doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc,
+      onSnapshot, query, orderBy, limit, serverTimestamp, writeBatch, runTransaction,
+      enableIndexedDbPersistence, getDocs, where
+    } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js';
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // offline persistence
+    enableIndexedDbPersistence(db).catch(() => {/* ignore for multi-tab */});
+    setPersistence(auth, browserLocalPersistence);
+
+    // ===== Helpers =====
+    const $ = s => document.querySelector(s);
+    const $$ = s => Array.from(document.querySelectorAll(s));
+    const toast = (msg, ok=true)=>{ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); t.style.borderColor= ok?'#214c41':'#5a2a3f'; setTimeout(()=>t.classList.remove('show'), 1800)};
+    const tzDayKey = (d=new Date())=>{
+      // Asia/Bangkok fixed key YYYY-MM-DD
+      const fmt = new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'});
+      return fmt.format(d); // en-CA gives YYYY-MM-DD
+    };
+
+    // State
+    let me = null; // { uid, displayName, photoURL, email, score, dailyClosedKey }
+    let unsubZones = null, unsubTasks = null, unsubLB = null;
+    let currentZoneId = null;
+
+    // ===== Auth UI =====
+    const authBar = $('#authBar');
+    const gate = $('#gate');
+    const main = $('#main');
+    const btnLogin = $('#btnLogin');
+
+    function renderAuth(){
+      if(!me){
+        authBar.innerHTML = `<button class="btn" id="googleLogin">Đăng nhập</button>`;
+        $('#googleLogin').onclick = doLogin;
+        gate.style.display='block';
+        main.style.display='none';
+      }else{
+        authBar.innerHTML = `
+          <img class="avatar" src="${me.photoURL||''}" alt="avatar">
+          <div class="row">
+            <div style="text-align:right">
+              <div style="font-weight:600">${me.displayName||'Không tên'}</div>
+              <div class="muted" style="font-size:12px">Điểm: <span id="scoreHead">${me.score??0}</span> · Hôm nay: <span id="dayKey">${tzDayKey()}</span></div>
+            </div>
+            <button class="btn ghost" id="btnLogout">Đăng xuất</button>
+          </div>`;
+        $('#btnLogout').onclick = ()=>signOut(auth);
+        gate.style.display='none';
+        main.style.display='block';
+      }
+    }
+
+    async function doLogin(){
+      try{
+        const provider = new GoogleAuthProvider();
+        const res = await signInWithPopup(auth, provider);
+        // init user doc if not exist
+        const uid = res.user.uid;
+        const uref = doc(db,'users',uid);
+        const snap = await getDoc(uref);
+        const base = {
+          displayName: res.user.displayName||'Không tên',
+          photoURL: res.user.photoURL||'',
+          email: res.user.email||'',
+          score: 0,
+          dailyClosedKey: '',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        };
+        if(!snap.exists()) await setDoc(uref, base);
+        else await updateDoc(uref, { displayName: base.displayName, photoURL: base.photoURL, updatedAt: serverTimestamp() });
+      }catch(e){ console.error(e); toast('Đăng nhập lỗi', false); }
+    }
+
+    onAuthStateChanged(auth, async (user)=>{
+      if(!user){
+        me = null;
+        cleanupListeners();
+        renderAuth();
+        return;
+      }
+      const uref = doc(db,'users',user.uid);
+      const snap = await getDoc(uref);
+      const data = snap.data()||{};
+      me = { uid:user.uid, ...data };
+      renderAuth();
+      bindUserRealtime();
+      bindZones();
+      bindLeaderboard();
+      // apply resets on load (idempotent per day)
+      await applyResetsForToday();
+    });
+
+    function cleanupListeners(){
+      if(unsubZones){ unsubZones(); unsubZones=null }
+      if(unsubTasks){ unsubTasks(); unsubTasks=null }
+      if(unsubLB){ unsubLB(); unsubLB=null }
+      $('#zoneList').innerHTML='';
+      $('#taskList').innerHTML='';
+      currentZoneId=null;
+    }
+
+    // ===== Tabs =====
+    $$('.tab').forEach(t=>t.onclick=()=>{
+      $$('.tab').forEach(x=>x.classList.remove('active'));
+      t.classList.add('active');
+      const v = t.dataset.view;
+      if(v==='app'){ $('#leaderboardView').style.display='none'; $('#aboutView').style.display='none' }
+      if(v==='leaderboard'){ $('#leaderboardView').style.display='block'; $('#aboutView').style.display='none' }
+      if(v==='about'){ $('#leaderboardView').style.display='none'; $('#aboutView').style.display='block' }
+    });
+
+    // ===== Zones =====
+    $('#btnAddZone').onclick = async ()=>{
+      if(!me) return;
+      const name = prompt('Tên Zone? (VD: Công việc)');
+      if(!name) return;
+      const z = {
+        name, pointPerTask: 10, bonusCompleteAll: 20, penaltyNotComplete: 10,
+        lastBonusKey:'', createdAt: serverTimestamp()
+      };
+      await addDoc(collection(db,'users',me.uid,'zones'), z);
+    };
+
+    function bindZones(){
+      if(!me) return;
+      const q = query(collection(db,'users',me.uid,'zones'), orderBy('createdAt'));
+      if(unsubZones) unsubZones();
+      unsubZones = onSnapshot(q, (ss)=>{
+        const list = $('#zoneList');
+        list.innerHTML='';
+        $('#zoneCount').textContent = ss.size;
+        ss.forEach(docSnap=>{
+          const z = { id: docSnap.id, ...docSnap.data() };
+          const el = document.createElement('div');
+          el.className='zone-item';
+          el.innerHTML = `
+            <div class="zone-head">
+              <div class="zone-name">${z.name}</div>
+              <span class="chip" title="Điểm mỗi task">+${z.pointPerTask}</span>
+              <span class="chip ok" title="Bonus hoàn tất">Bonus ${z.bonusCompleteAll}</span>
+              <span class="chip bad" title="Phạt cuối ngày">- ${z.penaltyNotComplete}</span>
+              <span class="space"></span>
+              <button class="btn" data-act="open">Mở</button>
+              <button class="btn danger" data-act="del">Xoá</button>
+            </div>
+          `;
+          el.querySelector('[data-act=open]').onclick = ()=>openZone(z.id, z.name);
+          el.querySelector('[data-act=del]').onclick = async ()=>{
+            if(confirm('Xoá Zone sẽ xoá cả tasks bên trong. Tiếp tục?')){
+              // delete tasks then zone (simple client loop)
+              const tasksCol = collection(db,'users',me.uid,'zones',z.id,'tasks');
+              const tss = await getDocs(tasksCol);
+              const batch = writeBatch(db);
+              tss.forEach(t=> batch.delete(t.ref));
+              batch.delete(doc(db,'users',me.uid,'zones',z.id));
+              await batch.commit();
+            }
+          };
+          list.appendChild(el);
+        });
+      });
+    }
+
+    async function openZone(zoneId, name){
+      currentZoneId = zoneId;
+      $('#currentZoneName').textContent = name;
+      bindTasks(zoneId);
+    }
+
+    // ===== Tasks =====
+    $('#btnAddTask').onclick = async ()=>{
+      if(!me || !currentZoneId) return toast('Chọn Zone trước', false);
+      const text = $('#taskText').value.trim();
+      if(!text) return;
+      const repeatType = $('#repeatType').value;
+      const weeklyDays = Array.from($('#weeklyDays').selectedOptions).map(o=>+o.value);
+      const t = { text, completed:false, repeatType, weeklyDays, lastResetKey:'', createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
+      await addDoc(collection(db,'users',me.uid,'zones',currentZoneId,'tasks'), t);
+      $('#taskText').value='';
+      $('#weeklyDays').selectedIndex=-1;
+    };
+
+    function bindTasks(zoneId){
+      if(unsubTasks) unsubTasks();
+      const q = query(collection(db,'users',me.uid,'zones',zoneId,'tasks'), orderBy('createdAt'));
+      unsubTasks = onSnapshot(q, async (ss)=>{
+        $('#taskCount').textContent = ss.size;
+        const list = $('#taskList'); list.innerHTML='';
+        ss.forEach(docSnap=>{
+          const t = { id: docSnap.id, ...docSnap.data() };
+          const el = document.createElement('div');
+          el.className = 'task' + (t.completed?' done':'');
+          const rpt = t.repeatType==='daily'?'<span class="chip warn">Daily</span>': t.repeatType==='weekly'?`<span class="chip warn">Weekly: ${(t.weeklyDays||[]).join(',')}</span>`:'<span class="chip">One‑off</span>';
+          el.innerHTML = `
+            <input type="checkbox" ${t.completed?'checked':''} aria-label="done" />
+            <div class="space">${t.text} ${rpt}</div>
+            <button class="btn ghost" data-act="del">Xoá</button>
+          `;
+          el.querySelector('input').onchange = (e)=>toggleTask(zoneId, t, e.target.checked);
+          el.querySelector('[data-act=del]').onclick = ()=>deleteTask(zoneId, t.id);
+          list.appendChild(el);
+        });
+      });
+    }
+
+    async function deleteTask(zoneId, taskId){
+      if(!confirm('Xoá task?')) return;
+      await deleteDoc(doc(db,'users',me.uid,'zones',zoneId,'tasks',taskId));
+    }
+
+    async function toggleTask(zoneId, t, checked){
+      // Transaction: set completed and adjust score; also bonus if all completed within day
+      const uref = doc(db,'users',me.uid);
+      const zref = doc(db,'users',me.uid,'zones',zoneId);
+      const tref = doc(db,'users',me.uid,'zones',zoneId,'tasks',t.id);
+      const today = tzDayKey();
+      try{
+        await runTransaction(db, async (tx)=>{
+          const uSnap = await tx.get(uref);
+          const zSnap = await tx.get(zref);
+          const u = uSnap.data();
+          const z = zSnap.data();
+          const delta = checked ? (z.pointPerTask||0) : -(z.pointPerTask||0);
+          const newScore = (u.score||0) + delta;
+          tx.update(uref, { score:newScore, updatedAt: serverTimestamp() });
+          tx.update(tref, { completed: checked, updatedAt: serverTimestamp() });
+
+          // check bonus on mark complete
+          if(checked){
+            // read all tasks in zone (client side because tx cannot query)
+            // workaround: store a counter? For demo: lightweight follow-up check below outside tx
+          }
+        });
+        // After-transaction bonus check (separate small step):
+        if(checked){
+          await maybeApplyZoneBonus(zoneId);
+        }
+      }catch(e){ console.error(e); toast('Lỗi cập nhật task', false); }
+    }
+
+    async function maybeApplyZoneBonus(zoneId){
+      const zref = doc(db,'users',me.uid,'zones',zoneId);
+      const zSnap = await getDoc(zref);
+      if(!zSnap.exists()) return;
+      const z = zSnap.data();
+      const today = tzDayKey();
+      if(z.lastBonusKey === today) return; // already applied today
+      const tss = await getDocs(collection(db,'users',me.uid,'zones',zoneId,'tasks'));
+      const allDone = tss.docs.length>0 && tss.docs.every(d=>d.data().completed);
+      if(!allDone) return;
+      const uref = doc(db,'users',me.uid);
+      await runTransaction(db, async (tx)=>{
+        const uSnap = await tx.get(uref); const u = uSnap.data();
+        const zSnap2 = await tx.get(zref); const z2 = zSnap2.data();
+        if(z2.lastBonusKey === today) return; // double-check inside tx
+        tx.update(uref, { score:(u.score||0)+(z2.bonusCompleteAll||0), updatedAt: serverTimestamp() });
+        tx.update(zref, { lastBonusKey: today });
+      });
+      toast('🎉 Hoàn tất Zone — cộng bonus!');
+    }
+
+    // ===== Resets (daily/weekly) on app load per day =====
+    async function applyResetsForToday(){
+      if(!me) return;
+      const dayKey = tzDayKey();
+      // For each zone -> each task: if repeatType=daily and lastResetKey!=dayKey => set completed=false & lastResetKey=dayKey
+      // weekly: if weekday in weeklyDays & lastResetKey!=dayKey => reset
+      const weekday = +new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Bangkok',weekday:'numeric'}).format(new Date());
+      const zss = await getDocs(collection(db,'users',me.uid,'zones'));
+      for(const z of zss.docs){
+        const tasksCol = collection(db,'users',me.uid,'zones',z.id,'tasks');
+        const tss = await getDocs(tasksCol);
+        const batch = writeBatch(db);
+        tss.forEach(t=>{
+          const d=t.data();
+          const needDaily = d.repeatType==='daily' && d.lastResetKey!==dayKey;
+          const needWeekly = d.repeatType==='weekly' && Array.isArray(d.weeklyDays) && d.weeklyDays.includes(weekday) && d.lastResetKey!==dayKey;
+          if(needDaily || needWeekly){
+            batch.update(doc(db,'users',me.uid,'zones',z.id,'tasks',t.id), { completed:false, lastResetKey:dayKey, updatedAt: serverTimestamp() });
+          }
+        });
+        if(!batch._mutations || batch._mutations.length===0) continue;
+        await batch.commit();
+      }
+    }
+
+    // ===== End Day (penalty) =====
+    $('#btnEndDay').onclick = async ()=>{
+      if(!me) return;
+      const dayKey = tzDayKey();
+      if(me.dailyClosedKey === dayKey){ toast('Hôm nay đã “Kết thúc ngày”', false); return; }
+      // compute penalties per zone
+      let totalPenalty = 0;
+      const zss = await getDocs(collection(db,'users',me.uid,'zones'));
+      for(const z of zss.docs){
+        const tasksCol = collection(db,'users',me.uid,'zones',z.id,'tasks');
+        const tss = await getDocs(tasksCol);
+        const anyUndone = tss.docs.some(d=>!d.data().completed);
+        if(anyUndone) totalPenalty += (z.data().penaltyNotComplete||0);
+      }
+      // Transaction apply penalty and stamp dailyClosedKey
+      const uref = doc(db,'users',me.uid);
+      await runTransaction(db, async (tx)=>{
+        const uSnap = await tx.get(uref); const u = uSnap.data();
+        if(u.dailyClosedKey === dayKey) return; // idempotent
+        tx.update(uref, { score:(u.score||0)-totalPenalty, dailyClosedKey:dayKey, updatedAt: serverTimestamp() });
+      });
+      toast(totalPenalty>0?`Đã trừ ${totalPenalty} điểm vì còn task chưa xong`:'✅ Không có phạt hôm nay');
+      // refresh local me
+      const uSnap2 = await getDoc(doc(db,'users',me.uid)); me.score = uSnap2.data().score; me.dailyClosedKey = dayKey; $('#scoreHead').textContent = me.score;
+    };
+
+    // ===== Leaderboard =====
+    function bindLeaderboard(){
+      if(unsubLB) unsubLB();
+      const qlb = query(collection(db,'users'), orderBy('score','desc'), limit(50));
+      unsubLB = onSnapshot(qlb, (ss)=>{
+        const list = $('#lbList'); list.innerHTML='';
+        let rank=1; const myId = me?.uid;
+        ss.forEach(d=>{
+          const u = { id:d.id, ...d.data() };
+          const row = document.createElement('div');
+          row.className = 'row' + (u.id===myId?' me':'');
+          row.style.border='1px solid var(--border)'; row.style.borderRadius='10px'; row.style.padding='8px';
+          row.innerHTML = `
+            <div style="width:44px;text-align:center;font-weight:700">${rank++}</div>
+            <div class="row" style="gap:10px;flex:1">
+              <img class="avatar" src="${u.photoURL||''}">
+              <div>
+                <div style="font-weight:600">${u.displayName||'Người chơi'}</div>
+                <div class="muted" style="font-size:12px">${(u.email||'').replace(/@.*/,'@…')}</div>
+              </div>
+            </div>
+            <div style="text-align:right;font-weight:800">${u.score||0}</div>
+          `;
+          $('#lbList').appendChild(row);
+        });
+        $('#lbUpdated').textContent = new Date().toLocaleTimeString();
+      });
+    }
+
+    // ===== Live user mirror =====
+    function bindUserRealtime(){
+      if(!me) return; const uref = doc(db,'users',me.uid);
+      onSnapshot(uref, (snap)=>{
+        const d = snap.data(); if(!d) return; me = { uid: me.uid, ...d };
+        const s = $('#scoreHead'); if(s) s.textContent = d.score||0;
+      });
+    }
+
+    // ===== Misc =====
+    // Weekly days multiple selector UX: show only when type=weekly
+    const repeatTypeSel = $('#repeatType');
+    const weeklySel = $('#weeklyDays');
+    const updateWeeklyVis = ()=>{ weeklySel.style.display = repeatTypeSel.value==='weekly' ? 'block' : 'none' };
+    repeatTypeSel.onchange = updateWeeklyVis; updateWeeklyVis();
+
+  </script>
 </body>
 </html>
