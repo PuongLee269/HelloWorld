@@ -167,6 +167,27 @@
         font-size: 1.05rem;
       }
 
+      .task-card.task-completed {
+        background: rgba(226, 232, 240, 0.6);
+      }
+
+      .task-card.task-completed strong {
+        text-decoration: line-through;
+        color: #94a3b8;
+      }
+
+      .task-title {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 600;
+      }
+
+      .task-title input[type="checkbox"] {
+        width: 1rem;
+        height: 1rem;
+      }
+
       .task-meta {
         display: flex;
         flex-direction: column;
@@ -391,9 +412,9 @@
         nameWarning.hidden = true;
 
         state.tasks.push({
-          id: crypto.randomUUID(),
           title,
           points: Number.isFinite(points) ? points : 0,
+          completed: false,
         });
 
         saveState();
@@ -405,12 +426,36 @@
       });
 
       taskList.addEventListener("click", (event) => {
-        if (event.target.matches("button[data-task-id]")) {
-          const taskId = event.target.getAttribute("data-task-id");
-          state.tasks = state.tasks.filter((task) => task.id !== taskId);
-          saveState();
-          renderTasks();
-          renderLeaderboard();
+        if (event.target.matches("button[data-task-index]") &&
+          event.target.dataset.taskIndex !== undefined) {
+          const taskIndex = Number.parseInt(
+            event.target.getAttribute("data-task-index"),
+            10
+          );
+          if (Number.isInteger(taskIndex)) {
+            state.tasks.splice(taskIndex, 1);
+            saveState();
+            renderTasks();
+            renderLeaderboard();
+          }
+        }
+      });
+
+      taskList.addEventListener("change", (event) => {
+        if (
+          event.target.matches('input[type="checkbox"][data-task-index]') &&
+          event.target.dataset.taskIndex !== undefined
+        ) {
+          const taskIndex = Number.parseInt(
+            event.target.getAttribute("data-task-index"),
+            10
+          );
+          if (Number.isInteger(taskIndex) && state.tasks[taskIndex]) {
+            state.tasks[taskIndex].completed = event.target.checked;
+            saveState();
+            renderTasks();
+            renderLeaderboard();
+          }
         }
       });
 
@@ -425,26 +470,38 @@
 
         const fragment = document.createDocumentFragment();
 
-        for (const task of state.tasks) {
+        state.tasks.forEach((task, index) => {
           const item = document.createElement("li");
           item.className = "task-card";
 
           const safeTitle = escapeHtml(task.title);
-          const safePlayerName = escapeHtml(state.playerName || "Unassigned");
+          const taskPoints = Number.isFinite(task.points) ? task.points : 0;
+
+          if (task.completed) {
+            item.classList.add("task-completed");
+          }
 
           item.innerHTML = `
             <div class="task-meta">
-              <strong>${safeTitle}</strong>
-              <span>Points: ${task.points}</span>
-              <span>Assigned to: ${safePlayerName}</span>
+              <label class="task-title">
+                <input
+                  type="checkbox"
+                  data-task-index="${index}"
+                  ${task.completed ? "checked" : ""}
+                  aria-label="Mark task as ${task.completed ? "incomplete" : "complete"}"
+                />
+                <strong>${safeTitle}</strong>
+              </label>
+              <span>Points: ${taskPoints}</span>
+              <span>Status: ${task.completed ? "Completed" : "In progress"}</span>
             </div>
             <div class="task-actions">
-              <button type="button" data-task-id="${task.id}">Remove</button>
+              <button type="button" data-task-index="${index}">Remove</button>
             </div>
           `;
 
           fragment.appendChild(item);
-        }
+        });
 
         taskList.appendChild(fragment);
       }
@@ -459,10 +516,13 @@
           return;
         }
 
-        const totalPoints = state.tasks.reduce(
-          (sum, task) => sum + (Number.isFinite(task.points) ? task.points : 0),
-          0
-        );
+        const totalPoints = state.tasks.reduce((sum, task) => {
+          if (!task.completed) {
+            return sum;
+          }
+          const taskPoints = Number.isFinite(task.points) ? task.points : 0;
+          return sum + taskPoints;
+        }, 0);
 
         const row = document.createElement("tr");
         row.innerHTML = `
@@ -507,14 +567,12 @@
           const tasks = Array.isArray(parsed.tasks)
             ? parsed.tasks
                 .map((task) => ({
-                  id:
-                    typeof task.id === "string"
-                      ? task.id
-                      : typeof crypto?.randomUUID === "function"
-                      ? crypto.randomUUID()
-                      : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
                   title: typeof task.title === "string" ? task.title : "",
                   points: Number.isFinite(task.points) ? task.points : 0,
+                  completed:
+                    typeof task.completed === "boolean"
+                      ? task.completed
+                      : Boolean(task.done ?? task.isComplete ?? false),
                 }))
                 .filter((task) => task.title)
             : [];
