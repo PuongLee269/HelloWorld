@@ -143,70 +143,6 @@
         border: 1px solid rgba(14, 165, 233, 0.35);
       }
 
-      .task-list {
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-        margin: 0;
-        padding: 0;
-        list-style: none;
-      }
-
-      .task-card {
-        background: rgba(248, 250, 252, 0.9);
-        border-radius: 10px;
-        padding: 0.75rem 1rem;
-        border: 1px solid var(--border);
-        display: grid;
-        grid-template-columns: 1fr auto;
-        gap: 0.5rem;
-        align-items: start;
-      }
-
-      .task-card strong {
-        font-size: 1.05rem;
-      }
-
-      .task-card.task-completed {
-        background: rgba(226, 232, 240, 0.6);
-      }
-
-      .task-card.task-completed strong {
-        text-decoration: line-through;
-        color: #94a3b8;
-      }
-
-      .task-title {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        font-weight: 600;
-      }
-
-      .task-title input[type="checkbox"] {
-        width: 1rem;
-        height: 1rem;
-      }
-
-      .task-meta {
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-        font-size: 0.9rem;
-      }
-
-      .task-actions {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-      }
-
-      .task-actions button {
-        background: #ef4444;
-        box-shadow: none;
-        padding: 0.5rem 0.85rem;
-      }
-
       table {
         width: 100%;
         border-collapse: collapse;
@@ -227,6 +163,46 @@
 
       tbody tr:nth-child(even) {
         background: rgba(241, 245, 249, 0.65);
+      }
+
+      #tasks-table {
+        margin: 0 auto;
+        max-width: 760px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+      }
+
+      #tasks-table caption {
+        padding: 1rem;
+        font-weight: 600;
+        font-size: 1.25rem;
+        color: var(--primary);
+      }
+
+      #tasks-table tbody tr.task-completed td:first-child {
+        text-decoration: line-through;
+        color: #94a3b8;
+      }
+
+      #tasks-table tbody tr td:last-child {
+        text-align: right;
+      }
+
+      #tasks-table tbody tr td:nth-child(3) {
+        text-align: center;
+      }
+
+      #tasks-table input[type="checkbox"] {
+        width: 1rem;
+        height: 1rem;
+      }
+
+      #tasks-table button {
+        background: #ef4444;
+        box-shadow: none;
+        padding: 0.5rem 0.85rem;
       }
 
       .helper-text {
@@ -320,10 +296,22 @@
         </form>
       </section>
 
-      <section aria-labelledby="tasks-heading">
-        <h2 id="tasks-heading">Current Tasks</h2>
-        <ul id="task-list" class="task-list" aria-live="polite"></ul>
-      </section>
+      <table
+        id="tasks-table"
+        aria-labelledby="tasks-heading"
+        role="grid"
+      >
+        <caption id="tasks-heading">Current Tasks</caption>
+        <thead>
+          <tr>
+            <th scope="col">Task</th>
+            <th scope="col">Points</th>
+            <th scope="col">Completed</th>
+            <th scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tasks-table-body" aria-live="polite"></tbody>
+      </table>
 
       <section aria-labelledby="leaderboard-heading">
         <h2 id="leaderboard-heading">Leaderboard</h2>
@@ -368,7 +356,7 @@
       const taskForm = document.getElementById("task-form");
       const taskNameInput = document.getElementById("task-name");
       const taskPointsInput = document.getElementById("task-points");
-      const taskList = document.getElementById("task-list");
+      const tasksTableBody = document.getElementById("tasks-table-body");
       const leaderboardBody = document.getElementById("leaderboard-body");
       const nameWarning = document.getElementById("name-warning");
       const yearSpan = document.getElementById("year");
@@ -425,7 +413,7 @@
         taskNameInput.focus();
       });
 
-      taskList.addEventListener("click", (event) => {
+      tasksTableBody.addEventListener("click", (event) => {
         if (event.target.matches("button[data-task-index]") &&
           event.target.dataset.taskIndex !== undefined) {
           const taskIndex = Number.parseInt(
@@ -441,7 +429,7 @@
         }
       });
 
-      taskList.addEventListener("change", (event) => {
+      tasksTableBody.addEventListener("change", (event) => {
         if (
           event.target.matches('input[type="checkbox"][data-task-index]') &&
           event.target.dataset.taskIndex !== undefined
@@ -460,50 +448,61 @@
       });
 
       function renderTasks() {
-        taskList.innerHTML = "";
+        tasksTableBody.innerHTML = "";
 
         if (!state.tasks.length) {
-          taskList.innerHTML =
-            '<li style="color: #94a3b8;">No tasks created yet.</li>';
+          const emptyRow = document.createElement("tr");
+          const emptyCell = document.createElement("td");
+          emptyCell.colSpan = 4;
+          emptyCell.textContent = "No tasks created yet.";
+          emptyCell.style.color = "#94a3b8";
+          emptyCell.style.textAlign = "center";
+          emptyRow.appendChild(emptyCell);
+          tasksTableBody.appendChild(emptyRow);
           return;
         }
 
         const fragment = document.createDocumentFragment();
 
         state.tasks.forEach((task, index) => {
-          const item = document.createElement("li");
-          item.className = "task-card";
-
-          const safeTitle = escapeHtml(task.title);
+          const row = document.createElement("tr");
           const taskPoints = Number.isFinite(task.points) ? task.points : 0;
 
           if (task.completed) {
-            item.classList.add("task-completed");
+            row.classList.add("task-completed");
           }
 
-          item.innerHTML = `
-            <div class="task-meta">
-              <label class="task-title">
-                <input
-                  type="checkbox"
-                  data-task-index="${index}"
-                  ${task.completed ? "checked" : ""}
-                  aria-label="Mark task as ${task.completed ? "incomplete" : "complete"}"
-                />
-                <strong>${safeTitle}</strong>
-              </label>
-              <span>Points: ${taskPoints}</span>
-              <span>Status: ${task.completed ? "Completed" : "In progress"}</span>
-            </div>
-            <div class="task-actions">
-              <button type="button" data-task-index="${index}">Remove</button>
-            </div>
-          `;
+          const titleCell = document.createElement("td");
+          titleCell.textContent = task.title || "";
 
-          fragment.appendChild(item);
+          const pointsCell = document.createElement("td");
+          pointsCell.textContent = taskPoints;
+
+          const completedCell = document.createElement("td");
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.dataset.taskIndex = index;
+          checkbox.checked = Boolean(task.completed);
+          checkbox.setAttribute(
+            "aria-label",
+            task.completed
+              ? "Mark task as incomplete"
+              : "Mark task as complete"
+          );
+          completedCell.appendChild(checkbox);
+
+          const actionsCell = document.createElement("td");
+          const removeButton = document.createElement("button");
+          removeButton.type = "button";
+          removeButton.dataset.taskIndex = index;
+          removeButton.textContent = "Remove";
+          actionsCell.appendChild(removeButton);
+
+          row.append(titleCell, pointsCell, completedCell, actionsCell);
+          fragment.appendChild(row);
         });
 
-        taskList.appendChild(fragment);
+        tasksTableBody.appendChild(fragment);
       }
 
       function renderLeaderboard() {
