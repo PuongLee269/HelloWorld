@@ -125,26 +125,6 @@
         box-shadow: 0 8px 18px rgba(14, 165, 233, 0.3);
       }
 
-      .player-checkboxes {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-        gap: 0.5rem 1rem;
-      }
-
-      .player-checkbox {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.5rem 0.75rem;
-        border-radius: 8px;
-        border: 1px solid var(--border);
-        background: rgba(248, 250, 252, 0.7);
-      }
-
-      .player-checkbox input {
-        margin: 0;
-      }
-
       .pill-list {
         display: flex;
         flex-wrap: wrap;
@@ -257,19 +237,19 @@
   <body>
     <header>
       <h1>Team Task Tracker</h1>
-      <p>Capture your tasks, assign players, and watch the leaderboard update live.</p>
+      <p>Capture your tasks and watch your personal leaderboard update live.</p>
     </header>
 
     <main>
-      <section aria-labelledby="players-heading">
+      <section aria-labelledby="player-heading">
         <div>
-          <h2 id="players-heading">Players</h2>
+          <h2 id="player-heading">Your Name</h2>
           <p class="helper-text">
-            Add players to make them available for task assignments.
+            Enter your name once to personalize your tasks and leaderboard.
           </p>
         </div>
-        <form id="player-form">
-          <label for="player-name">Player name</label>
+        <form id="player-form" autocomplete="off">
+          <label for="player-name">What should we call you?</label>
           <input
             id="player-name"
             name="player-name"
@@ -278,16 +258,16 @@
             autocomplete="off"
             required
           />
-          <button type="submit">Add Player</button>
+          <button type="submit">Save Name</button>
         </form>
-        <ul id="player-list" class="pill-list" aria-live="polite"></ul>
+        <p id="player-summary" class="helper-text" hidden></p>
       </section>
 
       <section aria-labelledby="task-heading">
         <div>
           <h2 id="task-heading">Create Task</h2>
           <p class="helper-text">
-            Select one or more players for each task and assign point values.
+            Log what you accomplish and assign point values to track progress.
           </p>
         </div>
         <form id="task-form">
@@ -300,14 +280,6 @@
             required
           />
 
-          <div>
-            <span class="label">Assign players</span>
-            <div id="player-checkboxes" class="player-checkboxes"></div>
-            <p id="assign-error" class="error-text" hidden>
-              Select at least one player to assign the task.
-            </p>
-          </div>
-
           <label for="task-points">Point value</label>
           <input
             id="task-points"
@@ -318,6 +290,10 @@
             placeholder="5"
             required
           />
+
+          <p id="name-warning" class="error-text" hidden>
+            Enter your name before creating tasks.
+          </p>
 
           <button type="submit">Add Task</button>
         </form>
@@ -350,27 +326,35 @@
       const storageKey = "task-tracker-state";
 
       const defaultState = {
-        players: [],
+        playerName: "",
         tasks: [],
       };
 
       const state = loadState();
 
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
       const playerForm = document.getElementById("player-form");
       const playerNameInput = document.getElementById("player-name");
-      const playerList = document.getElementById("player-list");
-      const playerCheckboxes = document.getElementById("player-checkboxes");
+      const playerSummary = document.getElementById("player-summary");
       const taskForm = document.getElementById("task-form");
       const taskNameInput = document.getElementById("task-name");
       const taskPointsInput = document.getElementById("task-points");
       const taskList = document.getElementById("task-list");
       const leaderboardBody = document.getElementById("leaderboard-body");
-      const assignError = document.getElementById("assign-error");
+      const nameWarning = document.getElementById("name-warning");
       const yearSpan = document.getElementById("year");
 
       yearSpan.textContent = new Date().getFullYear();
 
-      renderPlayers();
+      updatePlayerUI();
       renderTasks();
       renderLeaderboard();
 
@@ -382,49 +366,34 @@
           return;
         }
 
-        const nameExists = state.players.some(
-          (player) => player.name.toLowerCase() === name.toLowerCase()
-        );
-
-        if (nameExists) {
-          playerNameInput.value = "";
-          playerNameInput.focus();
-          return;
-        }
-
-        state.players.push({
-          id: crypto.randomUUID(),
-          name,
-        });
-
+        state.playerName = name;
         saveState();
-        renderPlayers();
+        updatePlayerUI();
+        renderTasks();
         renderLeaderboard();
 
         playerNameInput.value = "";
-        playerNameInput.focus();
+        taskNameInput.focus();
       });
 
       taskForm.addEventListener("submit", (event) => {
         event.preventDefault();
         const title = taskNameInput.value.trim();
         const points = Number.parseInt(taskPointsInput.value, 10);
-        const selectedPlayerIds = Array.from(
-          playerCheckboxes.querySelectorAll("input[type='checkbox']:checked")
-        ).map((checkbox) => checkbox.value);
 
-        if (!selectedPlayerIds.length) {
-          assignError.hidden = false;
+        if (!state.playerName) {
+          nameWarning.hidden = false;
+          playerForm.hidden = false;
+          playerNameInput.focus();
           return;
         }
 
-        assignError.hidden = true;
+        nameWarning.hidden = true;
 
         state.tasks.push({
           id: crypto.randomUUID(),
           title,
           points: Number.isFinite(points) ? points : 0,
-          playerIds: selectedPlayerIds,
         });
 
         saveState();
@@ -433,15 +402,6 @@
 
         taskForm.reset();
         taskNameInput.focus();
-      });
-
-      playerCheckboxes.addEventListener("change", () => {
-        if (assignError.hidden === false) {
-          const hasSelectedPlayer = playerCheckboxes.querySelector(
-            "input[type='checkbox']:checked"
-          );
-          assignError.hidden = Boolean(hasSelectedPlayer);
-        }
       });
 
       taskList.addEventListener("click", (event) => {
@@ -453,37 +413,6 @@
           renderLeaderboard();
         }
       });
-
-      function renderPlayers() {
-        playerList.innerHTML = "";
-        playerCheckboxes.innerHTML = "";
-
-        if (!state.players.length) {
-          playerList.innerHTML =
-            '<li style="color: #94a3b8;">No players added yet.</li>';
-          return;
-        }
-
-        const fragmentList = document.createDocumentFragment();
-        const fragmentCheckboxes = document.createDocumentFragment();
-
-        for (const player of state.players) {
-          const listItem = document.createElement("li");
-          listItem.textContent = player.name;
-          fragmentList.appendChild(listItem);
-
-          const label = document.createElement("label");
-          label.className = "player-checkbox";
-          label.innerHTML = `
-            <input type="checkbox" value="${player.id}" />
-            <span>${player.name}</span>
-          `;
-          fragmentCheckboxes.appendChild(label);
-        }
-
-        playerList.appendChild(fragmentList);
-        playerCheckboxes.appendChild(fragmentCheckboxes);
-      }
 
       function renderTasks() {
         taskList.innerHTML = "";
@@ -500,18 +429,14 @@
           const item = document.createElement("li");
           item.className = "task-card";
 
-          const playerNames = task.playerIds
-            .map((playerId) =>
-              state.players.find((player) => player.id === playerId)
-            )
-            .filter(Boolean)
-            .map((player) => player.name);
+          const safeTitle = escapeHtml(task.title);
+          const safePlayerName = escapeHtml(state.playerName || "Unassigned");
 
           item.innerHTML = `
             <div class="task-meta">
-              <strong>${task.title}</strong>
+              <strong>${safeTitle}</strong>
               <span>Points: ${task.points}</span>
-              <span>Assigned to: ${playerNames.join(", ")}</span>
+              <span>Assigned to: ${safePlayerName}</span>
             </div>
             <div class="task-actions">
               <button type="button" data-task-id="${task.id}">Remove</button>
@@ -527,45 +452,39 @@
       function renderLeaderboard() {
         leaderboardBody.innerHTML = "";
 
-        if (!state.players.length) {
+        if (!state.playerName) {
           const row = document.createElement("tr");
-          row.innerHTML = '<td colspan="2">Add players to see the leaderboard.</td>';
+          row.innerHTML = '<td colspan="2">Enter your name to see the leaderboard.</td>';
           leaderboardBody.appendChild(row);
           return;
         }
 
-        const totals = new Map();
-        for (const player of state.players) {
-          totals.set(player.id, 0);
+        const totalPoints = state.tasks.reduce(
+          (sum, task) => sum + (Number.isFinite(task.points) ? task.points : 0),
+          0
+        );
+
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${escapeHtml(state.playerName)}</td>
+          <td>${totalPoints}</td>
+        `;
+        leaderboardBody.appendChild(row);
+      }
+
+      function updatePlayerUI() {
+        if (state.playerName) {
+          playerForm.hidden = true;
+          playerSummary.hidden = false;
+          playerSummary.innerHTML = `Playing as <strong>${escapeHtml(
+            state.playerName
+          )}</strong>.`;
+          nameWarning.hidden = true;
+        } else {
+          playerForm.hidden = false;
+          playerSummary.hidden = true;
+          playerSummary.textContent = "";
         }
-
-        for (const task of state.tasks) {
-          for (const playerId of task.playerIds) {
-            const current = totals.get(playerId) ?? 0;
-            totals.set(playerId, current + task.points);
-          }
-        }
-
-        const leaderboardData = state.players
-          .map((player) => ({
-            id: player.id,
-            name: player.name,
-            points: totals.get(player.id) ?? 0,
-          }))
-          .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
-
-        const fragment = document.createDocumentFragment();
-
-        for (const entry of leaderboardData) {
-          const row = document.createElement("tr");
-          row.innerHTML = `
-            <td>${entry.name}</td>
-            <td>${entry.points}</td>
-          `;
-          fragment.appendChild(row);
-        }
-
-        leaderboardBody.appendChild(fragment);
       }
 
       function saveState() {
@@ -579,9 +498,29 @@
             return structuredClone(defaultState);
           }
           const parsed = JSON.parse(raw);
+          const playerName =
+            typeof parsed.playerName === "string"
+              ? parsed.playerName
+              : Array.isArray(parsed.players) && parsed.players.length
+              ? String(parsed.players[0].name ?? "")
+              : "";
+          const tasks = Array.isArray(parsed.tasks)
+            ? parsed.tasks
+                .map((task) => ({
+                  id:
+                    typeof task.id === "string"
+                      ? task.id
+                      : typeof crypto?.randomUUID === "function"
+                      ? crypto.randomUUID()
+                      : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                  title: typeof task.title === "string" ? task.title : "",
+                  points: Number.isFinite(task.points) ? task.points : 0,
+                }))
+                .filter((task) => task.title)
+            : [];
           return {
-            players: Array.isArray(parsed.players) ? parsed.players : [],
-            tasks: Array.isArray(parsed.tasks) ? parsed.tasks : [],
+            playerName,
+            tasks,
           };
         } catch (error) {
           console.error("Failed to load state from sessionStorage", error);
