@@ -21,7 +21,48 @@
       <p class="name-display" id="greeting" hidden></p>
     </section>
 
+    <section class="panel" id="zone-panel">
+      <h2>Khu vực</h2>
+      <form id="zone-form">
+        <input type="hidden" id="zone-id" />
+        <label>
+          <span>Tên khu vực</span>
+          <input type="text" id="zone-name" name="zone-name" autocomplete="off" placeholder="Ví dụ: Nhà bếp" required />
+        </label>
+        <div class="form-actions">
+          <button type="submit" id="zone-submit">Thêm khu vực</button>
+          <button type="button" id="zone-cancel" hidden>Huỷ</button>
+        </div>
+      </form>
+      <ul class="item-list" id="zone-list"></ul>
+      <p class="empty-state" id="zone-empty-state">Chưa có khu vực nào. Hãy tạo mới!</p>
+    </section>
+
+    <section class="panel" id="rule-panel">
+      <h2>Quy tắc khu vực</h2>
+      <p id="rule-help" class="help-text">Chọn một khu vực để cập nhật quy tắc.</p>
+      <form id="rule-form" hidden>
+        <label>
+          <span>Điểm cho mỗi việc hoàn thành</span>
+          <input type="number" id="rule-points" min="0" step="0.5" required />
+        </label>
+        <label>
+          <span>Thưởng hoàn thành tất cả việc</span>
+          <input type="number" id="rule-bonus" min="0" step="0.5" required />
+        </label>
+        <label>
+          <span>Phạt mỗi việc chưa xong</span>
+          <input type="number" id="rule-penalty" min="0" step="0.5" required />
+        </label>
+        <button type="submit">Lưu quy tắc</button>
+      </form>
+    </section>
+
     <section class="panel todos">
+      <header class="todos-header">
+        <h2>Việc cần làm</h2>
+        <p id="current-zone-label" class="help-text"></p>
+      </header>
       <form id="todo-form">
         <label>
           <span>Thêm việc cần làm</span>
@@ -31,6 +72,15 @@
       </form>
       <ul class="todo-list" id="todo-list"></ul>
       <p class="empty-state" id="empty-state">Chưa có việc nào. Hãy thêm việc đầu tiên!</p>
+    </section>
+
+    <section class="panel" id="score-panel">
+      <h2>Điểm số khu vực</h2>
+      <button type="button" id="close-day-btn">Chốt ngày</button>
+      <div id="score-summary" class="score-summary" hidden></div>
+      <h3>Lịch sử điểm</h3>
+      <ul class="item-list" id="score-history-list"></ul>
+      <p class="empty-state" id="score-empty-state">Chưa có lượt chốt ngày nào.</p>
     </section>
   </main>
   <script src="app.js"></script>
