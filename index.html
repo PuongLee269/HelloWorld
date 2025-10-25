@@ -92,6 +92,12 @@
 </div>
 
 <script>
+/* ====== CONFIG ====== */
+const CONFIG = {
+  ENDPOINT: 'https://script.google.com/macros/s/AKfycbyQ3imjnhKrzmuz4-KbPNsHzpYGY_Mv45os1bZEPoQrQ-UM8RjJvCznfP5x6RB6QX_Qpw/exec',
+  SETTINGS_PASS: '1000'
+};
+
 /* ====== STATE (localStorage) ====== */
 const LS = {
   PROFILE:'tq_profile',
@@ -101,13 +107,14 @@ const LS = {
   DAY:'tq_sim_day',
   BONUS:'tq_bonus_flags',
   SPAWN:'tq_spawned_day',
-  SYNC:'tq_sync_cfg'
+  SYNC:'tq_sync_cfg',      // giữ key cũ cho tương thích, nhưng giờ không dùng UI nữa
+  LBCACHE:'tq_lb_cache'   // cache leaderboard
 };
 
 const LEVELS = [
-  {lvl:1, cap:5, need:100},
-  {lvl:2, cap:7, need:250},
-  {lvl:3, cap:9, need:500},
+  {lvl:1, cap:5,  need:100},
+  {lvl:2, cap:7,  need:250},
+  {lvl:3, cap:9,  need:500},
   {lvl:4, cap:10, need:800},
   {lvl:5, cap:12, need:1200},
   {lvl:6, cap:14, need:1700},
@@ -119,19 +126,25 @@ const LEVELS = [
 function load(key, def){ try{ return JSON.parse(localStorage.getItem(key)) ?? def }catch{ return def } }
 function save(key, val){ localStorage.setItem(key, JSON.stringify(val)) }
 
+/* ===== Profile / Level / XP ===== */
 function getProfile(){
   let p = load(LS.PROFILE);
   if(!p){ p={name:'', level:1, xp:0}; save(LS.PROFILE,p); }
   return p;
 }
-function setName(name){ const p=getProfile(); p.name=(name||'').trim(); save(LS.PROFILE,p); }
+function setName(name){
+  const p=getProfile(); p.name=(name||'').trim(); save(LS.PROFILE,p);
+}
 function addXP(delta){
-  const p=getProfile(); p.xp = Math.max(0, Number(p.xp||0)+Number(delta||0));
+  const p=getProfile();
+  p.xp = Math.max(0, Number(p.xp||0)+Number(delta||0));
   while(true){
     const cfg = LEVELS.find(x=>x.lvl===p.level) || LEVELS.at(-1);
     const need = cfg.need || 0;
-    if(need>0 && p.xp>=need){ p.xp -= need; p.level = Math.min(LEVELS.at(-1).lvl, p.level+1); }
-    else break;
+    if(need>0 && p.xp>=need){
+      p.xp -= need;
+      p.level = Math.min(LEVELS.at(-1).lvl, p.level+1);
+    } else break;
   }
   save(LS.PROFILE,p);
 }
@@ -140,41 +153,81 @@ function getLevelInfo(){
   const cfg = LEVELS.find(x=>x.lvl===p.level) || LEVELS.at(-1);
   return {level:p.level, xp:p.xp, need:cfg.need||0, cap:cfg.cap};
 }
-function resetPoints(){ const p=getProfile(); p.level=1; p.xp=0; save(LS.PROFILE,p); }
-function ensureName(){ const p=getProfile(); if(!p.name){ const n=prompt('Nhập tên người chơi:'); if(n) setName(n); }}
+function resetPoints(){
+  const p=getProfile(); p.level=1; p.xp=0; save(LS.PROFILE,p);
+}
+function ensureName(){
+  const p=getProfile();
+  if(!p.name){
+    const n=prompt('Nhập tên người chơi:');
+    if(n) setName(n);
+  }
+}
 
-/* Day & flags */
-function getDay(){ let d=Number(localStorage.getItem(LS.DAY)||0); if(!d){ d=1; localStorage.setItem(LS.DAY,d) } return d; }
-function nextDay(){ const d=getDay()+1; localStorage.setItem(LS.DAY,d); return d; }
+/* ===== Ngày ảo & cờ bonus ===== */
+function getDay(){
+  let d=Number(localStorage.getItem(LS.DAY)||0);
+  if(!d){ d=1; localStorage.setItem(LS.DAY,d); }
+  return d;
+}
+function nextDay(){
+  const d=getDay()+1;
+  localStorage.setItem(LS.DAY,d);
+  return d;
+}
 function loadFlags(){ return load(LS.BONUS,{}); }
 function saveFlags(f){ save(LS.BONUS,f); }
-function bonusGiven(zoneId){ const day=getDay(); const f=loadFlags(); return !!(f[day] && f[day][zoneId]) }
-function markBonus(zoneId){ const day=getDay(); const f=loadFlags(); if(!f[day]) f[day]={}; f[day][zoneId]=true; saveFlags(f) }
-function clearFlagsFor(day){ const f=loadFlags(); delete f[day]; saveFlags(f) }
+function bonusGiven(zoneId){
+  const day=getDay();
+  const f=loadFlags();
+  return !!(f[day] && f[day][zoneId]);
+}
+function markBonus(zoneId){
+  const day=getDay();
+  const f=loadFlags();
+  if(!f[day]) f[day]={};
+  f[day][zoneId]=true;
+  saveFlags(f);
+}
+function clearFlagsFor(day){
+  const f=loadFlags();
+  delete f[day];
+  saveFlags(f);
+}
 
-/* Zones & Recurring */
+/* ===== Zones & Recurring ===== */
 function getZones(){ return load(LS.ZONES,[]) }
 function setZones(z){ save(LS.ZONES,z) }
-function addZone(z){ const L=getZones(); z.id=Date.now(); L.push(z); setZones(L) }
-function updZone(id,patch){ setZones(getZones().map(z=>z.id===id?{...z,...patch}:z)) }
-function delZone(id){ setZones(getZones().filter(z=>z.id!==id)) }
+function addZone(z){
+  const L=getZones(); z.id=Date.now(); L.push(z); setZones(L);
+}
+function updZone(id,patch){
+  setZones(getZones().map(z=>z.id===id?{...z,...patch}:z));
+}
+function delZone(id){
+  setZones(getZones().filter(z=>z.id!==id));
+}
 
 function getRecurring(){ return load(LS.RECUR,[]) }
-function addRecurring(r){ r.id=Date.now(); save(LS.RECUR,[...getRecurring(),r]) }
-function delRecurring(id){ save(LS.RECUR,getRecurring().filter(r=>r.id!==id)) }
+function addRecurring(r){
+  r.id=Date.now();
+  save(LS.RECUR,[...getRecurring(),r]);
+}
+function delRecurring(id){
+  save(LS.RECUR,getRecurring().filter(r=>r.id!==id));
+}
 
+/* ===== Tasks ===== */
 function getTasks(){ return load(LS.TASKS,[]) }
 function setTasks(a){ save(LS.TASKS,a) }
 
-// ===== Cache Leaderboard (dán sau setTasks) =====
-const LB_CACHE = 'tq_lb_cache';
-
+/* ===== Leaderboard Cache ===== */
 function getLBCache(){
   // { ts: milliseconds, list: array }
-  return load(LB_CACHE, { ts: 0, list: [] });
+  return load(LS.LBCACHE, { ts: 0, list: [] });
 }
 function setLBCache(v){
-  save(LB_CACHE, v);
+  save(LS.LBCACHE, v);
 }
 function renderLBRows(rowsEl, list){
   if (!Array.isArray(list) || !list.length){
@@ -192,72 +245,50 @@ function renderLBRows(rowsEl, list){
     </tr>
   `).join('');
 }
-// ===== Hết helper cache =====
 
-  
-/* Spawn recurring once per day */
+/* ===== Recurring spawn mỗi ngày ===== */
 function spawnRecurringIfNeeded(){
   const mark = Number(localStorage.getItem(LS.SPAWN)||0);
   if(mark===getDay()) return;
+
   const weekday = new Date().getDay();
   const recs = getRecurring();
   const zones = getZones();
   const tasks = getTasks();
   const {cap} = getLevelInfo();
+
   for(const r of recs){
-    const match = r.type==='daily' || (r.type==='weekly' && Array.isArray(r.days)&&r.days.includes(weekday));
+    const match = r.type==='daily' ||
+      (r.type==='weekly' && Array.isArray(r.days)&&r.days.includes(weekday));
     if(!match) continue;
+
     if(tasks.length>=cap) break;
-    const z = zones.find(z=>z.id==r.zoneId); if(!z) continue;
+
+    const z = zones.find(z=>z.id==r.zoneId);
+    if(!z) continue;
+
     const zoneCount = tasks.filter(t=>t.zoneId==r.zoneId).length;
     if(z.maxPerDay && zoneCount>=z.maxPerDay) continue;
-    tasks.push({id:Date.now()+Math.random(), text:r.text, zoneId:r.zoneId, done:false});
+
+    tasks.push({
+      id:Date.now()+Math.random(),
+      text:r.text,
+      zoneId:r.zoneId,
+      done:false
+    });
   }
+
   setTasks(tasks);
   localStorage.setItem(LS.SPAWN, String(getDay()));
 }
 
-/* Sync endpoint (optional) */
-async function autoSync(){
-  const cfg = getSyncCfg();
-  if (!cfg.autosync || !cfg.endpoint) return;
-
-  const p = getProfile();
-
-  // Chuẩn bị body dưới dạng form-encoded
-  const form = new URLSearchParams({
-    name:  (p.name || 'Player'),
-    level: String(p.level || 1),
-    xp:    String(p.xp || 0)
-  }).toString();
-
-  try {
-    const res = await fetch(cfg.endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: form
-    });
-
-    // Không cần JSON response; chỉ log nếu cần
-    if (!res.ok) {
-      console.warn('Auto-sync: server trả mã lỗi', res.status);
-    }
-  } catch (e) {
-    console.warn('Auto-sync failed', e);
-  }
-}
-// ======== KHỐI CẤU HÌNH SYNC (Apps Script friendly) ========
-function getSyncCfg(){ 
-  // Lưu cấu hình endpoint & autosync ở localStorage
-  return load(LS.SYNC, { endpoint:'', autosync:false });
-}
-function setSyncCfg(c){ 
-  save(LS.SYNC, c);
+/* ===== Sync config (cố định qua CONFIG) ===== */
+function getSyncCfg(){
+  // autosync luôn true khi qua ngày
+  return { endpoint: CONFIG.ENDPOINT, autosync: true };
 }
 
-// Gửi dạng application/x-www-form-urlencoded (tránh preflight CORS của Apps Script)
+/* Gửi điểm lên server dạng application/x-www-form-urlencoded */
 async function autoSync(){
   const cfg = getSyncCfg();
   if (!cfg.autosync || !cfg.endpoint) return;
@@ -276,22 +307,51 @@ async function autoSync(){
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: form
     });
-    if (!res.ok) console.warn('Auto-sync: server trả mã', res.status);
+    if (!res.ok){
+      console.warn('Auto-sync: server trả mã', res.status);
+    }
   } catch (e) {
     console.warn('Auto-sync failed', e);
   }
 }
-// ======== HẾT KHỐI CẤU HÌNH SYNC ========
 
-/* ====== VIEWS ====== */
+/* Fetch leaderboard từ server => cập nhật cache.
+   Chỉ dùng khi:
+   - Qua ngày
+   - Ấn "Tải lại" ở Leaderboard
+*/
+async function fetchLeaderboardAndCache(){
+  const cfg = getSyncCfg();
+  if(!cfg.endpoint) return;
+
+  const controller = new AbortController();
+  const t = setTimeout(()=>controller.abort(),8000); // timeout 8s
+  try{
+    const r = await fetch(cfg.endpoint, { signal: controller.signal });
+    clearTimeout(t);
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const data = await r.json();
+    if(Array.isArray(data)){
+      setLBCache({ ts: Date.now(), list: data });
+    }
+  }catch(e){
+    clearTimeout(t);
+    console.warn('fetchLeaderboardAndCache failed', e);
+  }
+}
+
+/* ====== VIEW HANDLERS ====== */
 const view = document.getElementById('view');
 const tabs = [...document.querySelectorAll('[data-tab]')];
 tabs.forEach(b=>b.onclick=()=>render(b.dataset.tab));
-function setActive(tab){ tabs.forEach(b=>b.classList.toggle('active',b.dataset.tab===tab)); }
+function setActive(tab){
+  tabs.forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+}
 
-/* Tasks */
+/* ===== Tasks View ===== */
 function viewTasks(){
   spawnRecurringIfNeeded();
+
   const zones=getZones();
   const tasks=getTasks();
   const {level,xp,need,cap}=getLevelInfo();
@@ -347,20 +407,38 @@ function viewTasks(){
   const sel = document.getElementById('taskZone');
   function addNow(){
     const text=(inp.value||'').trim(); if(!text) return;
-    if(getTasks().length>=cap){ alert('Đã đạt giới hạn task/ngày theo Level'); return; }
+    if(getTasks().length>=cap){
+      alert('Đã đạt giới hạn task/ngày theo Level');
+      return;
+    }
     const z = zones.find(z=>z.id==sel.value);
     const count = getTasks().filter(t=>t.zoneId==z.id).length;
-    if(z.maxPerDay && count>=z.maxPerDay){ alert(`Zone "${z.name}" đã đủ ${z.maxPerDay} task hôm nay`); return; }
-    setTasks([...getTasks(), {id:Date.now(), text, zoneId:Number(sel.value), done:false}]);
-    inp.value=''; render('tasks');
+    if(z.maxPerDay && count>=z.maxPerDay){
+      alert(`Zone "${z.name}" đã đủ ${z.maxPerDay} task hôm nay`);
+      return;
+    }
+    setTasks([...getTasks(), {
+      id:Date.now(),
+      text,
+      zoneId:Number(sel.value),
+      done:false
+    }]);
+    inp.value='';
+    render('tasks');
   }
   document.getElementById('btnAdd').onclick=addNow;
   inp.onkeydown=(e)=>{ if(e.key==='Enter') addNow(); };
+
+  // Tab để nhảy nhanh vào ô nhập
   window.onkeydown=(e)=>{
     const tag=(document.activeElement?.tagName||'').toLowerCase();
-    if(e.key==='Tab' && !['input','select','textarea','button'].includes(tag)){ e.preventDefault(); inp.focus(); }
+    if(e.key==='Tab' && !['input','select','textarea','button'].includes(tag)){
+      e.preventDefault();
+      inp.focus();
+    }
   };
 
+  // tick hoàn thành task
   view.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
     cb.onchange=()=>{
       const id=Number(cb.dataset.id);
@@ -374,48 +452,77 @@ function viewTasks(){
     };
   });
 
+  // xoá task
   view.querySelectorAll('.del').forEach(b=> b.onclick=()=>{
     const id=Number(b.dataset.id);
     setTasks(getTasks().filter(t=>t.id!==id));
     render('tasks');
   });
 
+  // Qua ngày
   document.getElementById('btnEnd').onclick=async ()=>{
-    const zones=getZones(); const tasks=getTasks(); const today=getDay();
+    const zones=getZones();
+    const tasks=getTasks();
+    const today=getDay();
+
     for(const z of zones){
       if(!z.maxPerDay) continue;
       const zoneTasks = tasks.filter(t=>t.zoneId==z.id);
       const totalCount = zoneTasks.length;
-      const doneCount = zoneTasks.filter(t=>t.done).length;
-      if(doneCount < z.maxPerDay) addXP(-Number(z.penalty||0));
-      if(totalCount > 0 && doneCount === totalCount && !bonusGiven(z.id)) { 
-        addXP(Number(z.bonus||0)); markBonus(z.id); 
+      const doneCount  = zoneTasks.filter(t=>t.done).length;
+
+      // penalty nếu không đạt max
+      if(doneCount < z.maxPerDay){
+        addXP(-Number(z.penalty||0));
+      }
+      // bonus nếu hoàn thành hết
+      if(totalCount > 0 && doneCount === totalCount && !bonusGiven(z.id)){
+        addXP(Number(z.bonus||0));
+        markBonus(z.id);
       }
     }
+
     clearFlagsFor(today);
     nextDay();
     setTasks([]);
     localStorage.removeItem(LS.SPAWN);
+
+    // spawn task lặp cho ngày mới
     spawnRecurringIfNeeded();
+
+    // đồng bộ điểm + cập nhật cache leaderboard NGAY LẬP TỨC
     await autoSync();
+    await fetchLeaderboardAndCache();
+
     alert('Đã qua ngày.');
     render('tasks');
   };
-  document.getElementById('btnReset').onclick=()=>{ if(confirm('Reset Level=1 & XP=0?')){ resetPoints(); render('tasks'); } };
+
+  // Reset điểm
+  document.getElementById('btnReset').onclick=()=>{
+    if(confirm('Reset Level=1 & XP=0?')){
+      resetPoints();
+      render('tasks');
+    }
+  };
 }
 
-/* Settings */
+/* ===== Settings (có password) ===== */
 function viewSettings(){
   const p=getProfile();
   const zones=getZones();
   const recs=getRecurring();
-  const sync=getSyncCfg();
 
   view.innerHTML = `
     <div class="card" style="margin-top:0">
       <h3>Hồ sơ người chơi</h3>
-      <div class="row"><div>Tên người chơi</div><div class="grid" style="grid-template-columns:1fr auto;align-items:center">
-        <input id="name" value="${p.name||''}"><button class="btn-primary" id="saveName">Lưu</button></div></div>
+      <div class="row">
+        <div>Tên người chơi</div>
+        <div class="grid" style="grid-template-columns:1fr auto;align-items:center">
+          <input id="name" value="${p.name||''}">
+          <button class="btn-primary" id="saveName">Lưu</button>
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -429,18 +536,28 @@ function viewSettings(){
         <div class="row"><div>Số Task tối đa/ngày</div><input id="zMax" type="number" value="3"></div>
         <div class="row"><div></div><button class="btn-primary" id="addZone">+ Thêm Zone</button></div>
       </div>
+
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Tên</th><th>Màu</th><th>Điểm</th><th>Bonus</th><th>Penalty</th><th>Max/ngày</th><th></th></tr></thead>
-          <tbody id="zoneT">${zones.map(z=>`
-            <tr data-id="${z.id}"><td><input name="name" value="${z.name}"></td>
-              <td><input name="color" value="${z.color}"></td>
-              <td><input name="point" type="number" value="${z.point||0}"></td>
-              <td><input name="bonus" type="number" value="${z.bonus||0}"></td>
-              <td><input name="penalty" type="number" value="${z.penalty||0}"></td>
-              <td><input name="maxPerDay" type="number" value="${z.maxPerDay||0}"></td>
-              <td><button class="btn-danger zdel" data-id="${z.id}">Xoá</button></td></tr>
-          `).join('')}</tbody>
+          <thead>
+            <tr>
+              <th>Tên</th><th>Màu</th><th>Điểm</th><th>Bonus</th>
+              <th>Penalty</th><th>Max/ngày</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="zoneT">
+            ${zones.map(z=>`
+              <tr data-id="${z.id}">
+                <td><input name="name" value="${z.name}"></td>
+                <td><input name="color" value="${z.color}"></td>
+                <td><input name="point" type="number" value="${z.point||0}"></td>
+                <td><input name="bonus" type="number" value="${z.bonus||0}"></td>
+                <td><input name="penalty" type="number" value="${z.penalty||0}"></td>
+                <td><input name="maxPerDay" type="number" value="${z.maxPerDay||0}"></td>
+                <td><button class="btn-danger zdel" data-id="${z.id}">Xoá</button></td>
+              </tr>
+            `).join('')}
+          </tbody>
         </table>
       </div>
     </div>
@@ -448,77 +565,133 @@ function viewSettings(){
     <div class="card">
       <h3>Tasks lặp (Daily / Weekly)</h3>
       <div class="row"><div>Mô tả</div><input id="rText" placeholder="Tập thể dục 15’"></div>
-      <div class="row"><div>Zone</div><select id="rZone">${zones.map(z=>`<option value="${z.id}">${z.name}</option>`)}</select></div>
-      <div class="row"><div>Kiểu</div><select id="rType"><option value="daily">Mỗi ngày</option><option value="weekly">Theo thứ</option></select></div>
-      <div class="row" id="rDaysRow" style="display:none"><div>Chọn thứ</div>
+      <div class="row"><div>Zone</div>
+        <select id="rZone">
+          ${zones.map(z=>`<option value="${z.id}">${z.name}</option>`).join('')}
+        </select>
+      </div>
+      <div class="row"><div>Kiểu</div>
+        <select id="rType">
+          <option value="daily">Mỗi ngày</option>
+          <option value="weekly">Theo thứ</option>
+        </select>
+      </div>
+      <div class="row" id="rDaysRow" style="display:none">
+        <div>Chọn thứ</div>
         <div class="grid" style="grid-template-columns:repeat(7, minmax(40px,1fr))">
-          ${['CN','T2','T3','T4','T5','T6','T7'].map((l,i)=>`<label><input type="checkbox" value="${i}"> ${l}</label>`).join('')}
+          ${['CN','T2','T3','T4','T5','T6','T7'].map((l,i)=>`
+            <label>
+              <input type="checkbox" value="${i}"> ${l}
+            </label>
+          `).join('')}
         </div>
       </div>
-      <div class="row"><div></div><button class="btn-primary" id="addRec">+ Thêm Task lặp</button></div>
+      <div class="row">
+        <div></div>
+        <button class="btn-primary" id="addRec">+ Thêm Task lặp</button>
+      </div>
+
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Mô tả</th><th>Zone</th><th>Kiểu</th><th>Thứ</th><th></th></tr></thead>
-          <tbody id="recT">${recs.map(r=>{
-            const z = zones.find(z=>z.id==r.zoneId)?.name||'(xoá)';
-            return `<tr><td>${r.text}</td><td>${z}</td><td>${r.type}</td><td>${r.type==='weekly'?(r.days||[]).join(', '):'-'}</td>
-              <td><button class="btn-danger rdel" data-id="${r.id}">Xoá</button></td></tr>`
-          }).join('')}</tbody>
+          <thead>
+            <tr>
+              <th>Mô tả</th><th>Zone</th><th>Kiểu</th><th>Thứ</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="recT">
+            ${recs.map(r=>{
+              const z = zones.find(z=>z.id==r.zoneId)?.name||'(xoá)';
+              return `
+                <tr>
+                  <td>${r.text}</td>
+                  <td>${z}</td>
+                  <td>${r.type}</td>
+                  <td>${r.type==='weekly'?(r.days||[]).join(', '):'-'}</td>
+                  <td><button class="btn-danger rdel" data-id="${r.id}">Xoá</button></td>
+                </tr>`;
+            }).join('')}
+          </tbody>
         </table>
       </div>
     </div>
-
-    <div class="card">
-      <h3>Đồng bộ Leaderboard (tuỳ chọn)</h3>
-      <div class="row"><div>Endpoint</div><input id="syncEndpoint" value="${sync.endpoint||''}" placeholder="https://your-function.app/api/leaderboard"></div>
-      <div class="row"><div>Tự động đồng bộ</div><label><input id="syncAuto" type="checkbox" ${sync.autosync?'checked':''}> Khi bấm "Qua ngày"</label></div>
-      <div class="row"><div></div><button class="btn-primary" id="saveSync">Lưu cấu hình</button></div>
-    </div>
   `;
 
-  document.getElementById('saveName').onclick=()=>{ setName(document.getElementById('name').value); alert('Đã lưu'); };
+  // Lưu tên
+  document.getElementById('saveName').onclick=()=>{
+    setName(document.getElementById('name').value);
+    alert('Đã lưu');
+  };
+
+  // Zone CRUD
   document.getElementById('addZone').onclick=()=>{
     const g=id=>document.getElementById(id).value;
-    const z={name:g('zName').trim(), color:g('zColor'), point:Number(g('zPoint')), bonus:Number(g('zBonus')), penalty:Number(g('zPenalty')), maxPerDay:Number(g('zMax'))};
-    if(!z.name) return alert('Nhập tên Zone');
-    addZone(z); viewSettings();
+    const z={
+      name:g('zName').trim(),
+      color:g('zColor'),
+      point:Number(g('zPoint')),
+      bonus:Number(g('zBonus')),
+      penalty:Number(g('zPenalty')),
+      maxPerDay:Number(g('zMax'))
+    };
+    if(!z.name){ alert('Nhập tên Zone'); return; }
+    addZone(z);
+    viewSettings();
   };
   document.getElementById('zoneT').oninput=(e)=>{
     const tr=e.target.closest('tr[data-id]'); if(!tr) return;
-    const id=Number(tr.dataset.id); const name=e.target.name; let val=e.target.value;
-    if(['point','bonus','penalty','maxPerDay'].includes(name)) val=Number(val||0);
+    const id=Number(tr.dataset.id);
+    const name=e.target.name;
+    let val=e.target.value;
+    if(['point','bonus','penalty','maxPerDay'].includes(name)){
+      val=Number(val||0);
+    }
     updZone(id,{[name]:val});
   };
-  document.querySelectorAll('.zdel').forEach(b=> b.onclick=()=>{ delZone(Number(b.dataset.id)); viewSettings(); });
+  document.querySelectorAll('.zdel').forEach(b=> b.onclick=()=>{
+    delZone(Number(b.dataset.id));
+    viewSettings();
+  });
 
+  // Recurring CRUD
   const typeSel=document.getElementById('rType');
   const daysRow=document.getElementById('rDaysRow');
-  typeSel.onchange=()=> daysRow.style.display = typeSel.value==='weekly'?'grid':'none';
+  typeSel.onchange=()=>{
+    daysRow.style.display = typeSel.value==='weekly'?'grid':'none';
+  };
   document.getElementById('addRec').onclick=()=>{
-    const text=document.getElementById('rText').value.trim(); if(!text) return alert('Nhập mô tả');
-    const zoneId=Number(document.getElementById('rZone').value); const type=typeSel.value;
+    const text=document.getElementById('rText').value.trim();
+    if(!text){ alert('Nhập mô tả'); return; }
+    const zoneId=Number(document.getElementById('rZone').value);
+    const type=typeSel.value;
     const days=[...daysRow.querySelectorAll('input:checked')].map(c=>Number(c.value));
-    if(type==='weekly' && !days.length) return alert('Chọn thứ');
-    addRecurring({text, zoneId, type, days}); viewSettings();
+    if(type==='weekly' && !days.length){
+      alert('Chọn thứ');
+      return;
+    }
+    addRecurring({text, zoneId, type, days});
+    viewSettings();
   };
-  document.querySelectorAll('.rdel').forEach(b=> b.onclick=()=>{ delRecurring(Number(b.dataset.id)); viewSettings(); });
-
-  document.getElementById('saveSync').onclick=()=>{
-    setSyncCfg({endpoint:document.getElementById('syncEndpoint').value.trim(), autosync:document.getElementById('syncAuto').checked});
-    alert('Đã lưu cấu hình đồng bộ.');
-  };
+  document.querySelectorAll('.rdel').forEach(b=> b.onclick=()=>{
+    delRecurring(Number(b.dataset.id));
+    viewSettings();
+  });
 }
 
-/* Map */
+/* ===== Map View ===== */
 function viewMap(){
   const {level}=getLevelInfo();
   const total = Math.max(LEVELS.length, 9);
-  const items = Array.from({length:total},(_,i)=>({n:i+1, state: (i+1)<level?'passed':((i+1)===level?'current':'locked')}));
+  const items = Array.from({length:total},(_,i)=>({
+    n:i+1,
+    state: (i+1)<level?'passed':((i+1)===level?'current':'locked')
+  }));
+
   view.innerHTML = `
     <div class="map">
       <div class="path"></div>
       ${items.map((it,i)=>{
-        const y=40+(i*(280/(items.length-1))); const xoff=(i%2===0?-90:90);
+        const y=40+(i*(280/(items.length-1)));
+        const xoff=(i%2===0?-90:90);
         return `<div class="node ${it.state}" style="top:${y}px; left:calc(50% + ${xoff}px)">${it.n}</div>`;
       }).join('')}
       <div class="tag">Level: ${level}</div>
@@ -526,112 +699,104 @@ function viewMap(){
   `;
 }
 
-/* Leaderboard */
+/* ===== Leaderboard View =====
+   YÊU CẦU MỚI:
+   - Khi mở tab Leaderboard: KHÔNG gọi mạng nền.
+   - Chỉ hiển thị cache ngay lập tức.
+   - Chỉ khi bấm "Tải lại" mới fetch server & update cache & render lại.
+*/
 async function viewLeaderboard(){
-  const cfg = getSyncCfg();
   const cache = getLBCache();
 
-  // UI: thêm nút Tải lại + Đẩy điểm ngay
-  view.innerHTML = `<div class="card" style="margin-top:0"><h3>Leaderboard</h3>
-    <div class="muted">Nếu đã cấu hình Endpoint ở Settings, bảng dưới sẽ lấy dữ liệu từ đó. Nếu không, hiển thị điểm local.</div>
-    <div style="margin:10px 0;display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn-ghost" id="reload">Tải lại</button>
-      <button class="btn-primary" id="pushNow">Đẩy điểm ngay</button>
+  view.innerHTML = `
+    <div class="card" style="margin-top:0">
+      <h3>Leaderboard</h3>
+      <div class="muted">
+        Bảng xếp hạng dùng cache local. Nhấn "Tải lại"
+        để cập nhật từ server & đồng bộ cache.
+      </div>
+      <div style="margin:10px 0;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-ghost" id="reload">Tải lại</button>
+      </div>
+      <div class="table-wrap">
+        <table id="tbl">
+          <thead>
+            <tr>
+              <th>#</th><th>Người chơi</th><th>Level</th><th>XP</th><th>Cập nhật</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
     </div>
-    <div class="table-wrap">
-      <table id="tbl">
-        <thead><tr><th>#</th><th>Người chơi</th><th>Level</th><th>XP</th><th>Cập nhật</th></tr></thead>
-        <tbody id="rows"></tbody>
-      </table>
-    </div>
-  </div>`;
+  `;
 
   const rows = document.getElementById('rows');
 
-  // 1) Hiển thị cache ngay lập tức (nếu có)
-  renderLBRows(rows, cache.list);
+  // render cache ngay lập tức
+  renderLBRows(rows, cache.list.length ? cache.list : fallbackLocalProfileList());
 
-  // Helper fetch có timeout (tránh đợi vô hạn khi Apps Script “lạnh”)
-  async function fetchWithTimeout(ms){
-    const controller = new AbortController();
-    const t = setTimeout(()=>controller.abort(), ms);
-    try{
-      const r = await fetch(cfg.endpoint, { signal: controller.signal });
-      clearTimeout(t);
-      if(!r.ok) throw new Error('HTTP '+r.status);
-      return await r.json();
-    }catch(e){
-      clearTimeout(t);
-      throw e;
-    }
-  }
-
-  // 2) Tải nền: nếu có endpoint thì GET; nếu không dùng điểm local
-  async function refresh(forceNetwork = true){
-    try{
-      if(!cfg.endpoint){
-        // Fallback: điểm local nếu chưa cấu hình endpoint
-        const p=getProfile();
-        const list=[{name:p.name||'Player', level:p.level||1, xp:p.xp||0, updatedAt:new Date().toISOString()}];
-        renderLBRows(rows, list);
-        setLBCache({ ts: Date.now(), list });
-        return;
-      }
-
-      let list = cache.list;
-      if(forceNetwork){
-        const data = await fetchWithTimeout(8000); // 8s timeout
-        if(Array.isArray(data)){
-          list = data;
-          setLBCache({ ts: Date.now(), list });
-        }
-      }
-      renderLBRows(rows, list);
-    }catch(err){
-      console.warn('LB refresh error', err);
-      // Giữ nguyên cache đang hiển thị, không xoá bảng
-    }
-  }
-
-  // Nút điều khiển
-  document.getElementById('reload').onclick = () => refresh(true);
-  const pushBtn = document.getElementById('pushNow');
-  pushBtn.onclick = async () => {
-    await autoSync();     // dùng endpoint đã lưu ở Settings
-    await refresh(true);  // tải lại sau khi đẩy
+  // "Tải lại": fetch server -> update cache -> render lại
+  document.getElementById('reload').onclick = async () => {
+    await fetchLeaderboardAndCache();
+    const fresh = getLBCache();
+    renderLBRows(rows, fresh.list.length ? fresh.list : fallbackLocalProfileList());
   };
 
-  // Lần render đầu: hiển thị cache và tải nền
-  refresh(true);
-}
-
-
-  async function loadBoard(){
-    const rows=document.getElementById('rows');
-    try{
-      let list=[];
-      if(cfg.endpoint){ const r=await fetch(cfg.endpoint); if(r.ok) list=await r.json(); }
-      if(!Array.isArray(list) || !list.length){
-        const p=getProfile(); list=[{name:p.name||'Player', level:p.level||1, xp:p.xp||0, updatedAt:new Date().toISOString()}];
-      }
-      list.sort((a,b)=> (b.level-a.level) || (b.xp-a.xp) || (a.name||'').localeCompare(b.name||''));
-      rows.innerHTML = list.map((u,i)=>`<tr><td>${i+1}</td><td>${u.name||'-'}</td><td>${u.level??'-'}</td><td>${u.xp??'-'}</td><td>${u.updatedAt?new Date(u.updatedAt).toLocaleString():'-'}</td></tr>`).join('');
-    }catch{ rows.innerHTML='<tr><td colspan="5">Lỗi tải leaderboard</td></tr>'; }
+  function fallbackLocalProfileList(){
+    // nếu cache trống hoàn toàn -> dùng điểm local
+    const p=getProfile();
+    return [{
+      name:p.name||'Player',
+      level:p.level||1,
+      xp:p.xp||0,
+      updatedAt:new Date().toISOString()
+    }];
   }
-  document.getElementById('reload').onclick=loadBoard;
-  loadBoard();
 }
 
-/* Router */
+/* ===== Settings Auth ===== */
+let settingsUnlocked=false;
+function ensureSettingsAuth(){
+  if(settingsUnlocked) return true;
+  const pass=prompt('Nhập mật khẩu Settings:');
+  if(pass===CONFIG.SETTINGS_PASS){
+    settingsUnlocked=true;
+    return true;
+  }
+  alert('Sai mật khẩu');
+  return false;
+}
+
+/* ===== Router ===== */
 function render(tab){
-  setActive(tab);
-  if(tab==='tasks') viewTasks();
-  else if(tab==='map') viewMap();
-  else if(tab==='leaderboard') viewLeaderboard();
-  else viewSettings();
+  if(tab==='tasks'){
+    setActive('tasks');
+    viewTasks();
+  } else if(tab==='map'){
+    setActive('map');
+    viewMap();
+  } else if(tab==='leaderboard'){
+    setActive('leaderboard');
+    viewLeaderboard();
+  } else if(tab==='settings'){
+    // check mật khẩu
+    if(ensureSettingsAuth()){
+      setActive('settings');
+      viewSettings();
+    } else {
+      // nếu sai pass thì quay lại tab tasks
+      setActive('tasks');
+      viewTasks();
+    }
+  } else {
+    // fallback
+    setActive('tasks');
+    viewTasks();
+  }
 }
 
-/* Boot */
+/* ===== Boot ===== */
 ensureName();
 render('tasks');
 </script>
