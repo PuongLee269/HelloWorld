@@ -2,48 +2,81 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Todo Quest — 1 file</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Todo Quest — 1 file (Responsive)</title>
 <style>
-  :root{--ink:#1b1e2e;--muted:#7d82a8;--card:#fff;--bg:#f6f7ff;--border:#e8e8fb;--accent:#8b7cff}
+  :root{
+    --ink:#1b1e2e;--muted:#7d82a8;--card:#fff;--bg:#f6f7ff;--border:#e8e8fb;--accent:#8b7cff;
+    --radius:16px;--space:20px;--space-sm:12px;--tap:46px;
+  }
   *{box-sizing:border-box}
+  html,body{height:100%}
   body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-  .wrap{max-width:960px;margin:28px auto;padding:20px;background:var(--card);border:1px solid var(--border);
-        border-radius:16px;box-shadow:0 10px 30px rgba(20,16,60,.08)}
-  h1{margin:0 0 12px}
-  .tabs{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
-  .btn{padding:8px 12px;border:1px solid var(--border);background:#fff;border-radius:10px;cursor:pointer}
+  .wrap{max-width:960px;margin:var(--space-sm) auto;padding:var(--space);background:var(--card);
+        border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 10px 30px rgba(20,16,60,.08)}
+  h1{margin:0 0 var(--space-sm)}
+  /* Tabs: scrollable on mobile */
+  .tabs{display:flex;gap:8px;margin-bottom:12px;overflow:auto;padding-bottom:4px}
+  .tabs::-webkit-scrollbar{height:6px}
+  .tabs::-webkit-scrollbar-thumb{background:#ddd;border-radius:6px}
+  .btn{min-height:var(--tap);padding:8px 14px;border:1px solid var(--border);background:#fff;border-radius:10px;cursor:pointer;white-space:nowrap}
   .btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn-primary{min-height:var(--tap);background:var(--accent);color:#fff;border:none;border-radius:10px;padding:10px 14px;cursor:pointer}
+  .btn-ghost{min-height:var(--tap);background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 14px}
+  .btn-danger{min-height:var(--tap);background:#ff3b30;color:#fff;border:none;border-radius:10px;padding:10px 14px}
   .pill{background:#eef;border:1px solid #dde;border-radius:999px;padding:4px 10px}
   .muted{color:var(--muted)}
-  .top{display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap}
-  input,select,textarea{padding:8px;border-radius:8px;border:1px solid #ccc;width:100%;font:inherit}
-  .btn-primary{background:var(--accent);color:#fff;border:none}
-  .btn-danger{background:#ff3b30;color:#fff;border:none}
-  .btn-ghost{background:#fff;border:1px solid var(--border)}
+  .top{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+  /* Inputs */
+  input,select,textarea{height:var(--tap);padding:10px;border-radius:10px;border:1px solid #ccd;width:100%;font:inherit;background:#fff}
+  input[type="checkbox"]{height:auto;width:auto}
+  /* Layout rows (Settings) */
   .grid{display:grid;gap:10px}
-  .row{display:grid;grid-template-columns:180px 1fr;gap:10px;align-items:center}
+  .row{display:grid;grid-template-columns:200px 1fr;gap:10px;align-items:center}
   .card{padding:12px;border:1px solid var(--border);border-radius:12px;background:#fff;margin-top:12px}
-  .bar{height:8px;background:#eee;border-radius:6px;overflow:hidden;margin-bottom:10px}
+  .bar{height:10px;background:#eee;border-radius:6px;overflow:hidden;margin-bottom:10px}
   .fill{height:100%;background:var(--accent)}
+  /* Tasks */
   ul{list-style:none;margin:0;padding:0}
   .zone{border:1px solid #f0f0ff;border-radius:12px;margin:12px 0}
   .zone header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #f4f4ff;background:#fafaff;border-radius:12px 12px 0 0}
   .badge{font-size:12px;padding:2px 8px;border-radius:999px;background:#fff;border:1px solid #eee}
-  li.task{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-top:1px solid #f7f7ff}
-  .left{display:flex;align-items:center;gap:8px}
+  li.task{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-top:1px solid #f7f7ff}
+  .left{display:flex;align-items:center;gap:10px}
   .done .txt{text-decoration:line-through;color:#9aa}
   .creator{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .left input[type="checkbox"]{transform:scale(1.25)} /* bigger touch */
+  /* Map */
   .map{position:relative;height:360px;background:linear-gradient(180deg,#fafbff,#f6f7ff);border-radius:16px;border:1px solid var(--border);overflow:hidden}
   .path{position:absolute;left:50%;top:20px;bottom:20px;width:4px;background:#e8e8fb;transform:translateX(-50%)}
-  .node{position:absolute;left:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-        background:#fff;border:2px solid #e8e8fb;box-shadow:0 6px 16px rgba(20,16,60,.08);font-weight:700;color:#434a77}
+  .node{position:absolute;left:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;
+        display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #e8e8fb;box-shadow:0 6px 16px rgba(20,16,60,.08);font-weight:700;color:#434a77}
   .node.passed{border-color:#9AE6B4;background:#f6fff8}
   .node.current{border-color:#8b7cff;box-shadow:0 0 0 6px rgba(139,124,255,.12)}
   .node.locked{opacity:.55}
   .map .tag{position:absolute;top:6px;right:6px;background:var(--accent);color:#fff;padding:2px 8px;border-radius:999px;font-size:12px}
-  table{width:100%;border-collapse:collapse}
-  th,td{padding:8px;border-bottom:1px solid #f0f0ff;text-align:left}
+  /* Tables scroll wrapper */
+  .table-wrap{overflow:auto;border:1px solid var(--border);border-radius:12px}
+  table{width:100%;border-collapse:collapse;background:#fff}
+  th,td{padding:10px;border-bottom:1px solid #f0f0ff;text-align:left;white-space:nowrap}
+  /* ====== Responsive breakpoints ====== */
+  @media (max-width: 992px){
+    .wrap{margin:10px; padding:16px}
+  }
+  @media (max-width: 768px){
+    .row{grid-template-columns:1fr}
+    .creator{flex-direction:column}
+    .map{height:320px}
+    .node{width:56px;height:56px;font-size:15px}
+  }
+  @media (max-width: 480px){
+    body{font-size:15px}
+    .wrap{padding:14px}
+    .map{height:280px}
+    .node{width:50px;height:50px;font-size:14px}
+    .tabs{gap:6px}
+    .btn{padding:8px 12px}
+  }
 </style>
 </head>
 <body>
@@ -94,7 +127,6 @@ function getProfile(){
 function setName(name){ const p=getProfile(); p.name=(name||'').trim(); save(LS.PROFILE,p); }
 function addXP(delta){
   const p=getProfile(); p.xp = Math.max(0, Number(p.xp||0)+Number(delta||0));
-  // level up
   while(true){
     const cfg = LEVELS.find(x=>x.lvl===p.level) || LEVELS.at(-1);
     const need = cfg.need || 0;
@@ -138,7 +170,7 @@ function setTasks(a){ save(LS.TASKS,a) }
 function spawnRecurringIfNeeded(){
   const mark = Number(localStorage.getItem(LS.SPAWN)||0);
   if(mark===getDay()) return;
-  const weekday = new Date().getDay(); // 0-6 CN..T6
+  const weekday = new Date().getDay();
   const recs = getRecurring();
   const zones = getZones();
   const tasks = getTasks();
@@ -182,7 +214,6 @@ function viewTasks(){
   const {level,xp,need,cap}=getLevelInfo();
   const day=getDay();
 
-  // group
   const groups = zones.map(z=>({
     z,
     list: tasks.filter(t=>t.zoneId==z.id),
@@ -194,7 +225,7 @@ function viewTasks(){
       <span class="pill">Ngày ảo: <b>${day}</b></span>
       <span class="pill">Level: <b>${level}</b></span>
       <span class="pill">XP: <b>${xp}</b>${need?` / ${need}`:''}</span>
-      <span class="muted">Giới hạn task/ngày: <b>${cap}</b></span>
+      <span class="muted">Giới hạn/ngày: <b>${cap}</b></span>
       <span style="margin-left:auto;display:flex;gap:8px">
         <button class="btn-ghost" id="btnEnd">Qua ngày</button>
         <button class="btn-danger" id="btnReset">Reset điểm</button>
@@ -229,12 +260,10 @@ function viewTasks(){
     `).join('')}
   `;
 
-  // add
   const inp = document.getElementById('taskText');
   const sel = document.getElementById('taskZone');
   function addNow(){
     const text=(inp.value||'').trim(); if(!text) return;
-    // level cap
     if(getTasks().length>=cap){ alert('Đã đạt giới hạn task/ngày theo Level'); return; }
     const z = zones.find(z=>z.id==sel.value);
     const count = getTasks().filter(t=>t.zoneId==z.id).length;
@@ -244,13 +273,11 @@ function viewTasks(){
   }
   document.getElementById('btnAdd').onclick=addNow;
   inp.onkeydown=(e)=>{ if(e.key==='Enter') addNow(); };
-  // Tab hotkey: focus ô nhập nếu đang không ở input
   window.onkeydown=(e)=>{
     const tag=(document.activeElement?.tagName||'').toLowerCase();
     if(e.key==='Tab' && !['input','select','textarea','button'].includes(tag)){ e.preventDefault(); inp.focus(); }
   };
 
-  // toggle
   view.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
     cb.onchange=()=>{
       const id=Number(cb.dataset.id);
@@ -260,7 +287,6 @@ function viewTasks(){
       t.done = cb.checked;
       addXP(cb.checked? Number(z.point||0) : -Number(z.point||0));
       setTasks(getTasks().map(x=>x.id===id?t:x));
-      // bonus khi đủ số task của zone
       if(t.done && z.maxPerDay){
         const doneCount = getTasks().filter(x=>x.zoneId==z.id && x.done).length;
         if(doneCount>=z.maxPerDay && !bonusGiven(z.id)){
@@ -271,30 +297,26 @@ function viewTasks(){
     };
   });
 
-  // delete
   view.querySelectorAll('.del').forEach(b=> b.onclick=()=>{
     const id=Number(b.dataset.id);
     setTasks(getTasks().filter(t=>t.id!==id));
     render('tasks');
   });
 
-  // end day
   document.getElementById('btnEnd').onclick=async ()=>{
-    // penalty theo zone nếu chưa đạt
     const zones=getZones(); const tasks=getTasks(); const today=getDay();
     for(const z of zones){
       if(!z.maxPerDay) continue;
       const doneCount = tasks.filter(t=>t.zoneId==z.id && t.done).length;
       if(doneCount<z.maxPerDay) addXP(-Number(z.penalty||0));
-      // nếu chưa từng thưởng mà đã đủ thì thưởng (edge)
       if(doneCount>=z.maxPerDay && !bonusGiven(z.id)) { addXP(Number(z.bonus||0)); markBonus(z.id); }
     }
     clearFlagsFor(today);
     nextDay();
     setTasks([]);
-    localStorage.removeItem(LS.SPAWN); // cho phép spawn lại
+    localStorage.removeItem(LS.SPAWN);
     spawnRecurringIfNeeded();
-    await autoSync(); // nếu bật autosync + có endpoint
+    await autoSync();
     alert('Đã qua ngày.');
     render('tasks');
   };
@@ -326,18 +348,20 @@ function viewSettings(){
         <div class="row"><div>Số Task tối đa/ngày</div><input id="zMax" type="number" value="3"></div>
         <div class="row"><div></div><button class="btn-primary" id="addZone">+ Thêm Zone</button></div>
       </div>
-      <table>
-        <thead><tr><th>Tên</th><th>Màu</th><th>Điểm</th><th>Bonus</th><th>Penalty</th><th>Max/ngày</th><th></th></tr></thead>
-        <tbody id="zoneT">${zones.map(z=>`
-          <tr data-id="${z.id}"><td><input name="name" value="${z.name}"></td>
-            <td><input name="color" value="${z.color}"></td>
-            <td><input name="point" type="number" value="${z.point||0}"></td>
-            <td><input name="bonus" type="number" value="${z.bonus||0}"></td>
-            <td><input name="penalty" type="number" value="${z.penalty||0}"></td>
-            <td><input name="maxPerDay" type="number" value="${z.maxPerDay||0}"></td>
-            <td><button class="btn-danger zdel" data-id="${z.id}">Xoá</button></td></tr>
-        `).join('')}</tbody>
-      </table>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tên</th><th>Màu</th><th>Điểm</th><th>Bonus</th><th>Penalty</th><th>Max/ngày</th><th></th></tr></thead>
+          <tbody id="zoneT">${zones.map(z=>`
+            <tr data-id="${z.id}"><td><input name="name" value="${z.name}"></td>
+              <td><input name="color" value="${z.color}"></td>
+              <td><input name="point" type="number" value="${z.point||0}"></td>
+              <td><input name="bonus" type="number" value="${z.bonus||0}"></td>
+              <td><input name="penalty" type="number" value="${z.penalty||0}"></td>
+              <td><input name="maxPerDay" type="number" value="${z.maxPerDay||0}"></td>
+              <td><button class="btn-danger zdel" data-id="${z.id}">Xoá</button></td></tr>
+          `).join('')}</tbody>
+        </table>
+      </div>
     </div>
 
     <div class="card">
@@ -346,19 +370,21 @@ function viewSettings(){
       <div class="row"><div>Zone</div><select id="rZone">${zones.map(z=>`<option value="${z.id}">${z.name}</option>`)}</select></div>
       <div class="row"><div>Kiểu</div><select id="rType"><option value="daily">Mỗi ngày</option><option value="weekly">Theo thứ</option></select></div>
       <div class="row" id="rDaysRow" style="display:none"><div>Chọn thứ</div>
-        <div class="grid" style="grid-template-columns:repeat(7,1fr)">
+        <div class="grid" style="grid-template-columns:repeat(7, minmax(40px,1fr))">
           ${['CN','T2','T3','T4','T5','T6','T7'].map((l,i)=>`<label><input type="checkbox" value="${i}"> ${l}</label>`).join('')}
         </div>
       </div>
       <div class="row"><div></div><button class="btn-primary" id="addRec">+ Thêm Task lặp</button></div>
-      <table>
-        <thead><tr><th>Mô tả</th><th>Zone</th><th>Kiểu</th><th>Thứ</th><th></th></tr></thead>
-        <tbody id="recT">${recs.map(r=>{
-          const z = zones.find(z=>z.id==r.zoneId)?.name||'(xoá)';
-          return `<tr><td>${r.text}</td><td>${z}</td><td>${r.type}</td><td>${r.type==='weekly'?(r.days||[]).join(', '):'-'}</td>
-            <td><button class="btn-danger rdel" data-id="${r.id}">Xoá</button></td></tr>`
-        }).join('')}</tbody>
-      </table>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Mô tả</th><th>Zone</th><th>Kiểu</th><th>Thứ</th><th></th></tr></thead>
+          <tbody id="recT">${recs.map(r=>{
+            const z = zones.find(z=>z.id==r.zoneId)?.name||'(xoá)';
+            return `<tr><td>${r.text}</td><td>${z}</td><td>${r.type}</td><td>${r.type==='weekly'?(r.days||[]).join(', '):'-'}</td>
+              <td><button class="btn-danger rdel" data-id="${r.id}">Xoá</button></td></tr>`
+          }).join('')}</tbody>
+        </table>
+      </div>
     </div>
 
     <div class="card">
@@ -382,7 +408,7 @@ function viewSettings(){
     if(['point','bonus','penalty','maxPerDay'].includes(name)) val=Number(val||0);
     updZone(id,{[name]:val});
   };
-  view.querySelectorAll('.zdel').forEach(b=> b.onclick=()=>{ delZone(Number(b.dataset.id)); viewSettings(); });
+  document.querySelectorAll('.zdel').forEach(b=> b.onclick=()=>{ delZone(Number(b.dataset.id)); viewSettings(); });
 
   const typeSel=document.getElementById('rType');
   const daysRow=document.getElementById('rDaysRow');
@@ -394,7 +420,7 @@ function viewSettings(){
     if(type==='weekly' && !days.length) return alert('Chọn thứ');
     addRecurring({text, zoneId, type, days}); viewSettings();
   };
-  view.querySelectorAll('.rdel').forEach(b=> b.onclick=()=>{ delRecurring(Number(b.dataset.id)); viewSettings(); });
+  document.querySelectorAll('.rdel').forEach(b=> b.onclick=()=>{ delRecurring(Number(b.dataset.id)); viewSettings(); });
 
   document.getElementById('saveSync').onclick=()=>{
     setSyncCfg({endpoint:document.getElementById('syncEndpoint').value.trim(), autosync:document.getElementById('syncAuto').checked});
@@ -419,28 +445,26 @@ function viewMap(){
   `;
 }
 
-/* Leaderboard (đọc từ endpoint nếu có, nếu không hiển thị dữ liệu local) */
+/* Leaderboard */
 async function viewLeaderboard(){
   const cfg = getSyncCfg();
   view.innerHTML = `<div class="card" style="margin-top:0"><h3>Leaderboard</h3>
     <div class="muted">Nếu đã cấu hình Endpoint ở Settings, bảng dưới sẽ lấy dữ liệu từ đó. Nếu không, chỉ hiển thị điểm của bạn (local).</div>
     <div style="margin:10px 0"><button class="btn-ghost" id="reload">Tải lại</button></div>
-    <div id="board">Đang tải…</div></div>`;
+    <div class="table-wrap"><table id="tbl"><thead><tr><th>#</th><th>Người chơi</th><th>Level</th><th>XP</th><th>Cập nhật</th></tr></thead><tbody id="rows"></tbody></table></div>
+  </div>`;
 
   async function loadBoard(){
-    const el=document.getElementById('board');
+    const rows=document.getElementById('rows');
     try{
       let list=[];
-      if(cfg.endpoint){
-        const r=await fetch(cfg.endpoint); if(r.ok) list=await r.json();
-      }
+      if(cfg.endpoint){ const r=await fetch(cfg.endpoint); if(r.ok) list=await r.json(); }
       if(!Array.isArray(list) || !list.length){
         const p=getProfile(); list=[{name:p.name||'Player', level:p.level||1, xp:p.xp||0, updatedAt:new Date().toISOString()}];
       }
       list.sort((a,b)=> (b.level-a.level) || (b.xp-a.xp) || (a.name||'').localeCompare(b.name||''));
-      el.innerHTML = `<table><thead><tr><th>#</th><th>Người chơi</th><th>Level</th><th>XP</th><th>Cập nhật</th></tr></thead>
-        <tbody>${list.map((u,i)=>`<tr><td>${i+1}</td><td>${u.name||'-'}</td><td>${u.level??'-'}</td><td>${u.xp??'-'}</td><td>${u.updatedAt?new Date(u.updatedAt).toLocaleString():'-'}</td></tr>`).join('')}</tbody></table>`;
-    }catch(e){ el.textContent='Lỗi tải leaderboard'; }
+      rows.innerHTML = list.map((u,i)=>`<tr><td>${i+1}</td><td>${u.name||'-'}</td><td>${u.level??'-'}</td><td>${u.xp??'-'}</td><td>${u.updatedAt?new Date(u.updatedAt).toLocaleString():'-'}</td></tr>`).join('');
+    }catch{ rows.innerHTML='<tr><td colspan="5">Lỗi tải leaderboard</td></tr>'; }
   }
   document.getElementById('reload').onclick=loadBoard;
   loadBoard();
