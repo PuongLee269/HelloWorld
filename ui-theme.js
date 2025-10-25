@@ -1,7 +1,8 @@
-<script>
+// ui-theme.js
+
 // UI THEME CONFIG
 window.UI_THEME = {
-  // icon cho từng tab (có thể đổi ở đây)
+  // icon cho từng tab (đổi icon ở đây)
   tabIcons: {
     tasks:        "🗒️",
     map:          "🗺️",
@@ -10,7 +11,7 @@ window.UI_THEME = {
     settings:     "⚙️"
   },
 
-  // nền gradient cho từng tab (có thể chỉnh)
+  // nền gradient cho từng tab (đổi màu ở đây)
   backgrounds:{
     tasks:       "linear-gradient(160deg,#d4f1ff 0%,#c8ffe0 50%,#fff6d8 100%)",
     map:         "linear-gradient(160deg,#a0e0ff 0%,#6dd6a8 50%,#fff1b8 100%)",
@@ -19,7 +20,7 @@ window.UI_THEME = {
     settings:    "linear-gradient(160deg,#ececec 0%,#d5d9ff 50%,#ffffff 100%)"
   },
 
-  // style card kính mờ / bo góc / bóng
+  // style khối .wrap kiểu kính mờ
   wrapStyle: `
     max-width:960px;
     margin:12px auto;
@@ -32,7 +33,7 @@ window.UI_THEME = {
   `
 };
 
-// đổi nền body tuỳ tab
+// đổi nền body theo tab
 window.applyTabBackground = function(tabKey){
   const bg = (window.UI_THEME && window.UI_THEME.backgrounds[tabKey]) || "#f6f7ff";
   document.body.style.background = bg;
@@ -67,9 +68,8 @@ window.buildTabsBar = function(activeKey, onClickTab){
     `;
   }).join("");
 
-  // attach click
+  // gán click
   [...bar.querySelectorAll("[data-tab]")].forEach(b=>{
     b.onclick = ()=> onClickTab(b.dataset.tab);
   });
 };
-</script>
