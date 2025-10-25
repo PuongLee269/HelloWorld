@@ -252,7 +252,7 @@ function viewTasks(){
                 <input type="checkbox" data-id="${t.id}" ${t.done?'checked':''}>
                 <span class="txt">${t.text}</span>
               </div>
-              <button class="btn-danger del" data-id="${t.id}">🗑</button>
+              <button class="btn-danger del" data-id="${t.id}">×</button>
             </li>
           `).join('') : `<li class="task"><span class="muted">Chưa có task trong Zone này.</span></li>`}
         </ul>
@@ -287,12 +287,6 @@ function viewTasks(){
       t.done = cb.checked;
       addXP(cb.checked? Number(z.point||0) : -Number(z.point||0));
       setTasks(getTasks().map(x=>x.id===id?t:x));
-      if(t.done && z.maxPerDay){
-        const doneCount = getTasks().filter(x=>x.zoneId==z.id && x.done).length;
-        if(doneCount>=z.maxPerDay && !bonusGiven(z.id)){
-          addXP(Number(z.bonus||0)); markBonus(z.id);
-        }
-      }
       render('tasks');
     };
   });
@@ -307,9 +301,13 @@ function viewTasks(){
     const zones=getZones(); const tasks=getTasks(); const today=getDay();
     for(const z of zones){
       if(!z.maxPerDay) continue;
-      const doneCount = tasks.filter(t=>t.zoneId==z.id && t.done).length;
-      if(doneCount<z.maxPerDay) addXP(-Number(z.penalty||0));
-      if(doneCount>=z.maxPerDay && !bonusGiven(z.id)) { addXP(Number(z.bonus||0)); markBonus(z.id); }
+      const zoneTasks = tasks.filter(t=>t.zoneId==z.id);
+      const totalCount = zoneTasks.length;
+      const doneCount = zoneTasks.filter(t=>t.done).length;
+      if(doneCount < z.maxPerDay) addXP(-Number(z.penalty||0));
+      if(totalCount > 0 && doneCount === totalCount && !bonusGiven(z.id)) { 
+        addXP(Number(z.bonus||0)); markBonus(z.id); 
+      }
     }
     clearFlagsFor(today);
     nextDay();
