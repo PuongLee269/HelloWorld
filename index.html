@@ -3,99 +3,289 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Todo Quest — 1 file (Responsive)</title>
+<title>Todo Quest — Gradient UI</title>
 <style>
   :root{
-    --ink:#1b1e2e;--muted:#7d82a8;--card:#fff;--bg:#f6f7ff;--border:#e8e8fb;--accent:#8b7cff;
-    --radius:16px;--space:20px;--space-sm:12px;--tap:46px;
+    --ink:#1b1e2e;
+    --muted:#7d82a8;
+    --border:#e8e8fb;
+    --accent:#8b7cff;
+    --tap:46px;
   }
   *{box-sizing:border-box}
   html,body{height:100%}
-  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-  .wrap{max-width:960px;margin:var(--space-sm) auto;padding:var(--space);background:var(--card);
-        border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 10px 30px rgba(20,16,60,.08)}
-  h1{margin:0 0 var(--space-sm)}
-  /* Tabs */
-  .tabs{display:flex;gap:8px;margin-bottom:12px;overflow:auto;padding-bottom:4px}
+  body{
+    margin:0;
+    color:var(--ink);
+    font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    background:#f6f7ff; /* sẽ bị override bằng gradient từ UI_THEME */
+    background-attachment:fixed;
+  }
+
+  /* card khung chính (.wrap) sẽ bị override style inline từ ui-theme.js */
+
+  h1{margin:0 0 12px;font-size:24px;font-weight:600;color:#1b1e2e;display:flex;align-items:center;gap:8px}
+
+  /* Tabs bar */
+  .tabs{
+    display:flex;
+    gap:8px;
+    margin-bottom:16px;
+    overflow-x:auto;
+    padding-bottom:4px;
+  }
   .tabs::-webkit-scrollbar{height:6px}
   .tabs::-webkit-scrollbar-thumb{background:#ddd;border-radius:6px}
-  .btn{min-height:var(--tap);padding:8px 14px;border:1px solid var(--border);background:#fff;border-radius:10px;cursor:pointer;white-space:nowrap}
-  .btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
-  .btn-primary{min-height:var(--tap);background:var(--accent);color:#fff;border:none;border-radius:10px;padding:10px 14px;cursor:pointer}
-  .btn-ghost{min-height:var(--tap);background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 14px}
-  .btn-danger{min-height:var(--tap);background:#ff3b30;color:#fff;border:none;border-radius:10px;padding:10px 14px}
-  .pill{background:#eef;border:1px solid #dde;border-radius:999px;padding:4px 10px}
-  .muted{color:var(--muted)}
-  .top{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+
+  .btn{
+    display:flex;
+    align-items:center;
+    min-height:var(--tap);
+    padding:8px 14px;
+    border:1px solid rgba(0,0,0,.05);
+    background:rgba(255,255,255,.8);
+    border-radius:12px;
+    cursor:pointer;
+    white-space:nowrap;
+    box-shadow:0 6px 16px rgba(0,0,0,.08);
+    font-weight:500;
+  }
+  .btn.active{
+    background:linear-gradient(135deg,#8b7cff 0%,#b09bff 100%);
+    color:#fff;
+    border-color:transparent;
+    box-shadow:0 10px 20px rgba(139,124,255,.4);
+  }
+  .btn-primary{
+    min-height:var(--tap);
+    background:linear-gradient(135deg,#8b7cff 0%,#b09bff 100%);
+    color:#fff;border:none;border-radius:12px;
+    padding:10px 14px;font-weight:500;
+    cursor:pointer;
+    box-shadow:0 10px 20px rgba(139,124,255,.4);
+  }
+  .btn-ghost{
+    min-height:var(--tap);
+    background:rgba(255,255,255,.8);
+    border:1px solid rgba(0,0,0,.05);
+    border-radius:12px;
+    padding:10px 14px;
+    box-shadow:0 6px 16px rgba(0,0,0,.08);
+    cursor:pointer;
+  }
+  .btn-danger{
+    min-height:var(--tap);
+    background:linear-gradient(135deg,#ff5f48 0%,#ff3425 100%);
+    color:#fff;border:none;border-radius:12px;
+    padding:10px 14px;font-weight:500;
+    cursor:pointer;
+    box-shadow:0 10px 20px rgba(255,60,48,.4);
+  }
+  .pill{
+    background:rgba(255,255,255,.8);
+    border:1px solid rgba(0,0,0,.05);
+    border-radius:999px;
+    padding:4px 10px;
+    font-size:14px;
+    box-shadow:0 6px 16px rgba(0,0,0,.08);
+  }
+  .muted{color:var(--muted);font-size:14px}
+
+  .top{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+
   /* Inputs */
-  input,select,textarea{height:var(--tap);padding:10px;border-radius:10px;border:1px solid #ccd;width:100%;font:inherit;background:#fff}
-  input[type="checkbox"]{height:auto;width:auto}
+  input,select,textarea{
+    height:var(--tap);
+    padding:10px;
+    border-radius:12px;
+    border:1px solid rgba(0,0,0,.08);
+    width:100%;
+    font:inherit;
+    background:#fff;
+    box-shadow:0 6px 16px rgba(0,0,0,.05);
+  }
+  input[type="checkbox"]{
+    height:auto;width:auto;box-shadow:none;
+  }
+
   /* Layout rows (Settings) */
   .grid{display:grid;gap:10px}
-  .row{display:grid;grid-template-columns:200px 1fr;gap:10px;align-items:center}
-  .card{padding:12px;border:1px solid var(--border);border-radius:12px;background:#fff;margin-top:12px}
-  .bar{height:10px;background:#eee;border-radius:6px;overflow:hidden;margin-bottom:10px}
-  .fill{height:100%;background:var(--accent)}
-  /* Tasks */
+  .row{
+    display:grid;
+    grid-template-columns:200px 1fr;
+    gap:10px;
+    align-items:center;
+  }
+
+  .card{
+    padding:16px;
+    border:1px solid rgba(0,0,0,.05);
+    border-radius:16px;
+    background:rgba(255,255,255,.85);
+    margin-top:16px;
+    box-shadow:0 16px 40px rgba(0,0,0,.1);
+    position:relative;
+    overflow:hidden;
+  }
+  .card h3{
+    margin:0 0 12px;
+    font-size:16px;
+    font-weight:600;
+    color:#1b1e2e;
+  }
+
+  /* mini gradient ribbon / tag etc could be added later */
+
+  .bar{
+    height:10px;
+    background:rgba(0,0,0,.07);
+    border-radius:6px;
+    overflow:hidden;
+    margin-bottom:10px;
+    box-shadow:inset 0 2px 4px rgba(0,0,0,.12);
+  }
+  .fill{
+    height:100%;
+    background:linear-gradient(90deg,#8b7cff 0%,#b09bff 100%);
+  }
+
+  /* Tasks list */
   ul{list-style:none;margin:0;padding:0}
-  .zone{border:1px solid #f0f0ff;border-radius:12px;margin:12px 0}
-  .zone header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #f4f4ff;background:#fafaff;border-radius:12px 12px 0 0}
-  .badge{font-size:12px;padding:2px 8px;border-radius:999px;background:#fff;border:1px solid #eee}
-  li.task{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-top:1px solid #f7f7ff}
+  .zone{
+    border:1px solid rgba(0,0,0,.05);
+    border-radius:16px;
+    margin:16px 0;
+    background:rgba(255,255,255,.8);
+    box-shadow:0 12px 32px rgba(0,0,0,.08);
+    overflow:hidden;
+  }
+  .zone header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:12px 16px;
+    border-bottom:1px solid rgba(0,0,0,.05);
+    background:linear-gradient(135deg,#fafbff 0%,#f6f7ff 100%);
+    font-weight:500;
+  }
+  .badge{
+    font-size:12px;
+    padding:2px 8px;
+    border-radius:999px;
+    background:#fff;
+    border:1px solid rgba(0,0,0,.07);
+    box-shadow:0 4px 10px rgba(0,0,0,.08);
+  }
+  li.task{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:12px 16px;
+    border-top:1px solid rgba(0,0,0,.03);
+  }
   .left{display:flex;align-items:center;gap:10px}
   .done .txt{text-decoration:line-through;color:#9aa}
   .creator{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
   .left input[type="checkbox"]{transform:scale(1.25)}
+
   /* Map */
-  .map{position:relative;height:360px;background:linear-gradient(180deg,#fafbff,#f6f7ff);border-radius:16px;border:1px solid var(--border);overflow:hidden}
-  .path{position:absolute;left:50%;top:20px;bottom:20px;width:4px;background:#e8e8fb;transform:translateX(-50%)}
-  .node{position:absolute;left:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;
-        display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #e8e8fb;box-shadow:0 6px 16px rgba(20,16,60,.08);font-weight:700;color:#434a77}
-  .node.passed{border-color:#9AE6B4;background:#f6fff8}
-  .node.current{border-color:#8b7cff;box-shadow:0 0 0 6px rgba(139,124,255,.12)}
-  .node.locked{opacity:.55}
-  .map .tag{position:absolute;top:6px;right:6px;background:var(--accent);color:#fff;padding:2px 8px;border-radius:999px;font-size:12px}
-  /* Table */
-  .table-wrap{overflow:auto;border:1px solid var(--border);border-radius:12px}
-  table{width:100%;border-collapse:collapse;background:#fff}
-  th,td{padding:10px;border-bottom:1px solid #f0f0ff;text-align:left;white-space:nowrap}
-  /* Responsive */
-  @media (max-width: 992px){
-    .wrap{margin:10px; padding:16px}
+  .map{
+    position:relative;
+    height:360px;
+    background:linear-gradient(180deg,#fafbff,#f6f7ff);
+    border-radius:24px;
+    border:1px solid rgba(0,0,0,.05);
+    overflow:hidden;
+    box-shadow:0 24px 60px rgba(0,0,0,.15);
   }
-  @media (max-width: 768px){
+  .path{position:absolute;left:50%;top:20px;bottom:20px;width:4px;background:#e8e8fb;transform:translateX(-50%)}
+  .node{
+    position:absolute;
+    left:50%;
+    transform:translate(-50%,-50%);
+    width:64px;height:64px;
+    border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    background:#fff;
+    border:2px solid #e8e8fb;
+    box-shadow:0 16px 32px rgba(0,0,0,.15);
+    font-weight:700;color:#434a77
+  }
+  .node.passed{border-color:#9AE6B4;background:#f6fff8}
+  .node.current{border-color:#8b7cff;box-shadow:0 0 0 6px rgba(139,124,255,.2),0 16px 32px rgba(0,0,0,.15)}
+  .node.locked{opacity:.55}
+  .map .tag{
+    position:absolute;
+    top:6px;right:6px;
+    background:#8b7cff;
+    color:#fff;
+    padding:4px 10px;
+    border-radius:999px;
+    font-size:12px;
+    box-shadow:0 12px 24px rgba(139,124,255,.4);
+  }
+
+  /* table wrap (Leaderboard) */
+  .table-wrap{
+    overflow:auto;
+    border:1px solid rgba(0,0,0,.05);
+    border-radius:16px;
+    background:rgba(255,255,255,.8);
+    box-shadow:0 16px 32px rgba(0,0,0,.08);
+  }
+  table{width:100%;border-collapse:collapse;background:transparent}
+  th,td{
+    padding:12px 16px;
+    border-bottom:1px solid rgba(0,0,0,.05);
+    text-align:left;
+    white-space:nowrap;
+    font-size:14px;
+  }
+  th{font-weight:600;color:#1b1e2e;background:rgba(255,255,255,.6)}
+
+  /* chart canvases */
+  .chart-card canvas{
+    width:100%;
+    max-width:100%;
+    height:160px;
+    display:block;
+  }
+
+  /* Responsive tweaks */
+  @media (max-width:768px){
     .row{grid-template-columns:1fr}
     .creator{flex-direction:column}
     .map{height:320px}
     .node{width:56px;height:56px;font-size:15px}
+    h1{font-size:20px}
   }
-  @media (max-width: 480px){
+  @media (max-width:480px){
     body{font-size:15px}
-    .wrap{padding:14px}
     .map{height:280px}
     .node{width:50px;height:50px;font-size:14px}
-    .tabs{gap:6px}
     .btn{padding:8px 12px}
+    .tabs{gap:6px}
   }
 </style>
 </head>
 <body>
+
 <div class="wrap">
-  <h1>Todo Quest</h1>
-  <div class="tabs">
-    <button class="btn active" data-tab="tasks">Tasks</button>
-    <button class="btn" data-tab="map">Map</button>
-    <button class="btn" data-tab="leaderboard">Leaderboard</button>
-    <button class="btn" data-tab="settings">Settings</button>
-  </div>
+  <h1><span>Todo Quest</span></h1>
+
+  <div class="tabs" id="tabsBar"></div>
+
   <div id="view">Đang nạp…</div>
 </div>
 
+<!-- import theme/ui config FIRST -->
+<script src="ui-theme.js"></script>
+
 <script>
-/* ====== CONFIG ====== */
+/* ====== CONFIG APP ====== */
 const CONFIG = {
-  ENDPOINT: 'https://script.google.com/macros/s/AKfycbyQ3imjnhKrzmuz4-KbPNsHzpYGY_Mv45os1bZEPoQrQ-UM8RjJvCznfP5x6RB6QX_Qpw/exec',
-  SETTINGS_PASS: '1000'
+  ENDPOINT:'https://script.google.com/macros/s/AKfycbyQ3imjnhKrzmuz4-KbPNsHzpYGY_Mv45os1bZEPoQrQ-UM8RjJvCznfP5x6RB6QX_Qpw/exec',
+  SETTINGS_PASS:'1000'
 };
 
 /* ====== STATE KEYS ====== */
@@ -107,7 +297,8 @@ const LS = {
   DAY:'tq_sim_day',
   BONUS:'tq_bonus_flags',
   SPAWN:'tq_spawned_day',
-  LBCACHE:'tq_lb_cache'
+  LBCACHE:'tq_lb_cache',
+  HIST:'tq_hist'            // lưu lịch sử điểm mỗi ngày để vẽ chart
 };
 
 const LEVELS = [
@@ -122,10 +313,18 @@ const LEVELS = [
   {lvl:9, cap:20, need:3800},
 ];
 
+/* ====== HELPERS ====== */
 function load(key, def){ try{ return JSON.parse(localStorage.getItem(key)) ?? def }catch{ return def } }
 function save(key, val){ localStorage.setItem(key, JSON.stringify(val)) }
 
-/* ===== PROFILE / LEVEL ===== */
+function todayDM(){
+  const d=new Date();
+  const dd=String(d.getDate()).padStart(2,'0');
+  const mm=String(d.getMonth()+1).padStart(2,'0');
+  return `${dd}-${mm}`;
+}
+
+/* ===== PROFILE / LEVEL / ENERGY (XP=>E) ===== */
 function getProfile(){
   let p = load(LS.PROFILE);
   if(!p){ p={name:'', level:1, xp:0}; save(LS.PROFILE,p); }
@@ -161,6 +360,24 @@ function ensureName(){
     const n=prompt('Nhập tên người chơi:');
     if(n) setName(n);
   }
+}
+
+/* ===== HISTORY SNAPSHOT (cho chart) ===== */
+function getHist(){ return load(LS.HIST,[]); }
+function setHist(h){ save(LS.HIST,h); }
+function pushHistSnapshot(){
+  const p=getProfile();
+  const h=getHist();
+  h.push({
+    ts:Date.now(),
+    level:p.level,
+    xp:p.xp   // xp = "E"
+  });
+  // giữ tối đa ~60 bản ghi gần nhất
+  if(h.length>60){
+    h.splice(0, h.length-60);
+  }
+  setHist(h);
 }
 
 /* ===== DAY & BONUS FLAGS ===== */
@@ -282,17 +499,14 @@ function spawnRecurringIfNeeded(){
   localStorage.setItem(LS.SPAWN, String(getDay()));
 }
 
-/* ===== SYNC CONFIG (cố định) ===== */
-function getSyncCfg(){
-  return { endpoint: CONFIG.ENDPOINT, autosync: true };
-}
+/* ===== SYNC / LEADERBOARD FETCH ===== */
+function getSyncCfg(){ return { endpoint: CONFIG.ENDPOINT, autosync: true }; }
 
-/* Gửi điểm của người chơi hiện tại lên server */
 async function autoSync(){
   const cfg = getSyncCfg();
   if(!cfg.autosync || !cfg.endpoint) return;
-
   const p = getProfile();
+
   const form = new URLSearchParams({
     name:  (p.name || 'Player'),
     level: String(p.level || 1),
@@ -313,7 +527,6 @@ async function autoSync(){
   }
 }
 
-/* Lấy leaderboard từ server và cập nhật cache */
 async function fetchLeaderboardAndCache(){
   const cfg = getSyncCfg();
   if(!cfg.endpoint) return;
@@ -334,10 +547,9 @@ async function fetchLeaderboardAndCache(){
   }
 }
 
-/* chạy ở nền lúc mở app để cache leaderboard mới nhất */
+// chạy nền lúc boot để cache leaderboard
 function backgroundBoardRefresh(){
-  // gọi nhưng không chặn UI
-  fetchLeaderboardAndCache().catch(()=>{ /* im lặng, không popup */ });
+  fetchLeaderboardAndCache().catch(()=>{});
 }
 
 /* ===== XOÁ HỒ SƠ LOCAL ===== */
@@ -348,22 +560,9 @@ function wipeLocalPlayer(){
   location.reload();
 }
 
-/* ===== VIEW ELEMENTS / ROUTER ===== */
-const view = document.getElementById('view');
-const tabs = [...document.querySelectorAll('[data-tab]')];
-tabs.forEach(b=>b.onclick=()=>render(b.dataset.tab));
-function setActive(tab){
-  tabs.forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
-}
-
-/* ===== HÀM QUA NGÀY / RESET =====
-   Làm cho "Qua ngày" mượt:
-   - Xử lý local ngay
-   - Báo xong luôn
-   - Rồi mới sync server / refresh leaderboard ở nền
-*/
+/* ===== HANDLE END DAY / RESET ===== */
 function handleResetPoints(){
-  if(confirm('Reset Level=1 & XP=0?')){
+  if(confirm('Reset Level=1 & E=0?')){
     resetPoints();
     alert('Đã reset điểm.');
     render('settings');
@@ -373,9 +572,9 @@ function handleResetPoints(){
 function handleEndDay(){
   const zones=getZones();
   const tasks=getTasks();
-  const today=getDay();
+  const todaySim=getDay();
 
-  // thưởng/phạt từng zone
+  // chấm thưởng/phạt
   for(const z of zones){
     if(!z.maxPerDay) continue;
     const zoneTasks = tasks.filter(t=>t.zoneId==z.id);
@@ -391,31 +590,104 @@ function handleEndDay(){
     }
   }
 
+  // lưu snapshot sau khi tính thưởng/phạt
+  pushHistSnapshot();
+
   // qua ngày local
-  clearFlagsFor(today);
+  clearFlagsFor(todaySim);
   nextDay();
   setTasks([]);
   localStorage.removeItem(LS.SPAWN);
   spawnRecurringIfNeeded();
 
-  // feedback ngay lập tức cho người chơi
+  // feedback ngay
   alert('Đã qua ngày.');
   render('settings');
 
-  // chạy sync & refresh leaderboard nền, không chặn UI
+  // sync & refresh leaderboard nền
   autoSync()
     .then(()=>fetchLeaderboardAndCache())
-    .catch(()=>{ /* bỏ qua lỗi nền */ });
+    .catch(()=>{});
 }
 
-/* ===== VIEW: TASKS ===== */
+/* ===== SIMPLE LINE CHART DRAWER ===== */
+function drawChart(canvasId, values){
+  const cvs = document.getElementById(canvasId);
+  if(!cvs) return;
+  const ctx = cvs.getContext('2d');
+  const W = cvs.width  = cvs.offsetWidth  || 300;
+  const H = cvs.height = cvs.offsetHeight || 160;
+
+  ctx.clearRect(0,0,W,H);
+
+  // background blur-ish panel
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.fillRect(0,0,W,H);
+
+  if(!values || !values.length){
+    ctx.fillStyle="#555";
+    ctx.font="14px system-ui";
+    ctx.fillText("Chưa có dữ liệu", 10, 24);
+    return;
+  }
+
+  const minV = Math.min(...values);
+  const maxV = Math.max(...values);
+  const padX=20, padY=20;
+  const span = (maxV-minV)||1;
+
+  // line path
+  ctx.lineWidth=3;
+  const grad = ctx.createLinearGradient(0,0,W,0);
+  grad.addColorStop(0,"#8b7cff");
+  grad.addColorStop(1,"#b09bff");
+  ctx.strokeStyle = grad;
+  ctx.beginPath();
+  values.forEach((v,i)=>{
+    const x = padX + ( (W-2*padX) * (i/(values.length-1||1)) );
+    const y = H-padY - ( (H-2*padY) * ((v-minV)/span) );
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+
+  // draw last point label
+  const lastIdx = values.length-1;
+  const lastVal = values[lastIdx];
+  const lastX = padX + ((W-2*padX)*(lastIdx/(values.length-1||1)));
+  const lastY = H-padY - ((H-2*padY)*((lastVal-minV)/span));
+  ctx.fillStyle="#ff3425";
+  ctx.beginPath();
+  ctx.arc(lastX,lastY,5,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.font="12px system-ui";
+  ctx.fillStyle="#1b1e2e";
+  ctx.fillText(String(lastVal), lastX+8, lastY-8);
+}
+
+/* ===== VIEW / ROUTING ===== */
+const view = document.getElementById('view');
+
+let settingsUnlocked=false;
+function ensureSettingsAuth(){
+  if(settingsUnlocked) return true;
+  const pass=prompt('Nhập mật khẩu Settings:');
+  if(pass===CONFIG.SETTINGS_PASS){
+    settingsUnlocked=true;
+    return true;
+  }
+  alert('Sai mật khẩu');
+  return false;
+}
+
+/* ----- Tasks Tab ----- */
 function viewTasks(){
   spawnRecurringIfNeeded();
 
   const zones=getZones();
   const tasks=getTasks();
   const {level,xp,need,cap}=getLevelInfo();
-  const day=getDay();
+  const dateNowDM = todayDM(); // real dd-mm
 
   const groups = zones.map(z=>({
     z,
@@ -425,10 +697,10 @@ function viewTasks(){
 
   view.innerHTML = `
     <div class="top">
-      <span class="pill">Ngày ảo: <b>${day}</b></span>
+      <span class="pill">Ngày: <b>${dateNowDM}</b></span>
       <span class="pill">Level: <b>${level}</b></span>
-      <span class="pill">XP: <b>${xp}</b>${need?` / ${need}`:''}</span>
-      <span class="muted">Giới hạn/ngày: <b>${cap}</b></span>
+      <span class="pill">E: <b>${xp}</b>${need?` / ${need}`:''}</span>
+      <span class="pill">Giới hạn/ngày: <b>${cap}</b></span>
     </div>
 
     <div class="bar"><div class="fill" style="width:${need?Math.min(100,Math.round(xp/need*100)):100}%;"></div></div>
@@ -441,7 +713,7 @@ function viewTasks(){
 
     ${groups.map(g=>`
       <section class="zone">
-        <header style="border-color:${g.z.color}">
+        <header style="border-color:${g.z.color||'#e8e8fb'}">
           <div><b>${g.z.name}</b></div>
           <div class="badge">Hoàn thành: ${g.done}/${g.z.maxPerDay||0}</div>
         </header>
@@ -510,7 +782,7 @@ function viewTasks(){
     };
   });
 
-  // xoá task
+  // delete task
   view.querySelectorAll('.del').forEach(b=> b.onclick=()=>{
     const id=Number(b.dataset.id);
     setTasks(getTasks().filter(t=>t.id!==id));
@@ -518,13 +790,109 @@ function viewTasks(){
   });
 }
 
-/* ===== VIEW: SETTINGS ===== */
+/* ----- Map Tab ----- */
+function viewMap(){
+  const {level}=getLevelInfo();
+  const total = Math.max(LEVELS.length, 9);
+  const items = Array.from({length:total},(_,i)=>({
+    n:i+1,
+    state: (i+1)<level ? 'passed' : ((i+1)===level ? 'current' : 'locked')
+  }));
+
+  view.innerHTML = `
+    <div class="map">
+      <div class="path"></div>
+      ${items.map((it,i)=>{
+        const y=40+(i*(280/(items.length-1)));
+        const xoff=(i%2===0?-90:90);
+        return `<div class="node ${it.state}" style="top:${y}px; left:calc(50% + ${xoff}px)">${it.n}</div>`;
+      }).join('')}
+      <div class="tag">Level: ${level}</div>
+    </div>
+  `;
+}
+
+/* ----- Leaderboard Tab ----- */
+function viewLeaderboard(){
+  const cache = getLBCache();
+
+  view.innerHTML = `
+    <div class="card" style="margin-top:0">
+      <h3>Leaderboard</h3>
+      <div class="muted">
+        Dữ liệu đã được tải nền khi mở app. Nhấn "Tải lại" để cập nhật lại từ server.
+      </div>
+      <div style="margin:10px 0;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-ghost" id="reload">Tải lại</button>
+      </div>
+      <div class="table-wrap">
+        <table id="tbl">
+          <thead>
+            <tr>
+              <th>#</th><th>Người chơi</th><th>Level</th><th>E</th><th>Cập nhật</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  const rows = document.getElementById('rows');
+
+  function fallbackLocalProfileList(){
+    const p=getProfile();
+    return [{
+      name:p.name||'Player',
+      level:p.level||1,
+      xp:p.xp||0,
+      updatedAt:new Date().toISOString()
+    }];
+  }
+
+  renderLBRows(rows, cache.list.length ? cache.list : fallbackLocalProfileList());
+
+  document.getElementById('reload').onclick = async ()=>{
+    await fetchLeaderboardAndCache();
+    const fresh = getLBCache();
+    renderLBRows(rows, fresh.list.length ? fresh.list : fallbackLocalProfileList());
+  };
+}
+
+/* ----- Stats Tab (Biểu đồ 7 / 30 ngày) ----- */
+function viewStats(){
+  const hist = getHist(); // [{ts,level,xp}, ...]
+  // Lấy chuỗi điểm E (xp) gần nhất
+  const last7  = hist.slice(-7 ).map(r=>r.xp);
+  const last30 = hist.slice(-30).map(r=>r.xp);
+
+  view.innerHTML = `
+    <div class="card chart-card" style="margin-top:0">
+      <h3>Biểu đồ 7 ngày (E)</h3>
+      <canvas id="chart7"></canvas>
+    </div>
+
+    <div class="card chart-card">
+      <h3>Biểu đồ 30 ngày (E)</h3>
+      <canvas id="chart30"></canvas>
+    </div>
+
+    <div class="muted" style="margin-top:12px;font-size:13px">
+      Ghi chú: Lịch sử được lưu mỗi lần bạn bấm "Qua ngày".
+    </div>
+  `;
+
+  drawChart("chart7", last7);
+  drawChart("chart30", last30);
+}
+
+/* ----- Settings Tab ----- */
 function viewSettings(){
   const p=getProfile();
   const zones=getZones();
   const recs=getRecurring();
   const {level,xp,need,cap}=getLevelInfo();
-  const day=getDay();
+  const dateNowDM=todayDM();
 
   view.innerHTML = `
     <div class="card" style="margin-top:0">
@@ -532,9 +900,9 @@ function viewSettings(){
       <div class="row">
         <div>Thông tin hiện tại</div>
         <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px">
-          <div class="pill">Ngày ảo: <b>${day}</b></div>
+          <div class="pill">Ngày: <b>${dateNowDM}</b></div>
           <div class="pill">Level: <b>${level}</b></div>
-          <div class="pill">XP: <b>${xp}</b>${need?` / ${need}`:''}</div>
+          <div class="pill">E: <b>${xp}</b>${need?` / ${need}`:''}</div>
           <div class="pill">Giới hạn/ngày: <b>${cap}</b></div>
         </div>
       </div>
@@ -572,7 +940,7 @@ function viewSettings(){
         <div class="row"><div></div><button class="btn-primary" id="addZone">+ Thêm Zone</button></div>
       </div>
 
-      <div class="table-wrap">
+      <div class="table-wrap" style="margin-top:12px">
         <table>
           <thead>
             <tr>
@@ -584,7 +952,7 @@ function viewSettings(){
             ${zones.map(z=>`
               <tr data-id="${z.id}">
                 <td><input name="name" value="${z.name}"></td>
-                <td><input name="color" value="${z.color}"></td>
+                <td><input name="color" value="${z.color||'#8b7cff'}"></td>
                 <td><input name="point" type="number" value="${z.point||0}"></td>
                 <td><input name="bonus" type="number" value="${z.bonus||0}"></td>
                 <td><input name="penalty" type="number" value="${z.penalty||0}"></td>
@@ -624,7 +992,7 @@ function viewSettings(){
         <button class="btn-primary" id="addRec">+ Thêm Task lặp</button>
       </div>
 
-      <div class="table-wrap">
+      <div class="table-wrap" style="margin-top:12px">
         <table>
           <thead>
             <tr>
@@ -657,17 +1025,17 @@ function viewSettings(){
     </div>
   `;
 
-  /* Nút Qua ngày + Reset điểm */
+  /* hành động Qua ngày / Reset */
   document.getElementById('btnEnd').onclick = ()=>{ handleEndDay(); };
   document.getElementById('btnReset').onclick = ()=>{ handleResetPoints(); };
 
-  /* Hồ sơ người chơi */
+  /* Hồ sơ */
   document.getElementById('saveName').onclick=()=>{
     setName(document.getElementById('name').value);
     alert('Đã lưu');
   };
 
-  /* Zone CRUD */
+  /* Zones CRUD */
   document.getElementById('addZone').onclick=()=>{
     const g=id=>document.getElementById(id).value;
     const z={
@@ -736,120 +1104,40 @@ function viewSettings(){
   };
 }
 
-/* ===== VIEW: MAP ===== */
-function viewMap(){
-  const {level}=getLevelInfo();
-  const total = Math.max(LEVELS.length, 9);
-  const items = Array.from({length:total},(_,i)=>({
-    n:i+1,
-    state: (i+1)<level ? 'passed' : ((i+1)===level ? 'current' : 'locked')
-  }));
-
-  view.innerHTML = `
-    <div class="map">
-      <div class="path"></div>
-      ${items.map((it,i)=>{
-        const y=40+(i*(280/(items.length-1)));
-        const xoff=(i%2===0?-90:90);
-        return `<div class="node ${it.state}" style="top:${y}px; left:calc(50% + ${xoff}px)">${it.n}</div>`;
-      }).join('')}
-      <div class="tag">Level: ${level}</div>
-    </div>
-  `;
-}
-
-/* ===== VIEW: LEADERBOARD ===== */
-function viewLeaderboard(){
-  const cache = getLBCache();
-
-  view.innerHTML = `
-    <div class="card" style="margin-top:0">
-      <h3>Leaderboard</h3>
-      <div class="muted">
-        Dữ liệu từ cache local (đã tải nền khi mở app). Nhấn "Tải lại"
-        để buộc cập nhật lại từ server.
-      </div>
-      <div style="margin:10px 0;display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn-ghost" id="reload">Tải lại</button>
-      </div>
-      <div class="table-wrap">
-        <table id="tbl">
-          <thead>
-            <tr>
-              <th>#</th><th>Người chơi</th><th>Level</th><th>XP</th><th>Cập nhật</th>
-            </tr>
-          </thead>
-          <tbody id="rows"></tbody>
-        </table>
-      </div>
-    </div>
-  `;
-
-  const rows = document.getElementById('rows');
-
-  function fallbackLocalProfileList(){
-    const p=getProfile();
-    return [{
-      name:p.name||'Player',
-      level:p.level||1,
-      xp:p.xp||0,
-      updatedAt:new Date().toISOString()
-    }];
-  }
-
-  // render cache (đã cố gắng làm mới sẵn khi app boot)
-  renderLBRows(rows, cache.list.length ? cache.list : fallbackLocalProfileList());
-
-  // nút tải lại (manual refresh)
-  document.getElementById('reload').onclick = async ()=>{
-    await fetchLeaderboardAndCache();
-    const fresh = getLBCache();
-    renderLBRows(rows, fresh.list.length ? fresh.list : fallbackLocalProfileList());
-  };
-}
-
-/* ===== SETTINGS AUTH (password mở tab Settings) ===== */
-let settingsUnlocked=false;
-function ensureSettingsAuth(){
-  if(settingsUnlocked) return true;
-  const pass=prompt('Nhập mật khẩu Settings:');
-  if(pass===CONFIG.SETTINGS_PASS){
-    settingsUnlocked=true;
-    return true;
-  }
-  alert('Sai mật khẩu');
-  return false;
-}
-
-/* ===== ROUTER ===== */
+/* ----- Routing / Tabs / Theme ----- */
 function render(tab){
+  currentTab = tab;
+  // set background gradient theo tab
+  applyTabBackground(tab);
+  // rebuild tabs bar với icon, active state
+  buildTabsBar(tab, render);
+  // áp style kính mờ .wrap
+  applyThemeToWrap();
+
   if(tab==='tasks'){
-    setActive('tasks');
     viewTasks();
   } else if(tab==='map'){
-    setActive('map');
     viewMap();
   } else if(tab==='leaderboard'){
-    setActive('leaderboard');
     viewLeaderboard();
+  } else if(tab==='stats'){
+    viewStats();
   } else if(tab==='settings'){
     if(ensureSettingsAuth()){
-      setActive('settings');
       viewSettings();
-    } else {
-      setActive('tasks');
-      viewTasks();
+    }else{
+      render('tasks');
     }
   } else {
-    setActive('tasks');
     viewTasks();
   }
 }
 
 /* ===== BOOT ===== */
+let currentTab='tasks';
 ensureName();
-render('tasks');
-backgroundBoardRefresh(); // tải leaderboard nền ngay khi mở app
+render('tasks');              // mở app vào tab Tasks
+backgroundBoardRefresh();     // tự fetch leaderboard nền
 </script>
 </body>
 </html>
