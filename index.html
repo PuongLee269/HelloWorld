@@ -166,6 +166,35 @@ function delRecurring(id){ save(LS.RECUR,getRecurring().filter(r=>r.id!==id)) }
 function getTasks(){ return load(LS.TASKS,[]) }
 function setTasks(a){ save(LS.TASKS,a) }
 
+// ===== Cache Leaderboard (dán sau setTasks) =====
+const LB_CACHE = 'tq_lb_cache';
+
+function getLBCache(){
+  // { ts: milliseconds, list: array }
+  return load(LB_CACHE, { ts: 0, list: [] });
+}
+function setLBCache(v){
+  save(LB_CACHE, v);
+}
+function renderLBRows(rowsEl, list){
+  if (!Array.isArray(list) || !list.length){
+    rowsEl.innerHTML = '<tr><td colspan="5" class="muted">Chưa có dữ liệu</td></tr>';
+    return;
+  }
+  list.sort((a,b)=> (b.level-a.level) || (b.xp-a.xp) || (a.name||'').localeCompare(b.name||''));
+  rowsEl.innerHTML = list.map((u,i)=>`
+    <tr>
+      <td>${i+1}</td>
+      <td>${u.name||'-'}</td>
+      <td>${u.level??'-'}</td>
+      <td>${u.xp??'-'}</td>
+      <td>${u.updatedAt?new Date(u.updatedAt).toLocaleString():'-'}</td>
+    </tr>
+  `).join('');
+}
+// ===== Hết helper cache =====
+
+  
 /* Spawn recurring once per day */
 function spawnRecurringIfNeeded(){
   const mark = Number(localStorage.getItem(LS.SPAWN)||0);
@@ -500,11 +529,82 @@ function viewMap(){
 /* Leaderboard */
 async function viewLeaderboard(){
   const cfg = getSyncCfg();
+  const cache = getLBCache();
+
+  // UI: thêm nút Tải lại + Đẩy điểm ngay
   view.innerHTML = `<div class="card" style="margin-top:0"><h3>Leaderboard</h3>
-    <div class="muted">Nếu đã cấu hình Endpoint ở Settings, bảng dưới sẽ lấy dữ liệu từ đó. Nếu không, chỉ hiển thị điểm của bạn (local).</div>
-    <div style="margin:10px 0"><button class="btn-ghost" id="reload">Tải lại</button></div>
-    <div class="table-wrap"><table id="tbl"><thead><tr><th>#</th><th>Người chơi</th><th>Level</th><th>XP</th><th>Cập nhật</th></tr></thead><tbody id="rows"></tbody></table></div>
+    <div class="muted">Nếu đã cấu hình Endpoint ở Settings, bảng dưới sẽ lấy dữ liệu từ đó. Nếu không, hiển thị điểm local.</div>
+    <div style="margin:10px 0;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn-ghost" id="reload">Tải lại</button>
+      <button class="btn-primary" id="pushNow">Đẩy điểm ngay</button>
+    </div>
+    <div class="table-wrap">
+      <table id="tbl">
+        <thead><tr><th>#</th><th>Người chơi</th><th>Level</th><th>XP</th><th>Cập nhật</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
   </div>`;
+
+  const rows = document.getElementById('rows');
+
+  // 1) Hiển thị cache ngay lập tức (nếu có)
+  renderLBRows(rows, cache.list);
+
+  // Helper fetch có timeout (tránh đợi vô hạn khi Apps Script “lạnh”)
+  async function fetchWithTimeout(ms){
+    const controller = new AbortController();
+    const t = setTimeout(()=>controller.abort(), ms);
+    try{
+      const r = await fetch(cfg.endpoint, { signal: controller.signal });
+      clearTimeout(t);
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return await r.json();
+    }catch(e){
+      clearTimeout(t);
+      throw e;
+    }
+  }
+
+  // 2) Tải nền: nếu có endpoint thì GET; nếu không dùng điểm local
+  async function refresh(forceNetwork = true){
+    try{
+      if(!cfg.endpoint){
+        // Fallback: điểm local nếu chưa cấu hình endpoint
+        const p=getProfile();
+        const list=[{name:p.name||'Player', level:p.level||1, xp:p.xp||0, updatedAt:new Date().toISOString()}];
+        renderLBRows(rows, list);
+        setLBCache({ ts: Date.now(), list });
+        return;
+      }
+
+      let list = cache.list;
+      if(forceNetwork){
+        const data = await fetchWithTimeout(8000); // 8s timeout
+        if(Array.isArray(data)){
+          list = data;
+          setLBCache({ ts: Date.now(), list });
+        }
+      }
+      renderLBRows(rows, list);
+    }catch(err){
+      console.warn('LB refresh error', err);
+      // Giữ nguyên cache đang hiển thị, không xoá bảng
+    }
+  }
+
+  // Nút điều khiển
+  document.getElementById('reload').onclick = () => refresh(true);
+  const pushBtn = document.getElementById('pushNow');
+  pushBtn.onclick = async () => {
+    await autoSync();     // dùng endpoint đã lưu ở Settings
+    await refresh(true);  // tải lại sau khi đẩy
+  };
+
+  // Lần render đầu: hiển thị cache và tải nền
+  refresh(true);
+}
+
 
   async function loadBoard(){
     const rows=document.getElementById('rows');
