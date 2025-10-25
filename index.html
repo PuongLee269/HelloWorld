@@ -3,310 +3,516 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Todo Quest — Gradient UI</title>
+<title>Todo Quest</title>
 <style>
-  :root{
-    --ink:#1b1e2e;
-    --muted:#7d82a8;
-    --border:#e8e8fb;
-    --accent:#8b7cff;
-    --tap:46px;
-  }
-  *{box-sizing:border-box}
-  html,body{height:100%}
-  body{
-    margin:0;
-    color:var(--ink);
-    font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
-    background:#f6f7ff; /* sẽ bị override bằng gradient từ ui-theme.js */
-    background-attachment:fixed;
-  }
+:root{
+  --ink:#1b1e2e;
+  --muted:#7d82a8;
+  --tap:46px;
+  --radius-card:16px;
+  --radius-pill:999px;
+  --gradient-main:linear-gradient(135deg,#8b7cff 0%,#b09bff 100%);
+  --panel-bg:rgba(255,255,255,.85);
+  --panel-border:rgba(0,0,0,.05);
+  --panel-shadow:0 16px 40px rgba(0,0,0,.1);
+  --glass-bg:rgba(255,255,255,.08);
+}
 
-  /* .wrap sẽ được override style inline từ ui-theme.js */
-  .wrap{
-    max-width:960px;
-    margin:12px auto;
-    padding:20px;
-  }
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  color:var(--ink);
+  font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  background:#f6f7ff;
+  background-attachment:fixed;
+}
 
-  h1{
-    margin:0 0 12px;
-    font-size:24px;
-    font-weight:600;
-    color:#1b1e2e;
-    display:flex;
-    align-items:center;
-    gap:8px
-  }
+.wrap{
+  max-width:960px;
+  margin:12px auto;
+  padding:20px;
+}
 
-  /* Tabs bar */
-  .tabs{
-    display:flex;
-    gap:8px;
-    margin-bottom:16px;
-    overflow-x:auto;
-    padding-bottom:4px;
-  }
-  .tabs::-webkit-scrollbar{height:6px}
-  .tabs::-webkit-scrollbar-thumb{background:#ddd;border-radius:6px}
+h1{
+  margin:0 0 12px;
+  font-size:24px;
+  font-weight:600;
+  color:#1b1e2e;
+  display:flex;
+  align-items:center;
+  gap:8px
+}
 
-  .btn{
-    display:flex;
-    align-items:center;
-    min-height:var(--tap);
-    padding:8px 14px;
-    border:1px solid rgba(0,0,0,.05);
-    background:rgba(255,255,255,.8);
-    border-radius:12px;
-    cursor:pointer;
-    white-space:nowrap;
-    box-shadow:0 6px 16px rgba(0,0,0,.08);
-    font-weight:500;
-  }
-  .btn.active{
-    background:linear-gradient(135deg,#8b7cff 0%,#b09bff 100%);
-    color:#fff;
-    border-color:transparent;
-    box-shadow:0 10px 20px rgba(139,124,255,.4);
-  }
-  .btn-primary{
-    min-height:var(--tap);
-    background:linear-gradient(135deg,#8b7cff 0%,#b09bff 100%);
-    color:#fff;border:none;border-radius:12px;
-    padding:10px 14px;font-weight:500;
-    cursor:pointer;
-    box-shadow:0 10px 20px rgba(139,124,255,.4);
-  }
-  .btn-ghost{
-    min-height:var(--tap);
-    background:rgba(255,255,255,.8);
-    border:1px solid rgba(0,0,0,.05);
-    border-radius:12px;
-    padding:10px 14px;
-    box-shadow:0 6px 16px rgba(0,0,0,.08);
-    cursor:pointer;
-  }
-  .btn-danger{
-    min-height:var(--tap);
-    background:linear-gradient(135deg,#ff5f48 0%,#ff3425 100%);
-    color:#fff;border:none;border-radius:12px;
-    padding:10px 14px;font-weight:500;
-    cursor:pointer;
-    box-shadow:0 10px 20px rgba(255,60,48,.4);
-  }
-  .pill{
-    background:rgba(255,255,255,.8);
-    border:1px solid rgba(0,0,0,.05);
-    border-radius:999px;
-    padding:4px 10px;
-    font-size:14px;
-    box-shadow:0 6px 16px rgba(0,0,0,.08);
-  }
-  .muted{color:var(--muted);font-size:14px}
+/* Tabs bar */
+.tabs{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-bottom:16px;
+  overflow-x:auto;
+  padding-bottom:4px;
+}
+.tabs::-webkit-scrollbar{height:6px}
+.tabs::-webkit-scrollbar-thumb{background:#ddd;border-radius:6px}
 
-  .top{
-    display:flex;
-    align-items:center;
-    gap:8px;
-    margin-bottom:12px;
-    flex-wrap:wrap
-  }
+.tab-btn{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  min-height:var(--tap);
+  padding:8px 14px;
+  border:1px solid var(--panel-border);
+  background:rgba(255,255,255,.8);
+  border-radius:12px;
+  cursor:pointer;
+  white-space:nowrap;
+  font-weight:500;
+  box-shadow:0 6px 16px rgba(0,0,0,.08);
+  color:#1b1e2e;
+  font-size:14px;
+}
+.tab-btn.active{
+  background:var(--gradient-main);
+  color:#fff;
+  border-color:transparent;
+  box-shadow:0 10px 20px rgba(139,124,255,.4);
+}
 
-  /* Inputs */
-  input,select,textarea{
-    height:var(--tap);
-    padding:10px;
-    border-radius:12px;
-    border:1px solid rgba(0,0,0,.08);
-    width:100%;
-    font:inherit;
-    background:#fff;
-    box-shadow:0 6px 16px rgba(0,0,0,.05);
-  }
-  input[type="checkbox"]{
-    height:auto;width:auto;box-shadow:none;
-  }
+/* generic buttons */
+.btn-primary{
+  min-height:var(--tap);
+  background:var(--gradient-main);
+  color:#fff;border:none;border-radius:12px;
+  padding:10px 14px;font-weight:500;
+  cursor:pointer;
+  box-shadow:0 10px 20px rgba(139,124,255,.4);
+  font-size:14px;
+}
+.btn-ghost{
+  min-height:var(--tap);
+  background:rgba(255,255,255,.8);
+  border:1px solid var(--panel-border);
+  border-radius:12px;
+  padding:10px 14px;
+  font-size:14px;
+  font-weight:500;
+  color:#1b1e2e;
+  box-shadow:0 6px 16px rgba(0,0,0,.08);
+  cursor:pointer;
+}
+.btn-danger{
+  min-height:var(--tap);
+  background:linear-gradient(135deg,#ff5f48 0%,#ff3425 100%);
+  color:#fff;border:none;border-radius:12px;
+  padding:10px 14px;font-weight:500;
+  cursor:pointer;
+  box-shadow:0 10px 20px rgba(255,60,48,.4);
+  font-size:14px;
+}
 
-  /* Layout rows (Settings) */
-  .grid{display:grid;gap:10px}
-  .row{
-    display:grid;
-    grid-template-columns:200px 1fr;
-    gap:10px;
-    align-items:center;
-  }
+/* pills */
+.pill{
+  background:rgba(255,255,255,.8);
+  border:1px solid var(--panel-border);
+  border-radius:var(--radius-pill);
+  padding:4px 10px;
+  font-size:14px;
+  font-weight:500;
+  color:#1b1e2e;
+  box-shadow:0 6px 16px rgba(0,0,0,.08);
+}
+.muted{color:var(--muted);font-size:14px}
+.top{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:12px;
+  flex-wrap:wrap
+}
 
-  .card{
-    padding:16px;
-    border:1px solid rgba(0,0,0,.05);
-    border-radius:16px;
-    background:rgba(255,255,255,.85);
-    margin-top:16px;
-    box-shadow:0 16px 40px rgba(0,0,0,.1);
-    position:relative;
-    overflow:hidden;
-  }
-  .card h3{
-    margin:0 0 12px;
-    font-size:16px;
-    font-weight:600;
-    color:#1b1e2e;
-  }
+/* Inputs */
+input,select,textarea{
+  height:var(--tap);
+  padding:10px;
+  border-radius:12px;
+  border:1px solid rgba(0,0,0,.08);
+  width:100%;
+  font:inherit;
+  font-size:14px;
+  background:#fff;
+  box-shadow:0 6px 16px rgba(0,0,0,.05);
+}
+input[type="checkbox"]{
+  height:auto;width:auto;box-shadow:none;
+}
 
-  .bar{
-    height:10px;
-    background:rgba(0,0,0,.07);
-    border-radius:6px;
-    overflow:hidden;
-    margin-bottom:10px;
-    box-shadow:inset 0 2px 4px rgba(0,0,0,.12);
-  }
-  .fill{
-    height:100%;
-    background:linear-gradient(90deg,#8b7cff 0%,#b09bff 100%);
-  }
+/* layout (Settings rows) */
+.grid{display:grid;gap:10px}
+.row{
+  display:grid;
+  grid-template-columns:200px 1fr;
+  gap:10px;
+  align-items:flex-start;
+}
 
-  /* Tasks list */
-  ul{list-style:none;margin:0;padding:0}
-  .zone{
-    border:1px solid rgba(0,0,0,.05);
-    border-radius:16px;
-    margin:16px 0;
-    background:rgba(255,255,255,.8);
-    box-shadow:0 12px 32px rgba(0,0,0,.08);
-    overflow:hidden;
-  }
-  .zone header{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    padding:12px 16px;
-    border-bottom:1px solid rgba(0,0,0,.05);
-    background:linear-gradient(135deg,#fafbff 0%,#f6f7ff 100%);
-    font-weight:500;
-  }
-  .badge{
-    font-size:12px;
-    padding:2px 8px;
-    border-radius:999px;
-    background:#fff;
-    border:1px solid rgba(0,0,0,.07);
-    box-shadow:0 4px 10px rgba(0,0,0,.08);
-  }
-  li.task{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    padding:12px 16px;
-    border-top:1px solid rgba(0,0,0,.03);
-  }
-  .left{display:flex;align-items:center;gap:10px}
-  .done .txt{text-decoration:line-through;color:#9aa}
-  .creator{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
-  .left input[type="checkbox"]{transform:scale(1.25)}
+.card{
+  padding:16px;
+  border:1px solid var(--panel-border);
+  border-radius:16px;
+  background:var(--panel-bg);
+  margin-top:16px;
+  box-shadow:var(--panel-shadow);
+  position:relative;
+  overflow:hidden;
+}
+.card h3{
+  margin:0 0 12px;
+  font-size:16px;
+  font-weight:600;
+  color:#1b1e2e;
+}
 
-  /* Map */
-  .map{
-    position:relative;
-    height:360px;
-    background:linear-gradient(180deg,#fafbff,#f6f7ff);
-    border-radius:24px;
-    border:1px solid rgba(0,0,0,.05);
-    overflow:hidden;
-    box-shadow:0 24px 60px rgba(0,0,0,.15);
-  }
-  .path{position:absolute;left:50%;top:20px;bottom:20px;width:4px;background:#e8e8fb;transform:translateX(-50%)}
-  .node{
-    position:absolute;
-    left:50%;
-    transform:translate(-50%,-50%);
-    width:64px;height:64px;
-    border-radius:50%;
-    display:flex;align-items:center;justify-content:center;
-    background:#fff;
-    border:2px solid #e8e8fb;
-    box-shadow:0 16px 32px rgba(0,0,0,.15);
-    font-weight:700;color:#434a77
-  }
-  .node.passed{border-color:#9AE6B4;background:#f6fff8}
-  .node.current{border-color:#8b7cff;box-shadow:0 0 0 6px rgba(139,124,255,.2),0 16px 32px rgba(0,0,0,.15)}
-  .node.locked{opacity:.55}
-  .map .tag{
-    position:absolute;
-    top:6px;right:6px;
-    background:#8b7cff;
-    color:#fff;
-    padding:4px 10px;
-    border-radius:999px;
-    font-size:12px;
-    box-shadow:0 12px 24px rgba(139,124,255,.4);
-  }
+.bar{
+  height:10px;
+  background:rgba(0,0,0,.07);
+  border-radius:6px;
+  overflow:hidden;
+  margin-bottom:10px;
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.12);
+}
+.fill{
+  height:100%;
+  background:linear-gradient(90deg,#8b7cff 0%,#b09bff 100%);
+}
 
-  /* table wrap (Leaderboard) */
-  .table-wrap{
-    overflow:auto;
-    border:1px solid rgba(0,0,0,.05);
-    border-radius:16px;
-    background:rgba(255,255,255,.8);
-    box-shadow:0 16px 32px rgba(0,0,0,.08);
-  }
-  table{width:100%;border-collapse:collapse;background:transparent}
-  th,td{
-    padding:12px 16px;
-    border-bottom:1px solid rgba(0,0,0,.05);
-    text-align:left;
-    white-space:nowrap;
-    font-size:14px;
-  }
-  th{font-weight:600;color:#1b1e2e;background:rgba(255,255,255,.6)}
+/* task lists */
+ul{list-style:none;margin:0;padding:0}
+.zone{
+  border:1px solid rgba(0,0,0,.05);
+  border-radius:16px;
+  margin:16px 0;
+  background:rgba(255,255,255,.8);
+  box-shadow:0 12px 32px rgba(0,0,0,.08);
+  overflow:hidden;
+}
+.zone header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:12px 16px;
+  border-bottom:1px solid rgba(0,0,0,.05);
+  background:linear-gradient(135deg,#fafbff 0%,#f6f7ff 100%);
+  font-weight:500;
+  color:#1b1e2e;
+}
+.zone header.imgHead{
+  color:#fff;
+  border-bottom:1px solid rgba(255,255,255,.3);
+  background-size:cover;
+  background-position:center;
+  background-repeat:no-repeat;
+  background-blend-mode:normal;
+}
+.zone header.imgHead .badge{
+  background:rgba(0,0,0,.4);
+  color:#fff;
+  border:1px solid rgba(255,255,255,.3);
+}
 
-  /* chart canvases */
-  .chart-card canvas{
-    width:100%;
-    max-width:100%;
-    height:160px;
-    display:block;
-  }
+.badge{
+  font-size:12px;
+  padding:2px 8px;
+  border-radius:var(--radius-pill);
+  background:#fff;
+  border:1px solid rgba(0,0,0,.07);
+  color:#1b1e2e;
+  font-weight:500;
+  box-shadow:0 4px 10px rgba(0,0,0,.08);
+}
 
-  /* Responsive tweaks */
-  @media (max-width:768px){
-    .row{grid-template-columns:1fr}
-    .creator{flex-direction:column}
-    .map{height:320px}
-    .node{width:56px;height:56px;font-size:15px}
-    h1{font-size:20px}
-  }
-  @media (max-width:480px){
-    body{font-size:15px}
-    .map{height:280px}
-    .node{width:50px;height:50px;font-size:14px}
-    .btn{padding:8px 12px}
-    .tabs{gap:6px}
-  }
+/* swipe task row */
+li.task{
+  position:relative;
+  border-top:1px solid rgba(0,0,0,.03);
+  background:transparent;
+  padding:0;
+  overflow:hidden;
+}
+.task-inner{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:12px 16px;
+  background:transparent;
+  transition:transform .2s;
+}
+.left{display:flex;align-items:center;gap:10px}
+.done .txt{text-decoration:line-through;color:#9aa}
+.creator{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.left input[type="checkbox"]{transform:scale(1.25)}
+
+.del-btn{
+  position:absolute;
+  right:0;
+  top:0;
+  bottom:0;
+  width:60px;
+  min-width:60px;
+  padding:0;
+  border:none;
+  border-radius:0;
+  background:linear-gradient(135deg,#ff5f48 0%,#ff3425 100%);
+  color:#fff;
+  font-size:20px;
+  font-weight:600;
+  line-height:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:-4px 0 16px rgba(0,0,0,.2);
+  transition:transform .2s;
+  transform:translateX(60px); /* ẩn ban đầu */
+}
+
+li.task.show-del .task-inner{
+  transform:translateX(-60px);
+}
+li.task.show-del .del-btn{
+  transform:translateX(0);
+}
+
+/* tắt transition khi đang kéo */
+li.task.dragging .task-inner{
+  transition:none;
+}
+li.task.dragging .del-btn{
+  transition:none;
+}
+
+/* Map panel */
+.map{
+  position:relative;
+  height:360px;
+  border-radius:24px;
+  border:1px solid rgba(0,0,0,.05);
+  overflow:hidden;
+  box-shadow:0 24px 60px rgba(0,0,0,.15);
+
+  background:linear-gradient(180deg,#1a1c28,#2a3048);
+  background-size:cover;
+  background-position:center;
+  background-repeat:no-repeat;
+}
+
+/* ánh sáng dọc giữa map (chỉ làm đẹp) */
+.path{
+  position:absolute;
+  left:50%;
+  top:20px;
+  bottom:20px;
+  width:2px;
+  background:rgba(255,255,255,.6);
+  box-shadow:0 0 10px rgba(255,255,255,.8);
+  pointer-events:none;
+}
+
+/* mỗi mốc level */
+.mapNode{
+  position:absolute;
+  width:64px;
+  height:64px;
+  transform:translate(-50%,-50%) scale(1);
+  filter:grayscale(1) brightness(.5);
+  opacity:.6;
+  transition:all .2s;
+  pointer-events:none;
+}
+.mapNode img{
+  width:64px;
+  height:64px;
+  object-fit:contain;
+  display:block;
+  filter:inherit;
+  opacity:inherit;
+  transition:inherit;
+  border-radius:16px;
+}
+
+/* label "Cấp N" dưới icon */
+.mapNode .lv{
+  position:absolute;
+  left:50%;
+  top:72px;
+  transform:translateX(-50%);
+  padding:2px 8px;
+  font-size:12px;
+  font-weight:600;
+  color:#fff;
+  background:rgba(0,0,0,.35);
+  border:1px solid rgba(255,255,255,.35);
+  border-radius:999px;
+  white-space:nowrap;
+  backdrop-filter:blur(2px);
+  box-shadow:0 6px 16px rgba(0,0,0,.25);
+}
+
+/* level đã qua */
+.mapNode.passed{
+  filter:none;
+  opacity:1;
+}
+.mapNode.passed img{
+  background:rgba(255,255,255,.08);
+  border:2px solid rgba(255,255,255,.4);
+  box-shadow:0 14px 24px rgba(0,0,0,.5);
+}
+
+/* level hiện tại */
+.mapNode.current{
+  filter:none;
+  opacity:1;
+  transform:translate(-50%,-50%) scale(1.2);
+}
+.mapNode.current img{
+  background:rgba(255,255,255,.15);
+  border:2px solid rgba(255,255,255,.7);
+  backdrop-filter:blur(4px);
+  box-shadow:
+    0 0 12px rgba(255,255,255,.9),
+    0 0 28px rgba(139,124,255,.8),
+    0 20px 30px rgba(0,0,0,.6);
+}
+
+/* level khoá */
+.mapNode.locked img{
+  background:rgba(0,0,0,.2);
+  border:2px solid rgba(255,255,255,.15);
+  box-shadow:0 10px 20px rgba(0,0,0,.6) inset;
+}
+
+/* badge góc map */
+.map .tag{
+  position:absolute;
+  top:6px;
+  right:6px;
+  background:#8b7cff;
+  color:#fff;
+  padding:4px 10px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:500;
+  box-shadow:0 12px 24px rgba(139,124,255,.4);
+}
+
+/* Leaderboard table */
+.table-wrap{
+  overflow:auto;
+  border:1px solid rgba(0,0,0,.05);
+  border-radius:16px;
+  background:rgba(255,255,255,.8);
+  box-shadow:0 16px 32px rgba(0,0,0,.08);
+}
+table{
+  width:100%;
+  border-collapse:collapse;
+  background:transparent;
+  font-size:14px;
+}
+th,td{
+  padding:12px 16px;
+  border-bottom:1px solid rgba(0,0,0,.05);
+  text-align:left;
+  white-space:nowrap;
+}
+th{
+  font-weight:600;
+  color:#1b1e2e;
+  background:rgba(255,255,255,.6)
+}
+
+/* Charts */
+.chart-card canvas{
+  width:100%;
+  max-width:100%;
+  height:160px;
+  display:block;
+}
+
+/* thumb preview */
+.thumb{
+  width:48px;
+  height:48px;
+  border-radius:10px;
+  border:1px solid rgba(0,0,0,.1);
+  background-size:cover;
+  background-position:center;
+  background-color:#eee;
+  box-shadow:0 6px 16px rgba(0,0,0,.08);
+}
+
+@media (max-width:768px){
+  .row{grid-template-columns:1fr}
+  .creator{flex-direction:column}
+  .map{height:320px}
+  h1{font-size:20px}
+}
+@media (max-width:480px){
+  body{font-size:15px}
+  .map{height:280px}
+  .tab-btn{padding:8px 12px}
+  .tabs{gap:6px}
+}
 </style>
 </head>
 <body>
 
 <div class="wrap">
-  <h1><span>Todo Quest</span></h1>
+  <h1>Todo Quest</h1>
 
   <div class="tabs" id="tabsBar"></div>
 
   <div id="view">Đang nạp…</div>
 </div>
 
-<!-- 1. Theme / UI config (KHÔNG có thẻ <script> bên trong file ui-theme.js) -->
-<script src="ui-theme.js"></script>
-
-<!-- 2. App logic -->
 <script>
-/* ====== CONFIG APP ====== */
+/* ==============================
+   CONFIG
+============================== */
 const CONFIG = {
   ENDPOINT:'https://script.google.com/macros/s/AKfycbyQ3imjnhKrzmuz4-KbPNsHzpYGY_Mv45os1bZEPoQrQ-UM8RjJvCznfP5x6RB6QX_Qpw/exec',
-  SETTINGS_PASS:'1000'
+  SETTINGS_PASS:'1000',
+
+  // Icon PNG cho từng Level. Thay link ở đây nếu muốn icon riêng
+  mapIcons:{
+    1:'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/OOjs_UI_icon_mapPin-progressive.svg/64px-OOjs_UI_icon_mapPin-progressive.svg.png',
+    2:'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/OOjs_UI_icon_mapPin-progressive.svg/64px-OOjs_UI_icon_mapPin-progressive.svg.png',
+    3:'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/OOjs_UI_icon_mapPin-progressive.svg/64px-OOjs_UI_icon_mapPin-progressive.svg.png',
+    4:'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/OOjs_UI_icon_mapPin-progressive.svg/64px-OOjs_UI_icon_mapPin-progressive.svg.png',
+    5:'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/OOjs_UI_icon_mapPin-progressive.svg/64px-OOjs_UI_icon_mapPin-progressive.svg.png',
+    6:'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/OOjs_UI_icon_mapPin-progressive.svg/64px-OOjs_UI_icon_mapPin-progressive.svg.png',
+    7:'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/OOjs_UI_icon_mapPin-progressive.svg/64px-OOjs_UI_icon_mapPin-progressive.svg.png',
+    8:'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/OOjs_UI_icon_mapPin-progressive.svg/64px-OOjs_UI_icon_mapPin-progressive.svg.png',
+    9:'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/OOjs_UI_icon_mapPin-progressive.svg/64px-OOjs_UI_icon_mapPin-progressive.svg.png'
+  },
+
+  // vị trí từng level theo ảnh mẫu (%, %, từ góc trên trái)
+  mapLayout:[
+    { left:12, top:86 }, // Cấp 1
+    { left:45, top:78 }, // Cấp 2
+    { left:77, top:76 }, // Cấp 3
+    { left:55, top:67 }, // Cấp 4
+    { left:23, top:63 }, // Cấp 5
+    { left:49, top:52 }, // Cấp 6
+    { left:78, top:44 }, // Cấp 7
+    { left:26, top:39 }, // Cấp 8
+    { left:42, top:20 }  // Cấp 9
+  ]
 };
 
-/* ====== STATE KEYS ====== */
+/* ==============================
+   LOCAL STORAGE KEYS
+============================== */
 const LS = {
   PROFILE:'tq_profile',
   ZONES:'tq_zones',
@@ -316,9 +522,13 @@ const LS = {
   BONUS:'tq_bonus_flags',
   SPAWN:'tq_spawned_day',
   LBCACHE:'tq_lb_cache',
-  HIST:'tq_hist'            // lịch sử điểm/ngày cho chart
+  HIST:'tq_hist',
+  MAPBG:'tq_map_bg'
 };
 
+/* ==============================
+   LEVEL CONFIG
+============================== */
 const LEVELS = [
   {lvl:1, cap:5,  need:100},
   {lvl:2, cap:7,  need:250},
@@ -331,23 +541,22 @@ const LEVELS = [
   {lvl:9, cap:20, need:3800},
 ];
 
-/* ====== HELPERS ====== */
+/* ==============================
+   GENERIC HELPERS
+============================== */
 function load(key, def){ try{ return JSON.parse(localStorage.getItem(key)) ?? def }catch{ return def } }
 function save(key, val){ localStorage.setItem(key, JSON.stringify(val)) }
-
 function todayDM(){
   const d=new Date();
   const dd=String(d.getDate()).padStart(2,'0');
   const mm=String(d.getMonth()+1).padStart(2,'0');
   return `${dd}-${mm}`;
 }
+function lastLevelCfg(){ return LEVELS[LEVELS.length-1]; }
 
-/* safe helper: phần tử cuối LEVELS */
-function lastLevelCfg(){
-  return LEVELS[LEVELS.length-1];
-}
-
-/* ===== PROFILE / LEVEL / "E" (XP) ===== */
+/* ==============================
+   PROFILE / LEVEL / XP ("E")
+============================== */
 function getProfile(){
   let p = load(LS.PROFILE);
   if(!p){ p={name:'', level:1, xp:0}; save(LS.PROFILE,p); }
@@ -388,7 +597,9 @@ function ensureName(){
   }
 }
 
-/* ===== HISTORY SNAPSHOT (Stats tab) ===== */
+/* ==============================
+   HISTORY SNAPSHOT (Stats)
+============================== */
 function getHist(){ return load(LS.HIST,[]); }
 function setHist(h){ save(LS.HIST,h); }
 function pushHistSnapshot(){
@@ -397,16 +608,31 @@ function pushHistSnapshot(){
   h.push({
     ts:Date.now(),
     level:p.level,
-    xp:p.xp   // xp == E
+    xp:p.xp
   });
-  // giữ khoảng 60 bản ghi gần nhất thôi
   if(h.length>60){
     h.splice(0, h.length-60);
   }
   setHist(h);
 }
 
-/* ===== DAY & BONUS FLAGS ===== */
+/* ==============================
+   MAP BACKGROUND
+============================== */
+function getMapBG(){
+  return localStorage.getItem(LS.MAPBG) || '';
+}
+function setMapBG(data){
+  if(data){
+    localStorage.setItem(LS.MAPBG, data);
+  }else{
+    localStorage.removeItem(LS.MAPBG);
+  }
+}
+
+/* ==============================
+   DAY / FLAGS
+============================== */
 function getDay(){
   let d=Number(localStorage.getItem(LS.DAY)||0);
   if(!d){ d=1; localStorage.setItem(LS.DAY,d); }
@@ -437,11 +663,25 @@ function clearFlagsFor(day){
   saveFlags(f);
 }
 
-/* ===== ZONES & RECURRING ===== */
+/* ==============================
+   ZONES / TASKS / RECURRING
+============================== */
+/*
+Zone obj:
+{
+  id,
+  name,
+  bg: base64 img string,
+  point, bonus, penalty, maxPerDay
+}
+*/
 function getZones(){ return load(LS.ZONES,[]) }
 function setZones(z){ save(LS.ZONES,z) }
 function addZone(z){
-  const L=getZones(); z.id=Date.now(); L.push(z); setZones(L);
+  const L=getZones();
+  z.id=Date.now();
+  L.push(z);
+  setZones(L);
 }
 function updZone(id,patch){
   setZones(getZones().map(z=>z.id===id?{...z,...patch}:z));
@@ -459,11 +699,12 @@ function delRecurring(id){
   save(LS.RECUR,getRecurring().filter(r=>r.id!==id));
 }
 
-/* ===== TASKS ===== */
 function getTasks(){ return load(LS.TASKS,[]) }
 function setTasks(a){ save(LS.TASKS,a) }
 
-/* ===== LEADERBOARD CACHE ===== */
+/* ==============================
+   LB CACHE
+============================== */
 function getLBCache(){
   return load(LS.LBCACHE, { ts:0, list:[] });
 }
@@ -489,12 +730,14 @@ function renderLBRows(rowsEl, list){
   `).join('');
 }
 
-/* ===== RECURRING AUTO SPAWN ===== */
+/* ==============================
+   SPAWN RECURRING EACH DAY
+============================== */
 function spawnRecurringIfNeeded(){
   const mark = Number(localStorage.getItem(LS.SPAWN)||0);
   if(mark===getDay()) return;
 
-  const weekday = new Date().getDay(); // 0=CN
+  const weekday = new Date().getDay();
   const recs = getRecurring();
   const zones = getZones();
   const tasks = getTasks();
@@ -525,7 +768,9 @@ function spawnRecurringIfNeeded(){
   localStorage.setItem(LS.SPAWN, String(getDay()));
 }
 
-/* ===== SYNC / LEADERBOARD FETCH ===== */
+/* ==============================
+   SYNC / LB FETCH
+============================== */
 function getSyncCfg(){ return { endpoint: CONFIG.ENDPOINT, autosync: true }; }
 
 async function autoSync(){
@@ -573,12 +818,13 @@ async function fetchLeaderboardAndCache(){
   }
 }
 
-// tải leaderboard nền khi mở app
 function backgroundBoardRefresh(){
   fetchLeaderboardAndCache().catch(()=>{});
 }
 
-/* ===== XOÁ HỒ SƠ LOCAL ===== */
+/* ==============================
+   DANGER LOCAL WIPE
+============================== */
 function wipeLocalPlayer(){
   localStorage.removeItem(LS.PROFILE);
   localStorage.removeItem(LS.LBCACHE);
@@ -586,7 +832,9 @@ function wipeLocalPlayer(){
   location.reload();
 }
 
-/* ===== END DAY / RESET ===== */
+/* ==============================
+   END DAY / RESET
+============================== */
 function handleResetPoints(){
   if(confirm('Reset Level=1 & E=0?')){
     resetPoints();
@@ -600,7 +848,6 @@ function handleEndDay(){
   const tasks=getTasks();
   const todaySim=getDay();
 
-  // chấm thưởng/phạt theo zone
   for(const z of zones){
     if(!z.maxPerDay) continue;
     const zoneTasks = tasks.filter(t=>t.zoneId==z.id);
@@ -616,27 +863,25 @@ function handleEndDay(){
     }
   }
 
-  // snapshot lịch sử (sau khi tính phạt/thưởng)
   pushHistSnapshot();
 
-  // qua ngày local
   clearFlagsFor(todaySim);
   nextDay();
   setTasks([]);
   localStorage.removeItem(LS.SPAWN);
   spawnRecurringIfNeeded();
 
-  // phản hồi ngay
   alert('Đã qua ngày.');
   render('settings');
 
-  // sync server và refresh leaderboard nền (không chặn UI)
   autoSync()
     .then(()=>fetchLeaderboardAndCache())
     .catch(()=>{});
 }
 
-/* ===== VẼ CHART CƠ BẢN (canvas) ===== */
+/* ==============================
+   MINI CHART DRAWER
+============================== */
 function drawChart(canvasId, values){
   const cvs = document.getElementById(canvasId);
   if(!cvs) return;
@@ -645,8 +890,6 @@ function drawChart(canvasId, values){
   const H = cvs.height = cvs.offsetHeight || 160;
 
   ctx.clearRect(0,0,W,H);
-
-  // background mờ kiểu panel
   ctx.fillStyle = "rgba(255,255,255,0.6)";
   ctx.fillRect(0,0,W,H);
 
@@ -662,7 +905,6 @@ function drawChart(canvasId, values){
   const padX=20, padY=20;
   const span = (maxV-minV)||1;
 
-  // line
   ctx.lineWidth=3;
   const grad = ctx.createLinearGradient(0,0,W,0);
   grad.addColorStop(0,"#8b7cff");
@@ -676,7 +918,6 @@ function drawChart(canvasId, values){
   });
   ctx.stroke();
 
-  // last point highlight
   const lastIdx = values.length-1;
   const lastVal = values[lastIdx];
   const lastX = padX + ((W-2*padX)*(lastIdx/(values.length-1||1)));
@@ -691,9 +932,152 @@ function drawChart(canvasId, values){
   ctx.fillText(String(lastVal), lastX+8, lastY-8);
 }
 
-/* ===== VIEW / ROUTING / TABS ===== */
+/* ==============================
+   SWIPE TASK HANDLERS
+============================== */
+function attachSwipeHandlersForTasks(){
+  const rows = [...document.querySelectorAll('li.task')];
 
+  rows.forEach(li=>{
+    const inner  = li.querySelector('.task-inner');
+    const delBtn = li.querySelector('.del-btn');
+
+    let startX = 0;
+    let currentX = 0;
+    let isDown = false;
+    let opened = li.classList.contains('show-del');
+
+    function openRow(){
+      li.classList.add('show-del');
+      li.classList.remove('dragging');
+      inner.style.transform = '';
+      delBtn.style.transform = '';
+      opened = true;
+    }
+
+    function closeRow(){
+      li.classList.remove('show-del');
+      li.classList.remove('dragging');
+      inner.style.transform = '';
+      delBtn.style.transform = 'translateX(60px)';
+      opened = false;
+    }
+
+    function applyDrag(dx){
+      let offset = dx;
+      if(offset < -60) offset = -60;
+      if(offset > 0)   offset = 0;
+
+      inner.style.transform = `translateX(${offset}px)`;
+
+      const btnOffset = 60 + offset;
+      delBtn.style.transform = `translateX(${btnOffset}px)`;
+    }
+
+    function startDrag(clientX){
+      isDown = true;
+      startX = clientX;
+      currentX = clientX;
+      li.classList.add('dragging');
+
+      if(opened){
+        inner.style.transform   = 'translateX(-60px)';
+        delBtn.style.transform  = 'translateX(0px)';
+      }
+    }
+
+    function moveDrag(clientX){
+      if(!isDown) return;
+      currentX = clientX;
+      const dx = currentX - startX;
+
+      if(opened){
+        applyDrag(-60 + dx);
+      }else{
+        applyDrag(dx);
+      }
+    }
+
+    function endDrag(){
+      if(!isDown) return;
+      isDown = false;
+
+      const dx = currentX - startX;
+
+      if(opened){
+        if(dx > 30){
+          closeRow();
+        }else{
+          openRow();
+        }
+      }else{
+        if(dx < -30){
+          openRow();
+        }else{
+          closeRow();
+        }
+      }
+    }
+
+    // Touch
+    li.addEventListener('touchstart', e=>{
+      startDrag(e.touches[0].clientX);
+    }, {passive:true});
+
+    li.addEventListener('touchmove', e=>{
+      if(!isDown) return;
+      moveDrag(e.touches[0].clientX);
+      e.preventDefault();
+    }, {passive:false});
+
+    li.addEventListener('touchend', ()=>{
+      endDrag();
+    });
+
+    // Mouse
+    li.addEventListener('mousedown', e=>{
+      startDrag(e.clientX);
+    });
+
+    li.addEventListener('mousemove', e=>{
+      if(!isDown) return;
+      moveDrag(e.clientX);
+    });
+
+    li.addEventListener('mouseup', ()=>{
+      endDrag();
+    });
+
+    li.addEventListener('mouseleave', ()=>{
+      if(isDown){
+        endDrag();
+      }
+    });
+
+    inner.addEventListener('click', e=>{
+      if(li.classList.contains('show-del')){
+        e.preventDefault();
+        e.stopPropagation();
+        closeRow();
+      }
+    });
+  });
+
+  document.querySelectorAll('.del-btn').forEach(btn=>{
+    btn.onclick = (e)=>{
+      e.stopPropagation();
+      const id = Number(btn.dataset.id);
+      setTasks(getTasks().filter(t=>t.id!==id));
+      render('tasks');
+    };
+  });
+}
+
+/* ==============================
+   VIEW FUNCTIONS
+============================== */
 const view = document.getElementById('view');
+const tabsBar = document.getElementById('tabsBar');
 let settingsUnlocked=false;
 
 function ensureSettingsAuth(){
@@ -707,20 +1091,41 @@ function ensureSettingsAuth(){
   return false;
 }
 
-/* --- Tasks tab --- */
+/* Build tabs bar */
+function buildTabsBar(active){
+  tabsBar.innerHTML = [
+    {id:'tasks', label:'Tasks', icon:'✅'},
+    {id:'map', label:'Map', icon:'🗺️'},
+    {id:'leaderboard', label:'Leaderboard', icon:'🏆'},
+    {id:'stats', label:'Biểu đồ', icon:'📈'},
+    {id:'settings', label:'Settings', icon:'⚙️'}
+  ].map(t=>`
+    <button class="tab-btn ${t.id===active?'active':''}" data-tab="${t.id}">
+      <span>${t.icon}</span><span>${t.label}</span>
+    </button>
+  `).join('');
+
+  [...tabsBar.querySelectorAll('.tab-btn')].forEach(btn=>{
+    btn.onclick=()=>{
+      render(btn.dataset.tab);
+    };
+  });
+}
+
+/* TASKS */
 function viewTasks(){
   spawnRecurringIfNeeded();
 
   const zones=getZones();
   const tasks=getTasks();
   const {level,xp,need,cap}=getLevelInfo();
-  const dateNowDM = todayDM(); // dd-mm thực tế
+  const dateNowDM = todayDM();
 
-  const groups = zones.map(z=>({
-    z,
-    list: tasks.filter(t=>t.zoneId==z.id),
-    done: tasks.filter(t=>t.zoneId==z.id && t.done).length
-  }));
+  const groups = zones.map(z=>{
+    const list = tasks.filter(t=>t.zoneId==z.id);
+    const done = list.filter(t=>t.done).length;
+    return {z,list,done};
+  });
 
   view.innerHTML = `
     <div class="top">
@@ -738,25 +1143,33 @@ function viewTasks(){
       <button class="btn-primary" id="btnAdd">Thêm</button>
     </div>
 
-    ${groups.map(g=>`
+    ${groups.map(g=>{
+      const z=g.z;
+      const headerClass = z.bg ? 'imgHead' : '';
+      const headerStyle = z.bg
+        ? `background-image:linear-gradient(0deg,rgba(0,0,0,.5),rgba(0,0,0,.15)),url('${z.bg}');`
+        : '';
+      return `
       <section class="zone">
-        <header style="border-color:${g.z.color||'#e8e8fb'}">
-          <div><b>${g.z.name}</b></div>
-          <div class="badge">Hoàn thành: ${g.done}/${g.z.maxPerDay||0}</div>
+        <header class="${headerClass}" style="${headerStyle}">
+          <div><b>${z.name}</b></div>
+          <div class="badge">Hoàn thành: ${g.done}/${z.maxPerDay||0}</div>
         </header>
         <ul>
           ${g.list.length? g.list.map(t=>`
-            <li class="task ${t.done?'done':''}">
-              <div class="left">
-                <input type="checkbox" data-id="${t.id}" ${t.done?'checked':''}>
-                <span class="txt">${t.text}</span>
+            <li class="task ${t.done?'done':''}" data-id="${t.id}">
+              <div class="task-inner">
+                <div class="left">
+                  <input type="checkbox" data-id="${t.id}" ${t.done?'checked':''}>
+                  <span class="txt">${t.text}</span>
+                </div>
               </div>
-              <button class="btn-danger del" data-id="${t.id}">×</button>
+              <button class="del-btn" data-id="${t.id}">×</button>
             </li>
-          `).join('') : `<li class="task"><span class="muted">Chưa có task trong Zone này.</span></li>`}
+          `).join('') : `<li class="task"><div class="task-inner"><span class="muted">Chưa có task trong Zone này.</span></div></li>`}
         </ul>
-      </section>
-    `).join('')}
+      </section>`;
+    }).join('')}
   `;
 
   const inp = document.getElementById('taskText');
@@ -809,37 +1222,45 @@ function viewTasks(){
     };
   });
 
-  // xoá task
-  view.querySelectorAll('.del').forEach(b=> b.onclick=()=>{
-    const id=Number(b.dataset.id);
-    setTasks(getTasks().filter(t=>t.id!==id));
-    render('tasks');
-  });
+  attachSwipeHandlersForTasks();
 }
 
-/* --- Map tab --- */
+/* MAP */
 function viewMap(){
-  const {level}=getLevelInfo();
-  const total = Math.max(LEVELS.length, 9);
-  const items = Array.from({length:total},(_,i)=>({
-    n:i+1,
-    state: (i+1)<level ? 'passed' : ((i+1)===level ? 'current' : 'locked')
-  }));
+  const { level } = getLevelInfo();
+  const total = 9;
+  const bgImg = getMapBG();
+
+  const layout = CONFIG.mapLayout;
+
+  const items = Array.from({length: total}, (_, i) => {
+    const n = i + 1;
+    return {
+      n,
+      icon: CONFIG.mapIcons[n],
+      state: n < level ? 'passed' : (n === level ? 'current' : 'locked'),
+      pos: layout[i]
+    };
+  });
+
+  const nodeHTML = items.map(it => `
+    <div class="mapNode ${it.state}"
+         style="top:${it.pos.top}%; left:${it.pos.left}%;">
+      <img src="${it.icon}" alt="LV ${it.n}">
+      <div class="lv">Cấp ${it.n}</div>
+    </div>
+  `).join('');
 
   view.innerHTML = `
-    <div class="map">
+    <div class="map" style="${bgImg?`background-image:url('${bgImg}');`:''}">
       <div class="path"></div>
-      ${items.map((it,i)=>{
-        const y=40+(i*(280/(items.length-1)));
-        const xoff=(i%2===0?-90:90);
-        return `<div class="node ${it.state}" style="top:${y}px; left:calc(50% + ${xoff}px)">${it.n}</div>`;
-      }).join('')}
+      ${nodeHTML}
       <div class="tag">Level: ${level}</div>
     </div>
   `;
 }
 
-/* --- Leaderboard tab --- */
+/* LEADERBOARD */
 function viewLeaderboard(){
   const cache = getLBCache();
 
@@ -847,7 +1268,7 @@ function viewLeaderboard(){
     <div class="card" style="margin-top:0">
       <h3>Leaderboard</h3>
       <div class="muted">
-        Dữ liệu đã tải nền khi mở app. Nhấn "Tải lại" để cập nhật trực tiếp từ server.
+        Dữ liệu được tải nền khi mở app. Nhấn "Tải lại" để cập nhật.
       </div>
       <div style="margin:10px 0;display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn-ghost" id="reload">Tải lại</button>
@@ -886,9 +1307,9 @@ function viewLeaderboard(){
   };
 }
 
-/* --- Stats tab (biểu đồ 7 / 30 ngày E) --- */
+/* STATS */
 function viewStats(){
-  const hist = getHist(); // [{ts,level,xp}, ...]
+  const hist = getHist();
   const last7  = hist.slice(-7 ).map(r=>r.xp);
   const last30 = hist.slice(-30).map(r=>r.xp);
 
@@ -904,7 +1325,7 @@ function viewStats(){
     </div>
 
     <div class="muted" style="margin-top:12px;font-size:13px">
-      Ghi chú: Lịch sử được lưu mỗi lần bạn bấm "Qua ngày".
+      Lịch sử được lưu mỗi lần bạn bấm "Qua ngày".
     </div>
   `;
 
@@ -912,13 +1333,14 @@ function viewStats(){
   drawChart("chart30", last30);
 }
 
-/* --- Settings tab --- */
+/* SETTINGS */
 function viewSettings(){
   const p=getProfile();
   const zones=getZones();
   const recs=getRecurring();
   const {level,xp,need,cap}=getLevelInfo();
   const dateNowDM=todayDM();
+  const mapBG = getMapBG();
 
   view.innerHTML = `
     <div class="card" style="margin-top:0">
@@ -958,7 +1380,9 @@ function viewSettings(){
       <h3>Zones & Điểm</h3>
       <div class="grid">
         <div class="row"><div>Tên Zone</div><input id="zName" placeholder="Công việc"></div>
-        <div class="row"><div>Màu</div><input id="zColor" value="#8b7cff"></div>
+        <div class="row"><div>Hình nền Zone</div>
+          <input id="zBg" type="file" accept="image/*">
+        </div>
         <div class="row"><div>Điểm/Task</div><input id="zPoint" type="number" value="10"></div>
         <div class="row"><div>Bonus khi đạt Max</div><input id="zBonus" type="number" value="100"></div>
         <div class="row"><div>Penalty nếu KHÔNG đạt</div><input id="zPenalty" type="number" value="10"></div>
@@ -970,15 +1394,23 @@ function viewSettings(){
         <table>
           <thead>
             <tr>
-              <th>Tên</th><th>Màu</th><th>Điểm</th><th>Bonus</th>
-              <th>Penalty</th><th>Max/ngày</th><th></th>
+              <th>Tên</th>
+              <th>Nền</th>
+              <th>Điểm</th>
+              <th>Bonus</th>
+              <th>Penalty</th>
+              <th>Max/ngày</th>
+              <th></th>
             </tr>
           </thead>
           <tbody id="zoneT">
             ${zones.map(z=>`
               <tr data-id="${z.id}">
                 <td><input name="name" value="${z.name}"></td>
-                <td><input name="color" value="${z.color||'#8b7cff'}"></td>
+                <td>
+                  <div class="thumb" style="background-image:url('${z.bg||''}')"></div>
+                  <input class="bgUpload" data-id="${z.id}" type="file" accept="image/*" style="margin-top:6px">
+                </td>
                 <td><input name="point" type="number" value="${z.point||0}"></td>
                 <td><input name="bonus" type="number" value="${z.bonus||0}"></td>
                 <td><input name="penalty" type="number" value="${z.penalty||0}"></td>
@@ -1007,9 +1439,11 @@ function viewSettings(){
       </div>
       <div class="row" id="rDaysRow" style="display:none">
         <div>Chọn thứ</div>
-        <div class="grid" style="grid-template-columns:repeat(7, minmax(40px,1fr))">
+        <div class="grid" style="grid-template-columns:repeat(7, minmax(40px,1fr));gap:4px;font-size:14px">
           ${['CN','T2','T3','T4','T5','T6','T7'].map((l,i)=>`
-            <label><input type="checkbox" value="${i}"> ${l}</label>
+            <label style="display:flex;align-items:center;gap:4px">
+              <input type="checkbox" value="${i}"> ${l}
+            </label>
           `).join('')}
         </div>
       </div>
@@ -1027,11 +1461,11 @@ function viewSettings(){
           </thead>
           <tbody id="recT">
             ${recs.map(r=>{
-              const z = zones.find(z=>z.id==r.zoneId)?.name||'(xoá)';
+              const zn = zones.find(z=>z.id==r.zoneId)?.name||'(xoá)';
               return `
                 <tr>
                   <td>${r.text}</td>
-                  <td>${z}</td>
+                  <td>${zn}</td>
                   <td>${r.type}</td>
                   <td>${r.type==='weekly'?(r.days||[]).join(', '):'-'}</td>
                   <td><button class="btn-danger rdel" data-id="${r.id}">Xoá</button></td>
@@ -1039,6 +1473,20 @@ function viewSettings(){
             }).join('')}
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Map / Giao diện</h3>
+      <div class="row">
+        <div>Hình nền Map</div>
+        <div class="grid" style="grid-template-columns:auto 1fr;align-items:center;gap:12px">
+          <div class="thumb" style="width:80px;height:50px;border-radius:12px;background-image:url('${mapBG||''}');background-size:cover;background-position:center;background-color:#eee"></div>
+          <input id="mapBgFile" type="file" accept="image/*">
+        </div>
+      </div>
+      <div class="muted" style="font-size:13px">
+        Icon Level 1→9 chỉnh ở CONFIG.mapIcons trong code.
       </div>
     </div>
 
@@ -1051,7 +1499,14 @@ function viewSettings(){
     </div>
   `;
 
-  /* Hành động Ngày & Điểm */
+  // helper đọc file => base64
+  function readFileAsDataURL(file, cb){
+    const reader=new FileReader();
+    reader.onload=()=>cb(reader.result);
+    reader.readAsDataURL(file);
+  }
+
+  /* Ngày & Điểm buttons */
   document.getElementById('btnEnd').onclick = ()=>{ handleEndDay(); };
   document.getElementById('btnReset').onclick = ()=>{ handleResetPoints(); };
 
@@ -1061,25 +1516,38 @@ function viewSettings(){
     alert('Đã lưu');
   };
 
-  /* Zone CRUD */
+  /* Zone thêm mới */
   document.getElementById('addZone').onclick=()=>{
-    const g=id=>document.getElementById(id).value;
-    const z={
-      name:g('zName').trim(),
-      color:g('zColor'),
-      point:Number(g('zPoint')),
-      bonus:Number(g('zBonus')),
-      penalty:Number(g('zPenalty')),
-      maxPerDay:Number(g('zMax'))
-    };
-    if(!z.name){
-      alert('Nhập tên Zone');
-      return;
+    const nameVal=document.getElementById('zName').value.trim();
+    if(!nameVal){ alert('Nhập tên Zone'); return; }
+
+    const file=document.getElementById('zBg').files[0];
+    const pointVal=Number(document.getElementById('zPoint').value||0);
+    const bonusVal=Number(document.getElementById('zBonus').value||0);
+    const penVal=Number(document.getElementById('zPenalty').value||0);
+    const maxVal=Number(document.getElementById('zMax').value||0);
+
+    function finishAdd(bgData){
+      const z={
+        name:nameVal,
+        bg:bgData||'',
+        point:pointVal,
+        bonus:bonusVal,
+        penalty:penVal,
+        maxPerDay:maxVal
+      };
+      addZone(z);
+      viewSettings();
     }
-    addZone(z);
-    viewSettings();
+
+    if(file){
+      readFileAsDataURL(file, data=>finishAdd(data));
+    }else{
+      finishAdd('');
+    }
   };
 
+  /* Zone chỉnh sửa text/số */
   document.getElementById('zoneT').oninput=(e)=>{
     const tr=e.target.closest('tr[data-id]'); if(!tr) return;
     const id=Number(tr.dataset.id);
@@ -1091,12 +1559,26 @@ function viewSettings(){
     updZone(id,{[name]:val});
   };
 
+  /* Zone đổi hình nền */
+  document.querySelectorAll('.bgUpload').forEach(inp=>{
+    inp.onchange=()=>{
+      const file=inp.files[0];
+      const id=Number(inp.dataset.id);
+      if(!file) return;
+      readFileAsDataURL(file, data=>{
+        updZone(id,{bg:data});
+        viewSettings();
+      });
+    };
+  });
+
+  /* Zone xoá */
   document.querySelectorAll('.zdel').forEach(b=> b.onclick=()=>{
     delZone(Number(b.dataset.id));
     viewSettings();
   });
 
-  /* Recurring CRUD */
+  /* Recurring */
   const typeSel=document.getElementById('rType');
   const daysRow=document.getElementById('rDaysRow');
   typeSel.onchange=()=>{
@@ -1122,6 +1604,21 @@ function viewSettings(){
     viewSettings();
   });
 
+  /* Map bg upload */
+  const mapBgInput = document.getElementById('mapBgFile');
+  if(mapBgInput){
+    mapBgInput.onchange = ()=>{
+      const file = mapBgInput.files[0];
+      if(!file) return;
+      const reader=new FileReader();
+      reader.onload=()=>{
+        setMapBG(reader.result);
+        viewSettings();
+      };
+      reader.readAsDataURL(file);
+    };
+  }
+
   /* Local wipe */
   document.getElementById('wipeLocalBtn').onclick = ()=>{
     if(confirm('Xoá hồ sơ local và cache leaderboard trên máy này?')){
@@ -1130,22 +1627,15 @@ function viewSettings(){
   };
 }
 
-/* ===== ROUTER / THEME ===== */
+/* ==============================
+   ROUTER
+============================== */
 let currentTab='tasks';
 
 function render(tab){
   currentTab = tab;
+  buildTabsBar(tab);
 
-  // 1. đổi nền gradient theo tab
-  applyTabBackground(tab);
-
-  // 2. build thanh tabs với icon từ ui-theme.js
-  buildTabsBar(tab, render);
-
-  // 3. apply style kính mờ cho .wrap
-  applyThemeToWrap();
-
-  // 4. render nội dung tab
   if(tab==='tasks'){
     viewTasks();
   } else if(tab==='map'){
@@ -1165,10 +1655,12 @@ function render(tab){
   }
 }
 
-/* ===== BOOT ===== */
+/* ==============================
+   BOOT
+============================== */
 ensureName();
-render('tasks');          // mở mặc định tab Tasks
-backgroundBoardRefresh(); // tải leaderboard cache nền
+render('tasks');
+backgroundBoardRefresh();
 </script>
 </body>
 </html>
