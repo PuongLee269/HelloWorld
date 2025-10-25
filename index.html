@@ -1,727 +1,463 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Climate Dashboard</title>
-    <style>
-      :root {
-        font-size: 16px;
-        --bg: #f3f0ff;
-        --card: #ffffff;
-        --muted: #a3a8c3;
-        --text: #2d2f55;
-        --accent: #7d6bff;
-        --accent-strong: #f96fff;
-        --shadow: rgba(125, 107, 255, 0.18);
-        --panel: rgba(255, 255, 255, 0.75);
-        --border: rgba(138, 141, 178, 0.2);
-      }
-
-      * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
-
-      body {
-        min-height: 100vh;
-        font-family: "Poppins", "Inter", "Segoe UI", sans-serif;
-        background: radial-gradient(circle at top left, #fdf8ff 0%, var(--bg) 55%, #e6ebff 100%);
-        color: var(--text);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: clamp(1rem, 2vw + 1rem, 3rem);
-      }
-
-      .dashboard {
-        width: min(1100px, 100%);
-        display: grid;
-        grid-template-columns: 88px minmax(0, 1fr) 280px;
-        gap: 1.5rem;
-        padding: clamp(1.5rem, 2vw + 1.25rem, 2.5rem);
-        border-radius: 32px;
-        background: linear-gradient(150deg, rgba(255, 255, 255, 0.8), rgba(245, 243, 255, 0.8));
-        box-shadow: 0 40px 80px -40px rgba(97, 86, 255, 0.35);
-        backdrop-filter: blur(12px);
-      }
-
-      .sidebar {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 1.5rem;
-      }
-
-      .sidebar .logo {
-        width: 48px;
-        height: 48px;
-        border-radius: 16px;
-        background: linear-gradient(140deg, #ffb15c, #ff7e84);
-        color: white;
-        display: grid;
-        place-items: center;
-        font-weight: 700;
-        font-size: 1.25rem;
-      }
-
-      .nav-list {
-        display: grid;
-        gap: 1rem;
-      }
-
-      .nav-button {
-        width: 50px;
-        height: 50px;
-        border-radius: 18px;
-        border: 1px solid transparent;
-        background: var(--panel);
-        display: grid;
-        place-items: center;
-        color: var(--muted);
-        font-size: 1.25rem;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
-      }
-
-      .nav-button.active,
-      .nav-button:hover {
-        background: linear-gradient(135deg, #8f7bff, #6e8bff);
-        color: white;
-        box-shadow: 0 12px 25px -12px rgba(116, 102, 255, 0.8);
-      }
-
-      .main-panel {
-        display: grid;
-        grid-template-rows: auto 1fr;
-        gap: 1.5rem;
-      }
-
-      .panel-card {
-        background: var(--card);
-        border-radius: 28px;
-        border: 1px solid var(--border);
-        padding: clamp(1.5rem, 2vw + 1rem, 2rem);
-        box-shadow: 0 25px 45px -32px var(--shadow);
-        position: relative;
-        overflow: hidden;
-      }
-
-      .panel-card::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        border-radius: inherit;
-        background: linear-gradient(145deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0));
-        mix-blend-mode: lighten;
-        opacity: 0.6;
-      }
-
-      .panel-card > * {
-        position: relative;
-        z-index: 1;
-      }
-
-      .temperature-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 1rem;
-      }
-
-      .temperature-header h1 {
-        font-size: clamp(1.5rem, 2vw + 1rem, 2.5rem);
-        font-weight: 700;
-      }
-
-      .temperature-header span {
-        display: block;
-        font-size: 0.95rem;
-        color: var(--muted);
-      }
-
-      .temperature-header .status {
-        display: flex;
-        gap: 2rem;
-        font-weight: 500;
-      }
-
-      .status-item {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        color: var(--muted);
-      }
-
-      .status-dot {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #ffa9a4, #ff73f0);
-        box-shadow: 0 0 10px rgba(255, 140, 205, 0.6);
-      }
-
-      .status-icon {
-        width: 28px;
-        height: 28px;
-        border-radius: 12px;
-        background: rgba(125, 107, 255, 0.12);
-        display: grid;
-        place-items: center;
-        color: #7d6bff;
-      }
-
-      .temperature-body {
-        display: grid;
-        grid-template-columns: 1.2fr 1fr;
-        gap: 3rem;
-        align-items: center;
-        margin-top: 2.5rem;
-      }
-
-      .gauge {
-        position: relative;
-        width: min(280px, 55vw);
-        aspect-ratio: 1 / 1;
-        border-radius: 50%;
-        background: conic-gradient(from 220deg, #f5f3ff 0deg, #d8dcff 150deg, #a7b3ff 240deg, #ff9deb 290deg, #fff0fb 330deg, transparent 360deg);
-        display: grid;
-        place-items: center;
-        box-shadow: inset 0 0 0 20px rgba(255, 255, 255, 0.75), 0 18px 55px -30px rgba(97, 86, 255, 0.6);
-      }
-
-      .gauge::before {
-        content: "";
-        position: absolute;
-        inset: 20px;
-        border-radius: 50%;
-        background: var(--card);
-        box-shadow: 0 25px 45px -25px rgba(97, 86, 255, 0.35);
-      }
-
-      .gauge-inner {
-        position: relative;
-        z-index: 1;
-        width: 65%;
-        aspect-ratio: 1 / 1;
-        border-radius: 50%;
-        background: radial-gradient(circle, #ffffff 40%, #f7f6ff 100%);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 0.35rem;
-        text-align: center;
-      }
-
-      .gauge-inner .goal-label {
-        font-size: 0.9rem;
-        color: var(--muted);
-      }
-
-      .temp-value {
-        font-size: clamp(2.8rem, 6vw, 3.5rem);
-        font-weight: 700;
-        color: var(--accent);
-      }
-
-      .distance {
-        font-size: 0.85rem;
-        color: var(--muted);
-      }
-
-      .marker {
-        position: absolute;
-        font-size: 0.9rem;
-        color: var(--muted);
-        font-weight: 500;
-      }
-
-      .marker-high {
-        top: 12%;
-        right: 20%;
-      }
-
-      .marker-low {
-        bottom: 12%;
-        left: 18%;
-      }
-
-      .circle-btn {
-        position: absolute;
-        width: 46px;
-        height: 46px;
-        border-radius: 50%;
-        border: none;
-        background: linear-gradient(135deg, #fafbff, #ebe7ff);
-        box-shadow: 0 10px 25px -15px rgba(97, 86, 255, 0.6);
-        color: var(--accent);
-        font-size: 1.4rem;
-        cursor: pointer;
-        transition: transform 0.2s ease;
-      }
-
-      .circle-btn:hover {
-        transform: translateY(-2px);
-      }
-
-      .circle-btn.minus {
-        left: -15%;
-        top: 50%;
-        transform: translateY(-50%);
-      }
-
-      .circle-btn.plus {
-        right: -15%;
-        top: 50%;
-        transform: translateY(-50%);
-      }
-
-      .temperature-stats {
-        display: grid;
-        gap: 1.25rem;
-      }
-
-      .temperature-stats .stat {
-        background: rgba(125, 107, 255, 0.08);
-        border-radius: 20px;
-        padding: 1.25rem;
-        display: grid;
-        gap: 0.35rem;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
-      }
-
-      .temperature-stats .stat strong {
-        font-size: 2rem;
-        color: var(--text);
-      }
-
-      .temperature-stats .stat span {
-        font-size: 0.85rem;
-        color: var(--muted);
-      }
-
-      .temperature-stats .stat.highlight {
-        background: linear-gradient(135deg, rgba(255, 191, 106, 0.35), rgba(252, 138, 231, 0.4));
-        color: white;
-      }
-
-      .temperature-stats .stat.highlight strong,
-      .temperature-stats .stat.highlight span {
-        color: white;
-      }
-
-      .chart-card {
-        display: grid;
-        gap: 1.75rem;
-      }
-
-      .chart-card h2 {
-        font-size: 1.1rem;
-        font-weight: 600;
-        color: var(--text);
-      }
-
-      .chart {
-        display: flex;
-        align-items: flex-end;
-        gap: 1.25rem;
-      }
-
-      .chart-bar {
-        width: 32px;
-        border-radius: 16px 16px 8px 8px;
-        background: linear-gradient(135deg, rgba(161, 167, 255, 0.8), rgba(121, 102, 255, 0.9));
-        position: relative;
-        overflow: hidden;
-      }
-
-      .chart-bar:nth-child(4) {
-        background: linear-gradient(160deg, #ffb977, #ff7f91);
-        box-shadow: 0 15px 25px -20px rgba(255, 127, 145, 0.8);
-      }
-
-      .chart-bar::after {
-        content: attr(data-day);
-        position: absolute;
-        bottom: -2.2rem;
-        left: 50%;
-        transform: translateX(-50%);
-        font-size: 0.75rem;
-        color: var(--muted);
-      }
-
-      .chart-bar span {
-        position: absolute;
-        top: -1.8rem;
-        left: 50%;
-        transform: translateX(-50%);
-        font-size: 0.75rem;
-        font-weight: 600;
-        color: var(--muted);
-      }
-
-      .right-panel {
-        display: grid;
-        gap: 1.5rem;
-      }
-
-      .shortcut-card,
-      .devices-card,
-      .rooms-card {
-        background: var(--card);
-        border-radius: 24px;
-        padding: 1.5rem;
-        border: 1px solid var(--border);
-        box-shadow: 0 22px 45px -35px var(--shadow);
-        display: grid;
-        gap: 1.2rem;
-      }
-
-      .card-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-
-      .card-header h3 {
-        font-size: 1rem;
-        font-weight: 600;
-      }
-
-      .chip {
-        padding: 0.35rem 0.75rem;
-        border-radius: 999px;
-        font-size: 0.75rem;
-        background: rgba(125, 107, 255, 0.12);
-        color: #7d6bff;
-        font-weight: 500;
-      }
-
-      .shortcut-list {
-        display: grid;
-        gap: 0.9rem;
-      }
-
-      .shortcut-item {
-        display: grid;
-        grid-template-columns: auto 1fr auto;
-        align-items: center;
-        gap: 0.75rem;
-        padding: 0.9rem 1rem;
-        border-radius: 18px;
-        background: rgba(125, 107, 255, 0.08);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
-      }
-
-      .shortcut-icon {
-        width: 42px;
-        height: 42px;
-        border-radius: 14px;
-        background: linear-gradient(135deg, rgba(255, 255, 255, 0.85), rgba(226, 223, 255, 0.9));
-        display: grid;
-        place-items: center;
-        font-weight: 600;
-        color: var(--accent);
-      }
-
-      .toggle {
-        position: relative;
-        width: 48px;
-        height: 26px;
-        border-radius: 999px;
-        background: rgba(125, 107, 255, 0.25);
-        display: inline-flex;
-        align-items: center;
-        padding: 0 4px;
-      }
-
-      .toggle::after {
-        content: "";
-        width: 18px;
-        height: 18px;
-        border-radius: 50%;
-        background: #fff;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-        transform: translateX(22px);
-      }
-
-      .shortcut-item.off {
-        background: rgba(125, 107, 255, 0.05);
-      }
-
-      .shortcut-item.off .toggle {
-        background: rgba(161, 167, 255, 0.25);
-      }
-
-      .shortcut-item.off .toggle::after {
-        transform: translateX(0);
-      }
-
-      .devices-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 0.85rem;
-      }
-
-      .device {
-        border-radius: 18px;
-        padding: 0.9rem;
-        background: rgba(125, 107, 255, 0.08);
-        text-align: center;
-        font-size: 0.85rem;
-        color: var(--muted);
-        display: grid;
-        gap: 0.5rem;
-        justify-items: center;
-      }
-
-      .device strong {
-        font-size: 1.1rem;
-        color: var(--text);
-      }
-
-      .rooms-list {
-        display: grid;
-        gap: 0.85rem;
-      }
-
-      .room {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0.85rem 1rem;
-        border-radius: 18px;
-        background: rgba(255, 255, 255, 0.9);
-        border: 1px solid rgba(142, 150, 255, 0.12);
-      }
-
-      .room span {
-        font-weight: 500;
-      }
-
-      @media (max-width: 1050px) {
-        .dashboard {
-          grid-template-columns: 72px minmax(0, 1fr);
-        }
-
-        .right-panel {
-          grid-column: span 2;
-          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        }
-      }
-
-      @media (max-width: 820px) {
-        .dashboard {
-          grid-template-columns: minmax(0, 1fr);
-          gap: 1rem;
-        }
-
-        .sidebar {
-          flex-direction: row;
-          justify-content: center;
-        }
-
-        .main-panel {
-          order: 3;
-        }
-
-        .right-panel {
-          order: 2;
-        }
-
-        .temperature-body {
-          grid-template-columns: 1fr;
-          justify-items: center;
-        }
-
-        .circle-btn.minus {
-          left: 10%;
-        }
-
-        .circle-btn.plus {
-          right: 10%;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <div class="dashboard">
-      <aside class="sidebar">
-        <div class="logo">S</div>
-        <nav class="nav-list">
-          <button class="nav-button active">⌂</button>
-          <button class="nav-button">☼</button>
-          <button class="nav-button">☁</button>
-          <button class="nav-button">⌚</button>
-          <button class="nav-button">⋮</button>
-        </nav>
-      </aside>
-
-      <section class="main-panel">
-        <article class="panel-card">
-          <div class="temperature-header">
-            <div>
-              <span>Global</span>
-              <h1>Temperature</h1>
-            </div>
-            <div class="status">
-              <div class="status-item">
-                <span class="status-dot"></span>
-                <span>Comfort</span>
-              </div>
-              <div class="status-item">
-                <span class="status-icon">💧</span>
-                <span>53%</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="temperature-body">
-            <div class="gauge">
-              <div class="marker marker-high">32°</div>
-              <div class="marker marker-low">28°</div>
-              <button class="circle-btn minus" aria-label="Decrease temperature">−</button>
-              <button class="circle-btn plus" aria-label="Increase temperature">+</button>
-              <div class="gauge-inner">
-                <span class="goal-label">Goal</span>
-                <div class="temp-value">30°</div>
-                <span class="distance">112 km left</span>
-              </div>
-            </div>
-
-            <div class="temperature-stats">
-              <div class="stat">
-                <strong>Last Update</strong>
-                <span>8 minutes ago</span>
-              </div>
-              <div class="stat highlight">
-                <strong>19° → 30°</strong>
-                <span>Stable increase today</span>
-              </div>
-              <div class="stat">
-                <strong>Forecast</strong>
-                <span>Maintaining target zone</span>
-              </div>
-            </div>
-          </div>
-        </article>
-
-        <article class="panel-card chart-card">
-          <h2>Last Days</h2>
-          <div class="chart">
-            <div class="chart-bar" style="height: 90px" data-day="19">
-              <span>19°</span>
-            </div>
-            <div class="chart-bar" style="height: 120px" data-day="20">
-              <span>20°</span>
-            </div>
-            <div class="chart-bar" style="height: 70px" data-day="21">
-              <span>21°</span>
-            </div>
-            <div class="chart-bar" style="height: 150px" data-day="22">
-              <span>24°</span>
-            </div>
-            <div class="chart-bar" style="height: 110px" data-day="23">
-              <span>23°</span>
-            </div>
-            <div class="chart-bar" style="height: 130px" data-day="24">
-              <span>22°</span>
-            </div>
-            <div class="chart-bar" style="height: 85px" data-day="25">
-              <span>21°</span>
-            </div>
-          </div>
-        </article>
-      </section>
-
-      <aside class="right-panel">
-        <section class="shortcut-card">
-          <div class="card-header">
-            <h3>Shortcuts</h3>
-            <span class="chip">4</span>
-          </div>
-          <div class="shortcut-list">
-            <div class="shortcut-item">
-              <div class="shortcut-icon">°C</div>
-              <div>
-                <strong>Temperature</strong>
-                <span style="display: block; font-size: 0.75rem; color: var(--muted);">30°C</span>
-              </div>
-              <div class="toggle"></div>
-            </div>
-            <div class="shortcut-item">
-              <div class="shortcut-icon">☁</div>
-              <div>
-                <strong>Internet</strong>
-                <span style="display: block; font-size: 0.75rem; color: var(--muted);">Connected</span>
-              </div>
-              <div class="toggle"></div>
-            </div>
-            <div class="shortcut-item off">
-              <div class="shortcut-icon">💡</div>
-              <div>
-                <strong>Lights</strong>
-                <span style="display: block; font-size: 0.75rem; color: var(--muted);">Off</span>
-              </div>
-              <div class="toggle"></div>
-            </div>
-            <div class="shortcut-item off">
-              <div class="shortcut-icon">＋</div>
-              <div>
-                <strong>Add</strong>
-                <span style="display: block; font-size: 0.75rem; color: var(--muted);">Create new</span>
-              </div>
-              <div class="toggle"></div>
-            </div>
-          </div>
-        </section>
-
-        <section class="devices-card">
-          <div class="card-header">
-            <h3>Devices</h3>
-            <span class="chip">3 Active</span>
-          </div>
-          <div class="devices-grid">
-            <div class="device">
-              <strong>AC</strong>
-              <span>Cooling</span>
-            </div>
-            <div class="device">
-              <strong>Wi-Fi</strong>
-              <span>Online</span>
-            </div>
-            <div class="device">
-              <strong>Lights</strong>
-              <span>Idle</span>
-            </div>
-          </div>
-        </section>
-
-        <section class="rooms-card">
-          <div class="card-header">
-            <h3>Rooms</h3>
-            <span class="chip">6</span>
-          </div>
-          <div class="rooms-list">
-            <div class="room">
-              <span>Living Room</span>
-              <span>30°</span>
-            </div>
-            <div class="room">
-              <span>Bedroom</span>
-              <span>27°</span>
-            </div>
-            <div class="room">
-              <span>Kitchen</span>
-              <span>24°</span>
-            </div>
-          </div>
-        </section>
-      </aside>
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Todo Quest — 1 file</title>
+<style>
+  :root{--ink:#1b1e2e;--muted:#7d82a8;--card:#fff;--bg:#f6f7ff;--border:#e8e8fb;--accent:#8b7cff}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  .wrap{max-width:960px;margin:28px auto;padding:20px;background:var(--card);border:1px solid var(--border);
+        border-radius:16px;box-shadow:0 10px 30px rgba(20,16,60,.08)}
+  h1{margin:0 0 12px}
+  .tabs{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+  .btn{padding:8px 12px;border:1px solid var(--border);background:#fff;border-radius:10px;cursor:pointer}
+  .btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .pill{background:#eef;border:1px solid #dde;border-radius:999px;padding:4px 10px}
+  .muted{color:var(--muted)}
+  .top{display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap}
+  input,select,textarea{padding:8px;border-radius:8px;border:1px solid #ccc;width:100%;font:inherit}
+  .btn-primary{background:var(--accent);color:#fff;border:none}
+  .btn-danger{background:#ff3b30;color:#fff;border:none}
+  .btn-ghost{background:#fff;border:1px solid var(--border)}
+  .grid{display:grid;gap:10px}
+  .row{display:grid;grid-template-columns:180px 1fr;gap:10px;align-items:center}
+  .card{padding:12px;border:1px solid var(--border);border-radius:12px;background:#fff;margin-top:12px}
+  .bar{height:8px;background:#eee;border-radius:6px;overflow:hidden;margin-bottom:10px}
+  .fill{height:100%;background:var(--accent)}
+  ul{list-style:none;margin:0;padding:0}
+  .zone{border:1px solid #f0f0ff;border-radius:12px;margin:12px 0}
+  .zone header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #f4f4ff;background:#fafaff;border-radius:12px 12px 0 0}
+  .badge{font-size:12px;padding:2px 8px;border-radius:999px;background:#fff;border:1px solid #eee}
+  li.task{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-top:1px solid #f7f7ff}
+  .left{display:flex;align-items:center;gap:8px}
+  .done .txt{text-decoration:line-through;color:#9aa}
+  .creator{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .map{position:relative;height:360px;background:linear-gradient(180deg,#fafbff,#f6f7ff);border-radius:16px;border:1px solid var(--border);overflow:hidden}
+  .path{position:absolute;left:50%;top:20px;bottom:20px;width:4px;background:#e8e8fb;transform:translateX(-50%)}
+  .node{position:absolute;left:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+        background:#fff;border:2px solid #e8e8fb;box-shadow:0 6px 16px rgba(20,16,60,.08);font-weight:700;color:#434a77}
+  .node.passed{border-color:#9AE6B4;background:#f6fff8}
+  .node.current{border-color:#8b7cff;box-shadow:0 0 0 6px rgba(139,124,255,.12)}
+  .node.locked{opacity:.55}
+  .map .tag{position:absolute;top:6px;right:6px;background:var(--accent);color:#fff;padding:2px 8px;border-radius:999px;font-size:12px}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:8px;border-bottom:1px solid #f0f0ff;text-align:left}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Todo Quest</h1>
+  <div class="tabs">
+    <button class="btn active" data-tab="tasks">Tasks</button>
+    <button class="btn" data-tab="map">Map</button>
+    <button class="btn" data-tab="leaderboard">Leaderboard</button>
+    <button class="btn" data-tab="settings">Settings</button>
+  </div>
+  <div id="view">Đang nạp…</div>
+</div>
+
+<script>
+/* ====== STATE (localStorage) ====== */
+const LS = {
+  PROFILE:'tq_profile',
+  ZONES:'tq_zones',
+  TASKS:'tq_tasks',
+  RECUR:'tq_recurring',
+  DAY:'tq_sim_day',
+  BONUS:'tq_bonus_flags',
+  SPAWN:'tq_spawned_day',
+  SYNC:'tq_sync_cfg'
+};
+
+const LEVELS = [
+  {lvl:1, cap:5, need:100},
+  {lvl:2, cap:7, need:250},
+  {lvl:3, cap:9, need:500},
+  {lvl:4, cap:10, need:800},
+  {lvl:5, cap:12, need:1200},
+  {lvl:6, cap:14, need:1700},
+  {lvl:7, cap:16, need:2300},
+  {lvl:8, cap:18, need:3000},
+  {lvl:9, cap:20, need:3800},
+];
+
+function load(key, def){ try{ return JSON.parse(localStorage.getItem(key)) ?? def }catch{ return def } }
+function save(key, val){ localStorage.setItem(key, JSON.stringify(val)) }
+
+function getProfile(){
+  let p = load(LS.PROFILE);
+  if(!p){ p={name:'', level:1, xp:0}; save(LS.PROFILE,p); }
+  return p;
+}
+function setName(name){ const p=getProfile(); p.name=(name||'').trim(); save(LS.PROFILE,p); }
+function addXP(delta){
+  const p=getProfile(); p.xp = Math.max(0, Number(p.xp||0)+Number(delta||0));
+  // level up
+  while(true){
+    const cfg = LEVELS.find(x=>x.lvl===p.level) || LEVELS.at(-1);
+    const need = cfg.need || 0;
+    if(need>0 && p.xp>=need){ p.xp -= need; p.level = Math.min(LEVELS.at(-1).lvl, p.level+1); }
+    else break;
+  }
+  save(LS.PROFILE,p);
+}
+function getLevelInfo(){
+  const p=getProfile();
+  const cfg = LEVELS.find(x=>x.lvl===p.level) || LEVELS.at(-1);
+  return {level:p.level, xp:p.xp, need:cfg.need||0, cap:cfg.cap};
+}
+function resetPoints(){ const p=getProfile(); p.level=1; p.xp=0; save(LS.PROFILE,p); }
+function ensureName(){ const p=getProfile(); if(!p.name){ const n=prompt('Nhập tên người chơi:'); if(n) setName(n); }}
+
+/* Day & flags */
+function getDay(){ let d=Number(localStorage.getItem(LS.DAY)||0); if(!d){ d=1; localStorage.setItem(LS.DAY,d) } return d; }
+function nextDay(){ const d=getDay()+1; localStorage.setItem(LS.DAY,d); return d; }
+function loadFlags(){ return load(LS.BONUS,{}); }
+function saveFlags(f){ save(LS.BONUS,f); }
+function bonusGiven(zoneId){ const day=getDay(); const f=loadFlags(); return !!(f[day] && f[day][zoneId]) }
+function markBonus(zoneId){ const day=getDay(); const f=loadFlags(); if(!f[day]) f[day]={}; f[day][zoneId]=true; saveFlags(f) }
+function clearFlagsFor(day){ const f=loadFlags(); delete f[day]; saveFlags(f) }
+
+/* Zones & Recurring */
+function getZones(){ return load(LS.ZONES,[]) }
+function setZones(z){ save(LS.ZONES,z) }
+function addZone(z){ const L=getZones(); z.id=Date.now(); L.push(z); setZones(L) }
+function updZone(id,patch){ setZones(getZones().map(z=>z.id===id?{...z,...patch}:z)) }
+function delZone(id){ setZones(getZones().filter(z=>z.id!==id)) }
+
+function getRecurring(){ return load(LS.RECUR,[]) }
+function addRecurring(r){ r.id=Date.now(); save(LS.RECUR,[...getRecurring(),r]) }
+function delRecurring(id){ save(LS.RECUR,getRecurring().filter(r=>r.id!==id)) }
+
+function getTasks(){ return load(LS.TASKS,[]) }
+function setTasks(a){ save(LS.TASKS,a) }
+
+/* Spawn recurring once per day */
+function spawnRecurringIfNeeded(){
+  const mark = Number(localStorage.getItem(LS.SPAWN)||0);
+  if(mark===getDay()) return;
+  const weekday = new Date().getDay(); // 0-6 CN..T6
+  const recs = getRecurring();
+  const zones = getZones();
+  const tasks = getTasks();
+  const {cap} = getLevelInfo();
+  for(const r of recs){
+    const match = r.type==='daily' || (r.type==='weekly' && Array.isArray(r.days)&&r.days.includes(weekday));
+    if(!match) continue;
+    if(tasks.length>=cap) break;
+    const z = zones.find(z=>z.id==r.zoneId); if(!z) continue;
+    const zoneCount = tasks.filter(t=>t.zoneId==r.zoneId).length;
+    if(z.maxPerDay && zoneCount>=z.maxPerDay) continue;
+    tasks.push({id:Date.now()+Math.random(), text:r.text, zoneId:r.zoneId, done:false});
+  }
+  setTasks(tasks);
+  localStorage.setItem(LS.SPAWN, String(getDay()));
+}
+
+/* Sync endpoint (optional) */
+function getSyncCfg(){ return load(LS.SYNC, {endpoint:'', autosync:false}) }
+function setSyncCfg(c){ save(LS.SYNC,c) }
+async function autoSync(){
+  const cfg=getSyncCfg();
+  if(!cfg.autosync || !cfg.endpoint) return;
+  const p=getProfile();
+  try{
+    await fetch(cfg.endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:p.name||'Player',level:p.level||1,xp:p.xp||0})});
+  }catch(e){ console.warn('Auto-sync failed',e) }
+}
+
+/* ====== VIEWS ====== */
+const view = document.getElementById('view');
+const tabs = [...document.querySelectorAll('[data-tab]')];
+tabs.forEach(b=>b.onclick=()=>render(b.dataset.tab));
+function setActive(tab){ tabs.forEach(b=>b.classList.toggle('active',b.dataset.tab===tab)); }
+
+/* Tasks */
+function viewTasks(){
+  spawnRecurringIfNeeded();
+  const zones=getZones();
+  const tasks=getTasks();
+  const {level,xp,need,cap}=getLevelInfo();
+  const day=getDay();
+
+  // group
+  const groups = zones.map(z=>({
+    z,
+    list: tasks.filter(t=>t.zoneId==z.id),
+    done: tasks.filter(t=>t.zoneId==z.id && t.done).length
+  }));
+
+  view.innerHTML = `
+    <div class="top">
+      <span class="pill">Ngày ảo: <b>${day}</b></span>
+      <span class="pill">Level: <b>${level}</b></span>
+      <span class="pill">XP: <b>${xp}</b>${need?` / ${need}`:''}</span>
+      <span class="muted">Giới hạn task/ngày: <b>${cap}</b></span>
+      <span style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn-ghost" id="btnEnd">Qua ngày</button>
+        <button class="btn-danger" id="btnReset">Reset điểm</button>
+      </span>
     </div>
-  </body>
+    <div class="bar"><div class="fill" style="width:${need?Math.min(100,Math.round(xp/need*100)):100}%;"></div></div>
+
+    <div class="creator">
+      <input id="taskText" placeholder="Thêm nhiệm vụ… (Enter)">
+      <select id="taskZone">${zones.map(z=>`<option value="${z.id}">${z.name}</option>`).join('')}</select>
+      <button class="btn-primary" id="btnAdd">Thêm</button>
+    </div>
+
+    ${groups.map(g=>`
+      <section class="zone">
+        <header style="border-color:${g.z.color}">
+          <div><b>${g.z.name}</b></div>
+          <div class="badge">Hoàn thành: ${g.done}/${g.z.maxPerDay||0}</div>
+        </header>
+        <ul>
+          ${g.list.length? g.list.map(t=>`
+            <li class="task ${t.done?'done':''}">
+              <div class="left">
+                <input type="checkbox" data-id="${t.id}" ${t.done?'checked':''}>
+                <span class="txt">${t.text}</span>
+              </div>
+              <button class="btn-danger del" data-id="${t.id}">🗑</button>
+            </li>
+          `).join('') : `<li class="task"><span class="muted">Chưa có task trong Zone này.</span></li>`}
+        </ul>
+      </section>
+    `).join('')}
+  `;
+
+  // add
+  const inp = document.getElementById('taskText');
+  const sel = document.getElementById('taskZone');
+  function addNow(){
+    const text=(inp.value||'').trim(); if(!text) return;
+    // level cap
+    if(getTasks().length>=cap){ alert('Đã đạt giới hạn task/ngày theo Level'); return; }
+    const z = zones.find(z=>z.id==sel.value);
+    const count = getTasks().filter(t=>t.zoneId==z.id).length;
+    if(z.maxPerDay && count>=z.maxPerDay){ alert(`Zone "${z.name}" đã đủ ${z.maxPerDay} task hôm nay`); return; }
+    setTasks([...getTasks(), {id:Date.now(), text, zoneId:Number(sel.value), done:false}]);
+    inp.value=''; render('tasks');
+  }
+  document.getElementById('btnAdd').onclick=addNow;
+  inp.onkeydown=(e)=>{ if(e.key==='Enter') addNow(); };
+  // Tab hotkey: focus ô nhập nếu đang không ở input
+  window.onkeydown=(e)=>{
+    const tag=(document.activeElement?.tagName||'').toLowerCase();
+    if(e.key==='Tab' && !['input','select','textarea','button'].includes(tag)){ e.preventDefault(); inp.focus(); }
+  };
+
+  // toggle
+  view.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
+    cb.onchange=()=>{
+      const id=Number(cb.dataset.id);
+      const t = getTasks().find(t=>t.id===id);
+      if(!t) return;
+      const z = zones.find(z=>z.id==t.zoneId);
+      t.done = cb.checked;
+      addXP(cb.checked? Number(z.point||0) : -Number(z.point||0));
+      setTasks(getTasks().map(x=>x.id===id?t:x));
+      // bonus khi đủ số task của zone
+      if(t.done && z.maxPerDay){
+        const doneCount = getTasks().filter(x=>x.zoneId==z.id && x.done).length;
+        if(doneCount>=z.maxPerDay && !bonusGiven(z.id)){
+          addXP(Number(z.bonus||0)); markBonus(z.id);
+        }
+      }
+      render('tasks');
+    };
+  });
+
+  // delete
+  view.querySelectorAll('.del').forEach(b=> b.onclick=()=>{
+    const id=Number(b.dataset.id);
+    setTasks(getTasks().filter(t=>t.id!==id));
+    render('tasks');
+  });
+
+  // end day
+  document.getElementById('btnEnd').onclick=async ()=>{
+    // penalty theo zone nếu chưa đạt
+    const zones=getZones(); const tasks=getTasks(); const today=getDay();
+    for(const z of zones){
+      if(!z.maxPerDay) continue;
+      const doneCount = tasks.filter(t=>t.zoneId==z.id && t.done).length;
+      if(doneCount<z.maxPerDay) addXP(-Number(z.penalty||0));
+      // nếu chưa từng thưởng mà đã đủ thì thưởng (edge)
+      if(doneCount>=z.maxPerDay && !bonusGiven(z.id)) { addXP(Number(z.bonus||0)); markBonus(z.id); }
+    }
+    clearFlagsFor(today);
+    nextDay();
+    setTasks([]);
+    localStorage.removeItem(LS.SPAWN); // cho phép spawn lại
+    spawnRecurringIfNeeded();
+    await autoSync(); // nếu bật autosync + có endpoint
+    alert('Đã qua ngày.');
+    render('tasks');
+  };
+  document.getElementById('btnReset').onclick=()=>{ if(confirm('Reset Level=1 & XP=0?')){ resetPoints(); render('tasks'); } };
+}
+
+/* Settings */
+function viewSettings(){
+  const p=getProfile();
+  const zones=getZones();
+  const recs=getRecurring();
+  const sync=getSyncCfg();
+
+  view.innerHTML = `
+    <div class="card" style="margin-top:0">
+      <h3>Hồ sơ người chơi</h3>
+      <div class="row"><div>Tên người chơi</div><div class="grid" style="grid-template-columns:1fr auto;align-items:center">
+        <input id="name" value="${p.name||''}"><button class="btn-primary" id="saveName">Lưu</button></div></div>
+    </div>
+
+    <div class="card">
+      <h3>Zones & Điểm</h3>
+      <div class="grid">
+        <div class="row"><div>Tên Zone</div><input id="zName" placeholder="Công việc"></div>
+        <div class="row"><div>Màu</div><input id="zColor" value="#8b7cff"></div>
+        <div class="row"><div>Điểm/Task</div><input id="zPoint" type="number" value="10"></div>
+        <div class="row"><div>Bonus khi đạt Max</div><input id="zBonus" type="number" value="100"></div>
+        <div class="row"><div>Penalty nếu KHÔNG đạt</div><input id="zPenalty" type="number" value="10"></div>
+        <div class="row"><div>Số Task tối đa/ngày</div><input id="zMax" type="number" value="3"></div>
+        <div class="row"><div></div><button class="btn-primary" id="addZone">+ Thêm Zone</button></div>
+      </div>
+      <table>
+        <thead><tr><th>Tên</th><th>Màu</th><th>Điểm</th><th>Bonus</th><th>Penalty</th><th>Max/ngày</th><th></th></tr></thead>
+        <tbody id="zoneT">${zones.map(z=>`
+          <tr data-id="${z.id}"><td><input name="name" value="${z.name}"></td>
+            <td><input name="color" value="${z.color}"></td>
+            <td><input name="point" type="number" value="${z.point||0}"></td>
+            <td><input name="bonus" type="number" value="${z.bonus||0}"></td>
+            <td><input name="penalty" type="number" value="${z.penalty||0}"></td>
+            <td><input name="maxPerDay" type="number" value="${z.maxPerDay||0}"></td>
+            <td><button class="btn-danger zdel" data-id="${z.id}">Xoá</button></td></tr>
+        `).join('')}</tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>Tasks lặp (Daily / Weekly)</h3>
+      <div class="row"><div>Mô tả</div><input id="rText" placeholder="Tập thể dục 15’"></div>
+      <div class="row"><div>Zone</div><select id="rZone">${zones.map(z=>`<option value="${z.id}">${z.name}</option>`)}</select></div>
+      <div class="row"><div>Kiểu</div><select id="rType"><option value="daily">Mỗi ngày</option><option value="weekly">Theo thứ</option></select></div>
+      <div class="row" id="rDaysRow" style="display:none"><div>Chọn thứ</div>
+        <div class="grid" style="grid-template-columns:repeat(7,1fr)">
+          ${['CN','T2','T3','T4','T5','T6','T7'].map((l,i)=>`<label><input type="checkbox" value="${i}"> ${l}</label>`).join('')}
+        </div>
+      </div>
+      <div class="row"><div></div><button class="btn-primary" id="addRec">+ Thêm Task lặp</button></div>
+      <table>
+        <thead><tr><th>Mô tả</th><th>Zone</th><th>Kiểu</th><th>Thứ</th><th></th></tr></thead>
+        <tbody id="recT">${recs.map(r=>{
+          const z = zones.find(z=>z.id==r.zoneId)?.name||'(xoá)';
+          return `<tr><td>${r.text}</td><td>${z}</td><td>${r.type}</td><td>${r.type==='weekly'?(r.days||[]).join(', '):'-'}</td>
+            <td><button class="btn-danger rdel" data-id="${r.id}">Xoá</button></td></tr>`
+        }).join('')}</tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>Đồng bộ Leaderboard (tuỳ chọn)</h3>
+      <div class="row"><div>Endpoint</div><input id="syncEndpoint" value="${sync.endpoint||''}" placeholder="https://your-function.app/api/leaderboard"></div>
+      <div class="row"><div>Tự động đồng bộ</div><label><input id="syncAuto" type="checkbox" ${sync.autosync?'checked':''}> Khi bấm "Qua ngày"</label></div>
+      <div class="row"><div></div><button class="btn-primary" id="saveSync">Lưu cấu hình</button></div>
+    </div>
+  `;
+
+  document.getElementById('saveName').onclick=()=>{ setName(document.getElementById('name').value); alert('Đã lưu'); };
+  document.getElementById('addZone').onclick=()=>{
+    const g=id=>document.getElementById(id).value;
+    const z={name:g('zName').trim(), color:g('zColor'), point:Number(g('zPoint')), bonus:Number(g('zBonus')), penalty:Number(g('zPenalty')), maxPerDay:Number(g('zMax'))};
+    if(!z.name) return alert('Nhập tên Zone');
+    addZone(z); viewSettings();
+  };
+  document.getElementById('zoneT').oninput=(e)=>{
+    const tr=e.target.closest('tr[data-id]'); if(!tr) return;
+    const id=Number(tr.dataset.id); const name=e.target.name; let val=e.target.value;
+    if(['point','bonus','penalty','maxPerDay'].includes(name)) val=Number(val||0);
+    updZone(id,{[name]:val});
+  };
+  view.querySelectorAll('.zdel').forEach(b=> b.onclick=()=>{ delZone(Number(b.dataset.id)); viewSettings(); });
+
+  const typeSel=document.getElementById('rType');
+  const daysRow=document.getElementById('rDaysRow');
+  typeSel.onchange=()=> daysRow.style.display = typeSel.value==='weekly'?'grid':'none';
+  document.getElementById('addRec').onclick=()=>{
+    const text=document.getElementById('rText').value.trim(); if(!text) return alert('Nhập mô tả');
+    const zoneId=Number(document.getElementById('rZone').value); const type=typeSel.value;
+    const days=[...daysRow.querySelectorAll('input:checked')].map(c=>Number(c.value));
+    if(type==='weekly' && !days.length) return alert('Chọn thứ');
+    addRecurring({text, zoneId, type, days}); viewSettings();
+  };
+  view.querySelectorAll('.rdel').forEach(b=> b.onclick=()=>{ delRecurring(Number(b.dataset.id)); viewSettings(); });
+
+  document.getElementById('saveSync').onclick=()=>{
+    setSyncCfg({endpoint:document.getElementById('syncEndpoint').value.trim(), autosync:document.getElementById('syncAuto').checked});
+    alert('Đã lưu cấu hình đồng bộ.');
+  };
+}
+
+/* Map */
+function viewMap(){
+  const {level}=getLevelInfo();
+  const total = Math.max(LEVELS.length, 9);
+  const items = Array.from({length:total},(_,i)=>({n:i+1, state: (i+1)<level?'passed':((i+1)===level?'current':'locked')}));
+  view.innerHTML = `
+    <div class="map">
+      <div class="path"></div>
+      ${items.map((it,i)=>{
+        const y=40+(i*(280/(items.length-1))); const xoff=(i%2===0?-90:90);
+        return `<div class="node ${it.state}" style="top:${y}px; left:calc(50% + ${xoff}px)">${it.n}</div>`;
+      }).join('')}
+      <div class="tag">Level: ${level}</div>
+    </div>
+  `;
+}
+
+/* Leaderboard (đọc từ endpoint nếu có, nếu không hiển thị dữ liệu local) */
+async function viewLeaderboard(){
+  const cfg = getSyncCfg();
+  view.innerHTML = `<div class="card" style="margin-top:0"><h3>Leaderboard</h3>
+    <div class="muted">Nếu đã cấu hình Endpoint ở Settings, bảng dưới sẽ lấy dữ liệu từ đó. Nếu không, chỉ hiển thị điểm của bạn (local).</div>
+    <div style="margin:10px 0"><button class="btn-ghost" id="reload">Tải lại</button></div>
+    <div id="board">Đang tải…</div></div>`;
+
+  async function loadBoard(){
+    const el=document.getElementById('board');
+    try{
+      let list=[];
+      if(cfg.endpoint){
+        const r=await fetch(cfg.endpoint); if(r.ok) list=await r.json();
+      }
+      if(!Array.isArray(list) || !list.length){
+        const p=getProfile(); list=[{name:p.name||'Player', level:p.level||1, xp:p.xp||0, updatedAt:new Date().toISOString()}];
+      }
+      list.sort((a,b)=> (b.level-a.level) || (b.xp-a.xp) || (a.name||'').localeCompare(b.name||''));
+      el.innerHTML = `<table><thead><tr><th>#</th><th>Người chơi</th><th>Level</th><th>XP</th><th>Cập nhật</th></tr></thead>
+        <tbody>${list.map((u,i)=>`<tr><td>${i+1}</td><td>${u.name||'-'}</td><td>${u.level??'-'}</td><td>${u.xp??'-'}</td><td>${u.updatedAt?new Date(u.updatedAt).toLocaleString():'-'}</td></tr>`).join('')}</tbody></table>`;
+    }catch(e){ el.textContent='Lỗi tải leaderboard'; }
+  }
+  document.getElementById('reload').onclick=loadBoard;
+  loadBoard();
+}
+
+/* Router */
+function render(tab){
+  setActive(tab);
+  if(tab==='tasks') viewTasks();
+  else if(tab==='map') viewMap();
+  else if(tab==='leaderboard') viewLeaderboard();
+  else viewSettings();
+}
+
+/* Boot */
+ensureName();
+render('tasks');
+</script>
+</body>
 </html>
