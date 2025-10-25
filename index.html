@@ -15,7 +15,7 @@
   .wrap{max-width:960px;margin:var(--space-sm) auto;padding:var(--space);background:var(--card);
         border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 10px 30px rgba(20,16,60,.08)}
   h1{margin:0 0 var(--space-sm)}
-  /* Tabs: scrollable on mobile */
+  /* Tabs */
   .tabs{display:flex;gap:8px;margin-bottom:12px;overflow:auto;padding-bottom:4px}
   .tabs::-webkit-scrollbar{height:6px}
   .tabs::-webkit-scrollbar-thumb{background:#ddd;border-radius:6px}
@@ -45,7 +45,7 @@
   .left{display:flex;align-items:center;gap:10px}
   .done .txt{text-decoration:line-through;color:#9aa}
   .creator{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
-  .left input[type="checkbox"]{transform:scale(1.25)} /* bigger touch */
+  .left input[type="checkbox"]{transform:scale(1.25)}
   /* Map */
   .map{position:relative;height:360px;background:linear-gradient(180deg,#fafbff,#f6f7ff);border-radius:16px;border:1px solid var(--border);overflow:hidden}
   .path{position:absolute;left:50%;top:20px;bottom:20px;width:4px;background:#e8e8fb;transform:translateX(-50%)}
@@ -55,11 +55,11 @@
   .node.current{border-color:#8b7cff;box-shadow:0 0 0 6px rgba(139,124,255,.12)}
   .node.locked{opacity:.55}
   .map .tag{position:absolute;top:6px;right:6px;background:var(--accent);color:#fff;padding:2px 8px;border-radius:999px;font-size:12px}
-  /* Tables scroll wrapper */
+  /* Table */
   .table-wrap{overflow:auto;border:1px solid var(--border);border-radius:12px}
   table{width:100%;border-collapse:collapse;background:#fff}
   th,td{padding:10px;border-bottom:1px solid #f0f0ff;text-align:left;white-space:nowrap}
-  /* ====== Responsive breakpoints ====== */
+  /* Responsive */
   @media (max-width: 992px){
     .wrap{margin:10px; padding:16px}
   }
@@ -98,7 +98,7 @@ const CONFIG = {
   SETTINGS_PASS: '1000'
 };
 
-/* ====== STATE (localStorage) ====== */
+/* ====== STATE KEYS ====== */
 const LS = {
   PROFILE:'tq_profile',
   ZONES:'tq_zones',
@@ -107,8 +107,7 @@ const LS = {
   DAY:'tq_sim_day',
   BONUS:'tq_bonus_flags',
   SPAWN:'tq_spawned_day',
-  SYNC:'tq_sync_cfg',      // giữ key cũ cho tương thích, nhưng giờ không dùng UI nữa
-  LBCACHE:'tq_lb_cache'   // cache leaderboard
+  LBCACHE:'tq_lb_cache'
 };
 
 const LEVELS = [
@@ -126,7 +125,7 @@ const LEVELS = [
 function load(key, def){ try{ return JSON.parse(localStorage.getItem(key)) ?? def }catch{ return def } }
 function save(key, val){ localStorage.setItem(key, JSON.stringify(val)) }
 
-/* ===== Profile / Level / XP ===== */
+/* ===== PROFILE / LEVEL ===== */
 function getProfile(){
   let p = load(LS.PROFILE);
   if(!p){ p={name:'', level:1, xp:0}; save(LS.PROFILE,p); }
@@ -164,7 +163,7 @@ function ensureName(){
   }
 }
 
-/* ===== Ngày ảo & cờ bonus ===== */
+/* ===== DAY & BONUS FLAGS ===== */
 function getDay(){
   let d=Number(localStorage.getItem(LS.DAY)||0);
   if(!d){ d=1; localStorage.setItem(LS.DAY,d); }
@@ -195,7 +194,7 @@ function clearFlagsFor(day){
   saveFlags(f);
 }
 
-/* ===== Zones & Recurring ===== */
+/* ===== ZONES & RECURRING ===== */
 function getZones(){ return load(LS.ZONES,[]) }
 function setZones(z){ save(LS.ZONES,z) }
 function addZone(z){
@@ -217,24 +216,25 @@ function delRecurring(id){
   save(LS.RECUR,getRecurring().filter(r=>r.id!==id));
 }
 
-/* ===== Tasks ===== */
+/* ===== TASKS ===== */
 function getTasks(){ return load(LS.TASKS,[]) }
 function setTasks(a){ save(LS.TASKS,a) }
 
-/* ===== Leaderboard Cache ===== */
+/* ===== LEADERBOARD CACHE ===== */
 function getLBCache(){
-  // { ts: milliseconds, list: array }
-  return load(LS.LBCACHE, { ts: 0, list: [] });
+  return load(LS.LBCACHE, { ts:0, list:[] });
 }
 function setLBCache(v){
   save(LS.LBCACHE, v);
 }
 function renderLBRows(rowsEl, list){
-  if (!Array.isArray(list) || !list.length){
+  if(!Array.isArray(list) || !list.length){
     rowsEl.innerHTML = '<tr><td colspan="5" class="muted">Chưa có dữ liệu</td></tr>';
     return;
   }
-  list.sort((a,b)=> (b.level-a.level) || (b.xp-a.xp) || (a.name||'').localeCompare(b.name||''));
+  list.sort((a,b)=>
+    (b.level-a.level) || (b.xp-a.xp) || (a.name||'').localeCompare(b.name||'')
+  );
   rowsEl.innerHTML = list.map((u,i)=>`
     <tr>
       <td>${i+1}</td>
@@ -246,7 +246,7 @@ function renderLBRows(rowsEl, list){
   `).join('');
 }
 
-/* ===== Recurring spawn mỗi ngày ===== */
+/* ===== RECURRING SPAWN MỖI NGÀY ===== */
 function spawnRecurringIfNeeded(){
   const mark = Number(localStorage.getItem(LS.SPAWN)||0);
   if(mark===getDay()) return;
@@ -282,19 +282,17 @@ function spawnRecurringIfNeeded(){
   localStorage.setItem(LS.SPAWN, String(getDay()));
 }
 
-/* ===== Sync config (cố định qua CONFIG) ===== */
+/* ===== SYNC CONFIG (cố định) ===== */
 function getSyncCfg(){
-  // autosync luôn true khi qua ngày
   return { endpoint: CONFIG.ENDPOINT, autosync: true };
 }
 
-/* Gửi điểm lên server dạng application/x-www-form-urlencoded */
+/* Gửi điểm của người chơi hiện tại lên server */
 async function autoSync(){
   const cfg = getSyncCfg();
-  if (!cfg.autosync || !cfg.endpoint) return;
+  if(!cfg.autosync || !cfg.endpoint) return;
 
   const p = getProfile();
-
   const form = new URLSearchParams({
     name:  (p.name || 'Player'),
     level: String(p.level || 1),
@@ -303,36 +301,32 @@ async function autoSync(){
 
   try {
     const res = await fetch(cfg.endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: form
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:form
     });
-    if (!res.ok){
-      console.warn('Auto-sync: server trả mã', res.status);
+    if(!res.ok){
+      console.warn('autoSync: server trả mã', res.status);
     }
-  } catch (e) {
-    console.warn('Auto-sync failed', e);
+  } catch(e){
+    console.warn('autoSync failed', e);
   }
 }
 
-/* Fetch leaderboard từ server => cập nhật cache.
-   Chỉ dùng khi:
-   - Qua ngày
-   - Ấn "Tải lại" ở Leaderboard
-*/
+/* Lấy leaderboard từ server và cập nhật cache */
 async function fetchLeaderboardAndCache(){
   const cfg = getSyncCfg();
   if(!cfg.endpoint) return;
 
   const controller = new AbortController();
-  const t = setTimeout(()=>controller.abort(),8000); // timeout 8s
+  const t = setTimeout(()=>controller.abort(),8000);
   try{
     const r = await fetch(cfg.endpoint, { signal: controller.signal });
     clearTimeout(t);
     if(!r.ok) throw new Error('HTTP '+r.status);
     const data = await r.json();
     if(Array.isArray(data)){
-      setLBCache({ ts: Date.now(), list: data });
+      setLBCache({ ts:Date.now(), list:data });
     }
   }catch(e){
     clearTimeout(t);
@@ -340,7 +334,51 @@ async function fetchLeaderboardAndCache(){
   }
 }
 
-/* ====== VIEW HANDLERS ====== */
+/* ===== XOÁ NGƯỜI CHƠI KHỎI SERVER LEADERBOARD ===== */
+async function removeFromServerLeaderboard(name){
+  const cfg = getSyncCfg();
+  if(!name){
+    alert('Chưa nhập tên cần xoá');
+    return;
+  }
+
+  const form = new URLSearchParams({
+    name: name,
+    remove: '1'
+  }).toString();
+
+  try{
+    const res = await fetch(cfg.endpoint, {
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:form
+    });
+    if(!res.ok){
+      alert('Lỗi HTTP '+res.status);
+      return;
+    }
+    const data = await res.json();
+    if(data.ok){
+      alert('Đã xoá khỏi leaderboard server: '+name);
+      await fetchLeaderboardAndCache();
+    }else{
+      alert('Không tìm thấy người chơi để xoá');
+    }
+  }catch(e){
+    alert('Lỗi khi gọi server');
+    console.warn(e);
+  }
+}
+
+/* ===== XOÁ HỒ SƠ LOCAL ===== */
+function wipeLocalPlayer(){
+  localStorage.removeItem(LS.PROFILE);
+  localStorage.removeItem(LS.LBCACHE);
+  alert('Đã xoá hồ sơ local. Reload trang để tạo người chơi mới.');
+  location.reload();
+}
+
+/* ===== VIEW ELEMENTS / ROUTER ===== */
 const view = document.getElementById('view');
 const tabs = [...document.querySelectorAll('[data-tab]')];
 tabs.forEach(b=>b.onclick=()=>render(b.dataset.tab));
@@ -348,7 +386,52 @@ function setActive(tab){
   tabs.forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
 }
 
-/* ===== Tasks View ===== */
+/* ===== HÀM QUA NGÀY / RESET (di chuyển sang Settings) ===== */
+async function handleEndDay(){
+  const zones=getZones();
+  const tasks=getTasks();
+  const today=getDay();
+
+  for(const z of zones){
+    if(!z.maxPerDay) continue;
+    const zoneTasks = tasks.filter(t=>t.zoneId==z.id);
+    const totalCount = zoneTasks.length;
+    const doneCount  = zoneTasks.filter(t=>t.done).length;
+
+    // phạt nếu chưa đạt max
+    if(doneCount < z.maxPerDay){
+      addXP(-Number(z.penalty||0));
+    }
+    // thưởng nếu hoàn thành hết zone
+    if(totalCount > 0 && doneCount === totalCount && !bonusGiven(z.id)){
+      addXP(Number(z.bonus||0));
+      markBonus(z.id);
+    }
+  }
+
+  clearFlagsFor(today);
+  nextDay();
+  setTasks([]);
+  localStorage.removeItem(LS.SPAWN);
+  spawnRecurringIfNeeded();
+
+  // sync điểm và refresh leaderboard cache
+  await autoSync();
+  await fetchLeaderboardAndCache();
+
+  alert('Đã qua ngày.');
+  render('settings'); // quay lại Settings để thấy thông tin cập nhật
+}
+
+function handleResetPoints(){
+  if(confirm('Reset Level=1 & XP=0?')){
+    resetPoints();
+    alert('Đã reset điểm.');
+    render('settings');
+  }
+}
+
+/* ===== VIEW: TASKS ===== */
 function viewTasks(){
   spawnRecurringIfNeeded();
 
@@ -369,11 +452,8 @@ function viewTasks(){
       <span class="pill">Level: <b>${level}</b></span>
       <span class="pill">XP: <b>${xp}</b>${need?` / ${need}`:''}</span>
       <span class="muted">Giới hạn/ngày: <b>${cap}</b></span>
-      <span style="margin-left:auto;display:flex;gap:8px">
-        <button class="btn-ghost" id="btnEnd">Qua ngày</button>
-        <button class="btn-danger" id="btnReset">Reset điểm</button>
-      </span>
     </div>
+
     <div class="bar"><div class="fill" style="width:${need?Math.min(100,Math.round(xp/need*100)):100}%;"></div></div>
 
     <div class="creator">
@@ -405,6 +485,7 @@ function viewTasks(){
 
   const inp = document.getElementById('taskText');
   const sel = document.getElementById('taskZone');
+
   function addNow(){
     const text=(inp.value||'').trim(); if(!text) return;
     if(getTasks().length>=cap){
@@ -426,10 +507,10 @@ function viewTasks(){
     inp.value='';
     render('tasks');
   }
+
   document.getElementById('btnAdd').onclick=addNow;
   inp.onkeydown=(e)=>{ if(e.key==='Enter') addNow(); };
 
-  // Tab để nhảy nhanh vào ô nhập
   window.onkeydown=(e)=>{
     const tag=(document.activeElement?.tagName||'').toLowerCase();
     if(e.key==='Tab' && !['input','select','textarea','button'].includes(tag)){
@@ -438,7 +519,7 @@ function viewTasks(){
     }
   };
 
-  // tick hoàn thành task
+  // tick task
   view.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
     cb.onchange=()=>{
       const id=Number(cb.dataset.id);
@@ -458,63 +539,40 @@ function viewTasks(){
     setTasks(getTasks().filter(t=>t.id!==id));
     render('tasks');
   });
-
-  // Qua ngày
-  document.getElementById('btnEnd').onclick=async ()=>{
-    const zones=getZones();
-    const tasks=getTasks();
-    const today=getDay();
-
-    for(const z of zones){
-      if(!z.maxPerDay) continue;
-      const zoneTasks = tasks.filter(t=>t.zoneId==z.id);
-      const totalCount = zoneTasks.length;
-      const doneCount  = zoneTasks.filter(t=>t.done).length;
-
-      // penalty nếu không đạt max
-      if(doneCount < z.maxPerDay){
-        addXP(-Number(z.penalty||0));
-      }
-      // bonus nếu hoàn thành hết
-      if(totalCount > 0 && doneCount === totalCount && !bonusGiven(z.id)){
-        addXP(Number(z.bonus||0));
-        markBonus(z.id);
-      }
-    }
-
-    clearFlagsFor(today);
-    nextDay();
-    setTasks([]);
-    localStorage.removeItem(LS.SPAWN);
-
-    // spawn task lặp cho ngày mới
-    spawnRecurringIfNeeded();
-
-    // đồng bộ điểm + cập nhật cache leaderboard NGAY LẬP TỨC
-    await autoSync();
-    await fetchLeaderboardAndCache();
-
-    alert('Đã qua ngày.');
-    render('tasks');
-  };
-
-  // Reset điểm
-  document.getElementById('btnReset').onclick=()=>{
-    if(confirm('Reset Level=1 & XP=0?')){
-      resetPoints();
-      render('tasks');
-    }
-  };
 }
 
-/* ===== Settings (có password) ===== */
+/* ===== VIEW: SETTINGS ===== */
 function viewSettings(){
   const p=getProfile();
   const zones=getZones();
   const recs=getRecurring();
+  const {level,xp,need,cap}=getLevelInfo();
+  const day=getDay();
 
   view.innerHTML = `
     <div class="card" style="margin-top:0">
+      <h3>Ngày & Điểm</h3>
+      <div class="row">
+        <div>Thông tin hiện tại</div>
+        <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px">
+          <div class="pill">Ngày ảo: <b>${day}</b></div>
+          <div class="pill">Level: <b>${level}</b></div>
+          <div class="pill">XP: <b>${xp}</b>${need?` / ${need}`:''}</div>
+          <div class="pill">Giới hạn/ngày: <b>${cap}</b></div>
+        </div>
+      </div>
+      <div class="bar"><div class="fill" style="width:${need?Math.min(100,Math.round(xp/need*100)):100}%;"></div></div>
+
+      <div class="row">
+        <div>Hành động</div>
+        <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px">
+          <button class="btn-ghost" id="btnEnd">Qua ngày</button>
+          <button class="btn-danger" id="btnReset">Reset điểm</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
       <h3>Hồ sơ người chơi</h3>
       <div class="row">
         <div>Tên người chơi</div>
@@ -580,9 +638,7 @@ function viewSettings(){
         <div>Chọn thứ</div>
         <div class="grid" style="grid-template-columns:repeat(7, minmax(40px,1fr))">
           ${['CN','T2','T3','T4','T5','T6','T7'].map((l,i)=>`
-            <label>
-              <input type="checkbox" value="${i}"> ${l}
-            </label>
+            <label><input type="checkbox" value="${i}"> ${l}</label>
           `).join('')}
         </div>
       </div>
@@ -614,15 +670,38 @@ function viewSettings(){
         </table>
       </div>
     </div>
+
+    <div class="card">
+      <h3>Quản trị Leaderboard</h3>
+      <div class="row">
+        <div>Xoá người chơi khỏi bảng xếp hạng SERVER</div>
+        <div class="grid" style="grid-template-columns:1fr auto;align-items:center">
+          <input id="banName" placeholder="Nhập đúng tên trong bảng">
+          <button class="btn-danger" id="banBtn">Xoá khỏi server</button>
+        </div>
+      </div>
+      <div class="row">
+        <div>Xoá hồ sơ người chơi LOCAL (máy này)</div>
+        <div><button class="btn-danger" id="wipeLocalBtn">Xoá hồ sơ local</button></div>
+      </div>
+    </div>
   `;
 
-  // Lưu tên
+  /* Nút hành động Ngày & Điểm */
+  document.getElementById('btnEnd').onclick = async ()=>{
+    await handleEndDay();
+  };
+  document.getElementById('btnReset').onclick = ()=>{
+    handleResetPoints();
+  };
+
+  /* Hồ sơ người chơi */
   document.getElementById('saveName').onclick=()=>{
     setName(document.getElementById('name').value);
     alert('Đã lưu');
   };
 
-  // Zone CRUD
+  /* Zone CRUD */
   document.getElementById('addZone').onclick=()=>{
     const g=id=>document.getElementById(id).value;
     const z={
@@ -633,10 +712,14 @@ function viewSettings(){
       penalty:Number(g('zPenalty')),
       maxPerDay:Number(g('zMax'))
     };
-    if(!z.name){ alert('Nhập tên Zone'); return; }
+    if(!z.name){
+      alert('Nhập tên Zone');
+      return;
+    }
     addZone(z);
     viewSettings();
   };
+
   document.getElementById('zoneT').oninput=(e)=>{
     const tr=e.target.closest('tr[data-id]'); if(!tr) return;
     const id=Number(tr.dataset.id);
@@ -647,17 +730,19 @@ function viewSettings(){
     }
     updZone(id,{[name]:val});
   };
+
   document.querySelectorAll('.zdel').forEach(b=> b.onclick=()=>{
     delZone(Number(b.dataset.id));
     viewSettings();
   });
 
-  // Recurring CRUD
+  /* Recurring CRUD */
   const typeSel=document.getElementById('rType');
   const daysRow=document.getElementById('rDaysRow');
   typeSel.onchange=()=>{
     daysRow.style.display = typeSel.value==='weekly'?'grid':'none';
   };
+
   document.getElementById('addRec').onclick=()=>{
     const text=document.getElementById('rText').value.trim();
     if(!text){ alert('Nhập mô tả'); return; }
@@ -671,19 +756,38 @@ function viewSettings(){
     addRecurring({text, zoneId, type, days});
     viewSettings();
   };
+
   document.querySelectorAll('.rdel').forEach(b=> b.onclick=()=>{
     delRecurring(Number(b.dataset.id));
     viewSettings();
   });
+
+  /* Leaderboard Admin */
+  document.getElementById('banBtn').onclick = async ()=>{
+    const n = document.getElementById('banName').value.trim();
+    if(!n){
+      alert('Nhập tên cần xoá');
+      return;
+    }
+    if(confirm('Xoá "'+n+'" khỏi leaderboard server?')){
+      await removeFromServerLeaderboard(n);
+    }
+  };
+
+  document.getElementById('wipeLocalBtn').onclick = ()=>{
+    if(confirm('Xoá hồ sơ local và cache leaderboard trên máy này?')){
+      wipeLocalPlayer();
+    }
+  };
 }
 
-/* ===== Map View ===== */
+/* ===== VIEW: MAP ===== */
 function viewMap(){
   const {level}=getLevelInfo();
   const total = Math.max(LEVELS.length, 9);
   const items = Array.from({length:total},(_,i)=>({
     n:i+1,
-    state: (i+1)<level?'passed':((i+1)===level?'current':'locked')
+    state: (i+1)<level ? 'passed' : ((i+1)===level ? 'current' : 'locked')
   }));
 
   view.innerHTML = `
@@ -699,13 +803,8 @@ function viewMap(){
   `;
 }
 
-/* ===== Leaderboard View =====
-   YÊU CẦU MỚI:
-   - Khi mở tab Leaderboard: KHÔNG gọi mạng nền.
-   - Chỉ hiển thị cache ngay lập tức.
-   - Chỉ khi bấm "Tải lại" mới fetch server & update cache & render lại.
-*/
-async function viewLeaderboard(){
+/* ===== VIEW: LEADERBOARD ===== */
+function viewLeaderboard(){
   const cache = getLBCache();
 
   view.innerHTML = `
@@ -733,18 +832,7 @@ async function viewLeaderboard(){
 
   const rows = document.getElementById('rows');
 
-  // render cache ngay lập tức
-  renderLBRows(rows, cache.list.length ? cache.list : fallbackLocalProfileList());
-
-  // "Tải lại": fetch server -> update cache -> render lại
-  document.getElementById('reload').onclick = async () => {
-    await fetchLeaderboardAndCache();
-    const fresh = getLBCache();
-    renderLBRows(rows, fresh.list.length ? fresh.list : fallbackLocalProfileList());
-  };
-
   function fallbackLocalProfileList(){
-    // nếu cache trống hoàn toàn -> dùng điểm local
     const p=getProfile();
     return [{
       name:p.name||'Player',
@@ -753,9 +841,19 @@ async function viewLeaderboard(){
       updatedAt:new Date().toISOString()
     }];
   }
+
+  // render cache ngay lập tức
+  renderLBRows(rows, cache.list.length ? cache.list : fallbackLocalProfileList());
+
+  // nút tải lại
+  document.getElementById('reload').onclick = async ()=>{
+    await fetchLeaderboardAndCache();
+    const fresh = getLBCache();
+    renderLBRows(rows, fresh.list.length ? fresh.list : fallbackLocalProfileList());
+  };
 }
 
-/* ===== Settings Auth ===== */
+/* ===== SETTINGS AUTH (password để vào tab Settings) ===== */
 let settingsUnlocked=false;
 function ensureSettingsAuth(){
   if(settingsUnlocked) return true;
@@ -768,7 +866,7 @@ function ensureSettingsAuth(){
   return false;
 }
 
-/* ===== Router ===== */
+/* ===== ROUTER ===== */
 function render(tab){
   if(tab==='tasks'){
     setActive('tasks');
@@ -780,23 +878,20 @@ function render(tab){
     setActive('leaderboard');
     viewLeaderboard();
   } else if(tab==='settings'){
-    // check mật khẩu
     if(ensureSettingsAuth()){
       setActive('settings');
       viewSettings();
     } else {
-      // nếu sai pass thì quay lại tab tasks
       setActive('tasks');
       viewTasks();
     }
   } else {
-    // fallback
     setActive('tasks');
     viewTasks();
   }
 }
 
-/* ===== Boot ===== */
+/* ===== BOOT ===== */
 ensureName();
 render('tasks');
 </script>
