@@ -189,15 +189,35 @@ function spawnRecurringIfNeeded(){
 }
 
 /* Sync endpoint (optional) */
-function getSyncCfg(){ return load(LS.SYNC, {endpoint:'', autosync:false}) }
-function setSyncCfg(c){ save(LS.SYNC,c) }
 async function autoSync(){
-  const cfg=getSyncCfg();
-  if(!cfg.autosync || !cfg.endpoint) return;
-  const p=getProfile();
-  try{
-    await fetch(cfg.endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:p.name||'Player',level:p.level||1,xp:p.xp||0})});
-  }catch(e){ console.warn('Auto-sync failed',e) }
+  const cfg = getSyncCfg();
+  if (!cfg.autosync || !cfg.endpoint) return;
+
+  const p = getProfile();
+
+  // Chuẩn bị body dưới dạng form-encoded
+  const form = new URLSearchParams({
+    name:  (p.name || 'Player'),
+    level: String(p.level || 1),
+    xp:    String(p.xp || 0)
+  }).toString();
+
+  try {
+    const res = await fetch(cfg.endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: form
+    });
+
+    // Không cần JSON response; chỉ log nếu cần
+    if (!res.ok) {
+      console.warn('Auto-sync: server trả mã lỗi', res.status);
+    }
+  } catch (e) {
+    console.warn('Auto-sync failed', e);
+  }
 }
 
 /* ====== VIEWS ====== */
