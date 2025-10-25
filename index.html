@@ -334,40 +334,10 @@ async function fetchLeaderboardAndCache(){
   }
 }
 
-/* ===== XOÁ NGƯỜI CHƠI KHỎI SERVER LEADERBOARD ===== */
-async function removeFromServerLeaderboard(name){
-  const cfg = getSyncCfg();
-  if(!name){
-    alert('Chưa nhập tên cần xoá');
-    return;
-  }
-
-  const form = new URLSearchParams({
-    name: name,
-    remove: '1'
-  }).toString();
-
-  try{
-    const res = await fetch(cfg.endpoint, {
-      method:'POST',
-      headers:{'Content-Type':'application/x-www-form-urlencoded'},
-      body:form
-    });
-    if(!res.ok){
-      alert('Lỗi HTTP '+res.status);
-      return;
-    }
-    const data = await res.json();
-    if(data.ok){
-      alert('Đã xoá khỏi leaderboard server: '+name);
-      await fetchLeaderboardAndCache();
-    }else{
-      alert('Không tìm thấy người chơi để xoá');
-    }
-  }catch(e){
-    alert('Lỗi khi gọi server');
-    console.warn(e);
-  }
+/* chạy ở nền lúc mở app để cache leaderboard mới nhất */
+function backgroundBoardRefresh(){
+  // gọi nhưng không chặn UI
+  fetchLeaderboardAndCache().catch(()=>{ /* im lặng, không popup */ });
 }
 
 /* ===== XOÁ HỒ SƠ LOCAL ===== */
@@ -386,49 +356,56 @@ function setActive(tab){
   tabs.forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
 }
 
-/* ===== HÀM QUA NGÀY / RESET (di chuyển sang Settings) ===== */
-async function handleEndDay(){
-  const zones=getZones();
-  const tasks=getTasks();
-  const today=getDay();
-
-  for(const z of zones){
-    if(!z.maxPerDay) continue;
-    const zoneTasks = tasks.filter(t=>t.zoneId==z.id);
-    const totalCount = zoneTasks.length;
-    const doneCount  = zoneTasks.filter(t=>t.done).length;
-
-    // phạt nếu chưa đạt max
-    if(doneCount < z.maxPerDay){
-      addXP(-Number(z.penalty||0));
-    }
-    // thưởng nếu hoàn thành hết zone
-    if(totalCount > 0 && doneCount === totalCount && !bonusGiven(z.id)){
-      addXP(Number(z.bonus||0));
-      markBonus(z.id);
-    }
-  }
-
-  clearFlagsFor(today);
-  nextDay();
-  setTasks([]);
-  localStorage.removeItem(LS.SPAWN);
-  spawnRecurringIfNeeded();
-
-  // sync điểm và refresh leaderboard cache
-  await autoSync();
-  await fetchLeaderboardAndCache();
-
-  alert('Đã qua ngày.');
-  render('settings'); // quay lại Settings để thấy thông tin cập nhật
-}
-
+/* ===== HÀM QUA NGÀY / RESET =====
+   Làm cho "Qua ngày" mượt:
+   - Xử lý local ngay
+   - Báo xong luôn
+   - Rồi mới sync server / refresh leaderboard ở nền
+*/
 function handleResetPoints(){
   if(confirm('Reset Level=1 & XP=0?')){
     resetPoints();
     alert('Đã reset điểm.');
     render('settings');
   }
+}
+
+function handleEndDay(){
+  const zones=getZones();
+  const tasks=getTasks();
+  const today=getDay();
+
+  // thưởng/phạt từng zone
+  for(const z of zones){
+    if(!z.maxPerDay) continue;
+    const zoneTasks = tasks.filter(t=>t.zoneId==z.id);
+    const totalCount = zoneTasks.length;
+    const doneCount  = zoneTasks.filter(t=>t.done).length;
+
+    if(doneCount < z.maxPerDay){
+      addXP(-Number(z.penalty||0));
+    }
+    if(totalCount > 0 && doneCount === totalCount && !bonusGiven(z.id)){
+      addXP(Number(z.bonus||0));
+      markBonus(z.id);
+    }
+  }
+
+  // qua ngày local
+  clearFlagsFor(today);
+  nextDay();
+  setTasks([]);
+  localStorage.removeItem(LS.SPAWN);
+  spawnRecurringIfNeeded();
+
+  // feedback ngay lập tức cho người chơi
+  alert('Đã qua ngày.');
+  render('settings');
+
+  // chạy sync & refresh leaderboard nền, không chặn UI
+  autoSync()
+    .then(()=>fetchLeaderboardAndCache())
+    .catch(()=>{ /* bỏ qua lỗi nền */ });
 }
 
 /* ===== VIEW: TASKS ===== */
@@ -672,14 +649,7 @@ function viewSettings(){
     </div>
 
     <div class="card">
-      <h3>Quản trị Leaderboard</h3>
-      <div class="row">
-        <div>Xoá người chơi khỏi bảng xếp hạng SERVER</div>
-        <div class="grid" style="grid-template-columns:1fr auto;align-items:center">
-          <input id="banName" placeholder="Nhập đúng tên trong bảng">
-          <button class="btn-danger" id="banBtn">Xoá khỏi server</button>
-        </div>
-      </div>
+      <h3>Quản trị / Dữ liệu cục bộ</h3>
       <div class="row">
         <div>Xoá hồ sơ người chơi LOCAL (máy này)</div>
         <div><button class="btn-danger" id="wipeLocalBtn">Xoá hồ sơ local</button></div>
@@ -687,13 +657,9 @@ function viewSettings(){
     </div>
   `;
 
-  /* Nút hành động Ngày & Điểm */
-  document.getElementById('btnEnd').onclick = async ()=>{
-    await handleEndDay();
-  };
-  document.getElementById('btnReset').onclick = ()=>{
-    handleResetPoints();
-  };
+  /* Nút Qua ngày + Reset điểm */
+  document.getElementById('btnEnd').onclick = ()=>{ handleEndDay(); };
+  document.getElementById('btnReset').onclick = ()=>{ handleResetPoints(); };
 
   /* Hồ sơ người chơi */
   document.getElementById('saveName').onclick=()=>{
@@ -762,18 +728,7 @@ function viewSettings(){
     viewSettings();
   });
 
-  /* Leaderboard Admin */
-  document.getElementById('banBtn').onclick = async ()=>{
-    const n = document.getElementById('banName').value.trim();
-    if(!n){
-      alert('Nhập tên cần xoá');
-      return;
-    }
-    if(confirm('Xoá "'+n+'" khỏi leaderboard server?')){
-      await removeFromServerLeaderboard(n);
-    }
-  };
-
+  /* Local wipe */
   document.getElementById('wipeLocalBtn').onclick = ()=>{
     if(confirm('Xoá hồ sơ local và cache leaderboard trên máy này?')){
       wipeLocalPlayer();
@@ -811,8 +766,8 @@ function viewLeaderboard(){
     <div class="card" style="margin-top:0">
       <h3>Leaderboard</h3>
       <div class="muted">
-        Bảng xếp hạng dùng cache local. Nhấn "Tải lại"
-        để cập nhật từ server & đồng bộ cache.
+        Dữ liệu từ cache local (đã tải nền khi mở app). Nhấn "Tải lại"
+        để buộc cập nhật lại từ server.
       </div>
       <div style="margin:10px 0;display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn-ghost" id="reload">Tải lại</button>
@@ -842,10 +797,10 @@ function viewLeaderboard(){
     }];
   }
 
-  // render cache ngay lập tức
+  // render cache (đã cố gắng làm mới sẵn khi app boot)
   renderLBRows(rows, cache.list.length ? cache.list : fallbackLocalProfileList());
 
-  // nút tải lại
+  // nút tải lại (manual refresh)
   document.getElementById('reload').onclick = async ()=>{
     await fetchLeaderboardAndCache();
     const fresh = getLBCache();
@@ -853,7 +808,7 @@ function viewLeaderboard(){
   };
 }
 
-/* ===== SETTINGS AUTH (password để vào tab Settings) ===== */
+/* ===== SETTINGS AUTH (password mở tab Settings) ===== */
 let settingsUnlocked=false;
 function ensureSettingsAuth(){
   if(settingsUnlocked) return true;
@@ -894,6 +849,7 @@ function render(tab){
 /* ===== BOOT ===== */
 ensureName();
 render('tasks');
+backgroundBoardRefresh(); // tải leaderboard nền ngay khi mở app
 </script>
 </body>
 </html>
