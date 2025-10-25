@@ -18,13 +18,26 @@
     margin:0;
     color:var(--ink);
     font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
-    background:#f6f7ff; /* sẽ bị override bằng gradient từ UI_THEME */
+    background:#f6f7ff; /* sẽ bị override bằng gradient từ ui-theme.js */
     background-attachment:fixed;
   }
 
-  /* card khung chính (.wrap) sẽ bị override style inline từ ui-theme.js */
+  /* .wrap sẽ được override style inline từ ui-theme.js */
+  .wrap{
+    max-width:960px;
+    margin:12px auto;
+    padding:20px;
+  }
 
-  h1{margin:0 0 12px;font-size:24px;font-weight:600;color:#1b1e2e;display:flex;align-items:center;gap:8px}
+  h1{
+    margin:0 0 12px;
+    font-size:24px;
+    font-weight:600;
+    color:#1b1e2e;
+    display:flex;
+    align-items:center;
+    gap:8px
+  }
 
   /* Tabs bar */
   .tabs{
@@ -91,7 +104,13 @@
   }
   .muted{color:var(--muted);font-size:14px}
 
-  .top{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+  .top{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:12px;
+    flex-wrap:wrap
+  }
 
   /* Inputs */
   input,select,textarea{
@@ -133,8 +152,6 @@
     font-weight:600;
     color:#1b1e2e;
   }
-
-  /* mini gradient ribbon / tag etc could be added later */
 
   .bar{
     height:10px;
@@ -278,9 +295,10 @@
   <div id="view">Đang nạp…</div>
 </div>
 
-<!-- import theme/ui config FIRST -->
+<!-- 1. Theme / UI config (KHÔNG có thẻ <script> bên trong file ui-theme.js) -->
 <script src="ui-theme.js"></script>
 
+<!-- 2. App logic -->
 <script>
 /* ====== CONFIG APP ====== */
 const CONFIG = {
@@ -298,7 +316,7 @@ const LS = {
   BONUS:'tq_bonus_flags',
   SPAWN:'tq_spawned_day',
   LBCACHE:'tq_lb_cache',
-  HIST:'tq_hist'            // lưu lịch sử điểm mỗi ngày để vẽ chart
+  HIST:'tq_hist'            // lịch sử điểm/ngày cho chart
 };
 
 const LEVELS = [
@@ -324,7 +342,12 @@ function todayDM(){
   return `${dd}-${mm}`;
 }
 
-/* ===== PROFILE / LEVEL / ENERGY (XP=>E) ===== */
+/* safe helper: phần tử cuối LEVELS */
+function lastLevelCfg(){
+  return LEVELS[LEVELS.length-1];
+}
+
+/* ===== PROFILE / LEVEL / "E" (XP) ===== */
 function getProfile(){
   let p = load(LS.PROFILE);
   if(!p){ p={name:'', level:1, xp:0}; save(LS.PROFILE,p); }
@@ -337,18 +360,21 @@ function addXP(delta){
   const p=getProfile();
   p.xp = Math.max(0, Number(p.xp||0)+Number(delta||0));
   while(true){
-    const cfg = LEVELS.find(x=>x.lvl===p.level) || LEVELS.at(-1);
+    const cfg = LEVELS.find(x=>x.lvl===p.level) || lastLevelCfg();
     const need = cfg.need || 0;
     if(need>0 && p.xp>=need){
       p.xp -= need;
-      p.level = Math.min(LEVELS.at(-1).lvl, p.level+1);
-    } else break;
+      const maxLvl = lastLevelCfg().lvl;
+      p.level = Math.min(maxLvl, p.level+1);
+    } else {
+      break;
+    }
   }
   save(LS.PROFILE,p);
 }
 function getLevelInfo(){
   const p=getProfile();
-  const cfg = LEVELS.find(x=>x.lvl===p.level) || LEVELS.at(-1);
+  const cfg = LEVELS.find(x=>x.lvl===p.level) || lastLevelCfg();
   return {level:p.level, xp:p.xp, need:cfg.need||0, cap:cfg.cap};
 }
 function resetPoints(){
@@ -362,7 +388,7 @@ function ensureName(){
   }
 }
 
-/* ===== HISTORY SNAPSHOT (cho chart) ===== */
+/* ===== HISTORY SNAPSHOT (Stats tab) ===== */
 function getHist(){ return load(LS.HIST,[]); }
 function setHist(h){ save(LS.HIST,h); }
 function pushHistSnapshot(){
@@ -371,9 +397,9 @@ function pushHistSnapshot(){
   h.push({
     ts:Date.now(),
     level:p.level,
-    xp:p.xp   // xp = "E"
+    xp:p.xp   // xp == E
   });
-  // giữ tối đa ~60 bản ghi gần nhất
+  // giữ khoảng 60 bản ghi gần nhất thôi
   if(h.length>60){
     h.splice(0, h.length-60);
   }
@@ -463,12 +489,12 @@ function renderLBRows(rowsEl, list){
   `).join('');
 }
 
-/* ===== RECURRING SPAWN MỖI NGÀY ===== */
+/* ===== RECURRING AUTO SPAWN ===== */
 function spawnRecurringIfNeeded(){
   const mark = Number(localStorage.getItem(LS.SPAWN)||0);
   if(mark===getDay()) return;
 
-  const weekday = new Date().getDay();
+  const weekday = new Date().getDay(); // 0=CN
   const recs = getRecurring();
   const zones = getZones();
   const tasks = getTasks();
@@ -547,7 +573,7 @@ async function fetchLeaderboardAndCache(){
   }
 }
 
-// chạy nền lúc boot để cache leaderboard
+// tải leaderboard nền khi mở app
 function backgroundBoardRefresh(){
   fetchLeaderboardAndCache().catch(()=>{});
 }
@@ -560,7 +586,7 @@ function wipeLocalPlayer(){
   location.reload();
 }
 
-/* ===== HANDLE END DAY / RESET ===== */
+/* ===== END DAY / RESET ===== */
 function handleResetPoints(){
   if(confirm('Reset Level=1 & E=0?')){
     resetPoints();
@@ -574,7 +600,7 @@ function handleEndDay(){
   const tasks=getTasks();
   const todaySim=getDay();
 
-  // chấm thưởng/phạt
+  // chấm thưởng/phạt theo zone
   for(const z of zones){
     if(!z.maxPerDay) continue;
     const zoneTasks = tasks.filter(t=>t.zoneId==z.id);
@@ -590,7 +616,7 @@ function handleEndDay(){
     }
   }
 
-  // lưu snapshot sau khi tính thưởng/phạt
+  // snapshot lịch sử (sau khi tính phạt/thưởng)
   pushHistSnapshot();
 
   // qua ngày local
@@ -600,17 +626,17 @@ function handleEndDay(){
   localStorage.removeItem(LS.SPAWN);
   spawnRecurringIfNeeded();
 
-  // feedback ngay
+  // phản hồi ngay
   alert('Đã qua ngày.');
   render('settings');
 
-  // sync & refresh leaderboard nền
+  // sync server và refresh leaderboard nền (không chặn UI)
   autoSync()
     .then(()=>fetchLeaderboardAndCache())
     .catch(()=>{});
 }
 
-/* ===== SIMPLE LINE CHART DRAWER ===== */
+/* ===== VẼ CHART CƠ BẢN (canvas) ===== */
 function drawChart(canvasId, values){
   const cvs = document.getElementById(canvasId);
   if(!cvs) return;
@@ -620,7 +646,7 @@ function drawChart(canvasId, values){
 
   ctx.clearRect(0,0,W,H);
 
-  // background blur-ish panel
+  // background mờ kiểu panel
   ctx.fillStyle = "rgba(255,255,255,0.6)";
   ctx.fillRect(0,0,W,H);
 
@@ -636,7 +662,7 @@ function drawChart(canvasId, values){
   const padX=20, padY=20;
   const span = (maxV-minV)||1;
 
-  // line path
+  // line
   ctx.lineWidth=3;
   const grad = ctx.createLinearGradient(0,0,W,0);
   grad.addColorStop(0,"#8b7cff");
@@ -650,7 +676,7 @@ function drawChart(canvasId, values){
   });
   ctx.stroke();
 
-  // draw last point label
+  // last point highlight
   const lastIdx = values.length-1;
   const lastVal = values[lastIdx];
   const lastX = padX + ((W-2*padX)*(lastIdx/(values.length-1||1)));
@@ -665,10 +691,11 @@ function drawChart(canvasId, values){
   ctx.fillText(String(lastVal), lastX+8, lastY-8);
 }
 
-/* ===== VIEW / ROUTING ===== */
-const view = document.getElementById('view');
+/* ===== VIEW / ROUTING / TABS ===== */
 
+const view = document.getElementById('view');
 let settingsUnlocked=false;
+
 function ensureSettingsAuth(){
   if(settingsUnlocked) return true;
   const pass=prompt('Nhập mật khẩu Settings:');
@@ -680,14 +707,14 @@ function ensureSettingsAuth(){
   return false;
 }
 
-/* ----- Tasks Tab ----- */
+/* --- Tasks tab --- */
 function viewTasks(){
   spawnRecurringIfNeeded();
 
   const zones=getZones();
   const tasks=getTasks();
   const {level,xp,need,cap}=getLevelInfo();
-  const dateNowDM = todayDM(); // real dd-mm
+  const dateNowDM = todayDM(); // dd-mm thực tế
 
   const groups = zones.map(z=>({
     z,
@@ -782,7 +809,7 @@ function viewTasks(){
     };
   });
 
-  // delete task
+  // xoá task
   view.querySelectorAll('.del').forEach(b=> b.onclick=()=>{
     const id=Number(b.dataset.id);
     setTasks(getTasks().filter(t=>t.id!==id));
@@ -790,7 +817,7 @@ function viewTasks(){
   });
 }
 
-/* ----- Map Tab ----- */
+/* --- Map tab --- */
 function viewMap(){
   const {level}=getLevelInfo();
   const total = Math.max(LEVELS.length, 9);
@@ -812,7 +839,7 @@ function viewMap(){
   `;
 }
 
-/* ----- Leaderboard Tab ----- */
+/* --- Leaderboard tab --- */
 function viewLeaderboard(){
   const cache = getLBCache();
 
@@ -820,7 +847,7 @@ function viewLeaderboard(){
     <div class="card" style="margin-top:0">
       <h3>Leaderboard</h3>
       <div class="muted">
-        Dữ liệu đã được tải nền khi mở app. Nhấn "Tải lại" để cập nhật lại từ server.
+        Dữ liệu đã tải nền khi mở app. Nhấn "Tải lại" để cập nhật trực tiếp từ server.
       </div>
       <div style="margin:10px 0;display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn-ghost" id="reload">Tải lại</button>
@@ -859,10 +886,9 @@ function viewLeaderboard(){
   };
 }
 
-/* ----- Stats Tab (Biểu đồ 7 / 30 ngày) ----- */
+/* --- Stats tab (biểu đồ 7 / 30 ngày E) --- */
 function viewStats(){
   const hist = getHist(); // [{ts,level,xp}, ...]
-  // Lấy chuỗi điểm E (xp) gần nhất
   const last7  = hist.slice(-7 ).map(r=>r.xp);
   const last30 = hist.slice(-30).map(r=>r.xp);
 
@@ -886,7 +912,7 @@ function viewStats(){
   drawChart("chart30", last30);
 }
 
-/* ----- Settings Tab ----- */
+/* --- Settings tab --- */
 function viewSettings(){
   const p=getProfile();
   const zones=getZones();
@@ -1025,17 +1051,17 @@ function viewSettings(){
     </div>
   `;
 
-  /* hành động Qua ngày / Reset */
+  /* Hành động Ngày & Điểm */
   document.getElementById('btnEnd').onclick = ()=>{ handleEndDay(); };
   document.getElementById('btnReset').onclick = ()=>{ handleResetPoints(); };
 
-  /* Hồ sơ */
+  /* Hồ sơ người chơi */
   document.getElementById('saveName').onclick=()=>{
     setName(document.getElementById('name').value);
     alert('Đã lưu');
   };
 
-  /* Zones CRUD */
+  /* Zone CRUD */
   document.getElementById('addZone').onclick=()=>{
     const g=id=>document.getElementById(id).value;
     const z={
@@ -1104,16 +1130,22 @@ function viewSettings(){
   };
 }
 
-/* ----- Routing / Tabs / Theme ----- */
+/* ===== ROUTER / THEME ===== */
+let currentTab='tasks';
+
 function render(tab){
   currentTab = tab;
-  // set background gradient theo tab
+
+  // 1. đổi nền gradient theo tab
   applyTabBackground(tab);
-  // rebuild tabs bar với icon, active state
+
+  // 2. build thanh tabs với icon từ ui-theme.js
   buildTabsBar(tab, render);
-  // áp style kính mờ .wrap
+
+  // 3. apply style kính mờ cho .wrap
   applyThemeToWrap();
 
+  // 4. render nội dung tab
   if(tab==='tasks'){
     viewTasks();
   } else if(tab==='map'){
@@ -1125,7 +1157,7 @@ function render(tab){
   } else if(tab==='settings'){
     if(ensureSettingsAuth()){
       viewSettings();
-    }else{
+    } else {
       render('tasks');
     }
   } else {
@@ -1134,10 +1166,9 @@ function render(tab){
 }
 
 /* ===== BOOT ===== */
-let currentTab='tasks';
 ensureName();
-render('tasks');              // mở app vào tab Tasks
-backgroundBoardRefresh();     // tự fetch leaderboard nền
+render('tasks');          // mở mặc định tab Tasks
+backgroundBoardRefresh(); // tải leaderboard cache nền
 </script>
 </body>
 </html>
