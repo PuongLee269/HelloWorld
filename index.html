@@ -122,6 +122,24 @@ h1{
   color:#1b1e2e;
   box-shadow:0 6px 16px rgba(0,0,0,.08);
 }
+.task-kind{
+  display:inline-flex;
+  align-items:center;
+  padding:2px 8px;
+  margin-left:8px;
+  font-size:11px;
+  font-weight:600;
+  border-radius:999px;
+  text-transform:uppercase;
+  letter-spacing:.4px;
+  background:rgba(139,124,255,.18);
+  color:#5a4cc1;
+}
+.task-kind.single{
+  background:rgba(34,197,94,.18);
+  color:#1f9d55;
+}
+.task.done .task-kind{opacity:.7}
 .muted{color:var(--muted);font-size:14px}
 .top{
   display:flex;
@@ -708,7 +726,87 @@ function delRecurring(id){
   save(LS.RECUR,getRecurring().filter(r=>r.id!==id));
 }
 
-function getTasks(){ return load(LS.TASKS,[]) }
+function getTasks(){
+  const raw = load(LS.TASKS, []);
+  if(!Array.isArray(raw)) return [];
+
+  const recs = getRecurring();
+  const recIndex = new Map();
+  for(const r of recs){
+    const key = `${Number(r.zoneId)}|${String(r.text||'')}`;
+    if(!recIndex.has(key)) recIndex.set(key, []);
+    recIndex.get(key).push(r);
+  }
+
+  let changed=false;
+  const normalized = raw.map(item=>{
+    if(!item || typeof item!=='object'){
+      changed=true;
+      return null;
+    }
+
+    const zoneId = Number(item.zoneId);
+    let kind = item.kind==='recurring' ? 'recurring' : (item.kind==='single' ? 'single' : null);
+    let recurringId = typeof item.recurringId==='number' ? item.recurringId : null;
+    let done = !!item.done;
+
+    if(kind===null){
+      const key = `${zoneId}|${String(item.text||'')}`;
+      const match = recIndex.get(key) || [];
+      if(recurringId!=null){
+        kind='recurring';
+      }else if(match.length===1){
+        kind='recurring';
+        recurringId = match[0].id;
+      }else{
+        kind='single';
+      }
+      if(kind==='recurring' && done){
+        done=false;
+      }
+    }
+
+    if(kind==='recurring' && recurringId==null){
+      const key = `${zoneId}|${String(item.text||'')}`;
+      const match = recIndex.get(key) || [];
+      if(match.length===1){
+        recurringId = match[0].id;
+      }
+    }
+
+    const next = { ...item, zoneId, done, kind };
+    if(kind==='recurring'){
+      const existing = typeof next.recurringId==='number' ? next.recurringId : null;
+      next.recurringId = recurringId!=null ? recurringId : existing;
+    }else if('recurringId' in next){
+      delete next.recurringId;
+    }
+
+    if(item.zoneId!==next.zoneId || item.done!==next.done || item.kind!==next.kind || (kind==='recurring' && item.recurringId!==next.recurringId) || (kind!=='recurring' && 'recurringId' in item)){
+      changed=true;
+    }
+
+    return next;
+  }).filter(Boolean);
+
+  if(changed){
+    save(LS.TASKS, normalized);
+  }
+
+  return normalized;
+}
+
+function isTaskActiveToday(t){
+  if(!t) return false;
+  if(t.kind==='recurring') return true;
+  if(t.kind==='single') return !t.done;
+  return !t.done;
+}
+
+function getZoneActiveTasks(tasks, zoneId){
+  return tasks.filter(t=>t.zoneId==zoneId && isTaskActiveToday(t));
+}
+
 function setTasks(a){ save(LS.TASKS,a) }
 
 /* ==============================
@@ -752,25 +850,47 @@ function spawnRecurringIfNeeded(){
   const tasks = getTasks();
   const {cap} = getLevelInfo();
 
+  let activeCount = tasks.filter(isTaskActiveToday).length;
+  const existingRecurring = new Set(
+    tasks
+      .filter(t=>t.kind==='recurring' && typeof t.recurringId==='number')
+      .map(t=>t.recurringId)
+  );
+  const fallbackRecurringKeys = new Set(
+    tasks
+      .filter(t=>t.kind==='recurring' && typeof t.recurringId!=='number')
+      .map(t=>`${t.zoneId}|${String(t.text||'')}`)
+  );
+
   for(const r of recs){
     const match = r.type==='daily' ||
       (r.type==='weekly' && Array.isArray(r.days)&&r.days.includes(weekday));
     if(!match) continue;
 
-    if(tasks.length>=cap) break;
+    if(activeCount>=cap) break;
 
     const z = zones.find(z=>z.id==r.zoneId);
     if(!z) continue;
 
-    const zoneCount = tasks.filter(t=>t.zoneId==r.zoneId).length;
+    const recKey = `${r.zoneId}|${String(r.text||'')}`;
+    if(existingRecurring.has(r.id) || fallbackRecurringKeys.has(recKey)) continue;
+
+    const zoneCount = getZoneActiveTasks(tasks, r.zoneId).length;
     if(z.maxPerDay && zoneCount>=z.maxPerDay) continue;
 
-    tasks.push({
+    const newTask = {
       id:Date.now()+Math.random(),
       text:r.text,
       zoneId:r.zoneId,
-      done:false
-    });
+      done:false,
+      kind:'recurring',
+      recurringId:r.id
+    };
+
+    tasks.push(newTask);
+    existingRecurring.add(r.id);
+    fallbackRecurringKeys.add(recKey);
+    activeCount++;
   }
 
   setTasks(tasks);
@@ -863,7 +983,7 @@ function performDayRollover(opts={}){
 
     for(const z of zones){
       if(!z.maxPerDay) continue;
-      const zoneTasks = tasks.filter(t=>t.zoneId==z.id);
+      const zoneTasks = getZoneActiveTasks(tasks, z.id);
       const totalCount = zoneTasks.length;
       const doneCount  = zoneTasks.filter(t=>t.done).length;
 
@@ -880,7 +1000,8 @@ function performDayRollover(opts={}){
 
     clearFlagsFor(todaySim);
     nextDay();
-    setTasks([]);
+    const remaining = tasks.filter(t=>t.kind!=='recurring');
+    setTasks(remaining);
     localStorage.removeItem(LS.SPAWN);
     spawnRecurringIfNeeded();
 
@@ -1194,9 +1315,15 @@ function viewTasks(){
   const dateNowDM = todayDM();
 
   const groups = zones.map(z=>{
-    const list = tasks.filter(t=>t.zoneId==z.id);
-    const done = list.filter(t=>t.done).length;
-    return {z,list,done};
+    const list = tasks
+      .filter(t=>t.zoneId==z.id)
+      .sort((a,b)=>{
+        if(a.kind===b.kind) return Number(a.done)-Number(b.done);
+        return a.kind==='recurring' ? -1 : 1;
+      });
+    const activeList = list.filter(isTaskActiveToday);
+    const dailyDone = activeList.filter(t=>t.done).length;
+    return {z,list,dailyDone};
   });
 
   view.innerHTML = `
@@ -1225,15 +1352,16 @@ function viewTasks(){
       <section class="zone">
         <header class="${headerClass}" style="${headerStyle}">
           <div><b>${z.name}</b></div>
-          <div class="badge">Hoàn thành: ${g.done}/${z.maxPerDay||0}</div>
+          <div class="badge">Hoàn thành: ${g.dailyDone}/${z.maxPerDay||0}</div>
         </header>
         <ul>
           ${g.list.length? g.list.map(t=>`
-            <li class="task ${t.done?'done':''}" data-id="${t.id}">
+            <li class="task ${t.done?'done':''}" data-id="${t.id}" data-kind="${t.kind||'single'}">
               <div class="task-inner">
                 <div class="left">
                   <input type="checkbox" data-id="${t.id}" ${t.done?'checked':''}>
                   <span class="txt">${t.text}</span>
+                  <span class="task-kind ${t.kind||'single'}">${t.kind==='recurring'?'Lặp':'Đơn'}</span>
                 </div>
               </div>
               <button class="del-btn" data-id="${t.id}">×</button>
@@ -1249,21 +1377,25 @@ function viewTasks(){
 
   function addNow(){
     const text=(inp.value||'').trim(); if(!text) return;
-    if(getTasks().length>=cap){
+    const currentTasks = getTasks();
+    const activeTotal = currentTasks.filter(isTaskActiveToday).length;
+    if(activeTotal>=cap){
       alert('Đã đạt giới hạn task/ngày theo Level');
       return;
     }
     const z = zones.find(z=>z.id==sel.value);
-    const count = getTasks().filter(t=>t.zoneId==z.id).length;
+    if(!z) return;
+    const count = getZoneActiveTasks(currentTasks, z.id).length;
     if(z.maxPerDay && count>=z.maxPerDay){
       alert(`Zone "${z.name}" đã đủ ${z.maxPerDay} task hôm nay`);
       return;
     }
-    setTasks([...getTasks(), {
+    setTasks([...currentTasks, {
       id:Date.now(),
       text,
       zoneId:Number(sel.value),
-      done:false
+      done:false,
+      kind:'single'
     }]);
     inp.value='';
     render('tasks');
