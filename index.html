@@ -523,7 +523,8 @@ const LS = {
   SPAWN:'tq_spawned_day',
   LBCACHE:'tq_lb_cache',
   HIST:'tq_hist',
-  MAPBG:'tq_map_bg'
+  MAPBG:'tq_map_bg',
+  REALDATE:'tq_real_date'
 };
 
 /* ==============================
@@ -551,6 +552,14 @@ function todayDM(){
   const dd=String(d.getDate()).padStart(2,'0');
   const mm=String(d.getMonth()+1).padStart(2,'0');
   return `${dd}-${mm}`;
+}
+function getLastRealDate(){
+  return localStorage.getItem(LS.REALDATE) || '';
+}
+function setLastRealDate(val){
+  if(val){
+    localStorage.setItem(LS.REALDATE, val);
+  }
 }
 function lastLevelCfg(){ return LEVELS[LEVELS.length-1]; }
 
@@ -843,40 +852,100 @@ function handleResetPoints(){
   }
 }
 
-function handleEndDay(){
-  const zones=getZones();
-  const tasks=getTasks();
-  const todaySim=getDay();
+function performDayRollover(opts={}){
+  const auto=!!opts.auto;
+  if(isRolloverRunning) return false;
+  isRolloverRunning=true;
+  try{
+    const zones=getZones();
+    const tasks=getTasks();
+    const todaySim=getDay();
 
-  for(const z of zones){
-    if(!z.maxPerDay) continue;
-    const zoneTasks = tasks.filter(t=>t.zoneId==z.id);
-    const totalCount = zoneTasks.length;
-    const doneCount  = zoneTasks.filter(t=>t.done).length;
+    for(const z of zones){
+      if(!z.maxPerDay) continue;
+      const zoneTasks = tasks.filter(t=>t.zoneId==z.id);
+      const totalCount = zoneTasks.length;
+      const doneCount  = zoneTasks.filter(t=>t.done).length;
 
-    if(doneCount < z.maxPerDay){
-      addXP(-Number(z.penalty||0));
+      if(doneCount < z.maxPerDay){
+        addXP(-Number(z.penalty||0));
+      }
+      if(totalCount > 0 && doneCount === totalCount && !bonusGiven(z.id)){
+        addXP(Number(z.bonus||0));
+        markBonus(z.id);
+      }
     }
-    if(totalCount > 0 && doneCount === totalCount && !bonusGiven(z.id)){
-      addXP(Number(z.bonus||0));
-      markBonus(z.id);
+
+    pushHistSnapshot();
+
+    clearFlagsFor(todaySim);
+    nextDay();
+    setTasks([]);
+    localStorage.removeItem(LS.SPAWN);
+    spawnRecurringIfNeeded();
+
+    setLastRealDate(todayDM());
+
+    if(!auto){
+      alert('Đã qua ngày.');
     }
+
+    autoSync()
+      .then(()=>fetchLeaderboardAndCache())
+      .catch(()=>{});
+
+    return true;
+  } finally {
+    isRolloverRunning=false;
   }
+}
 
-  pushHistSnapshot();
+function handleEndDay(){
+  if(performDayRollover({auto:false})){
+    render('settings');
+  }
+}
 
-  clearFlagsFor(todaySim);
-  nextDay();
-  setTasks([]);
-  localStorage.removeItem(LS.SPAWN);
-  spawnRecurringIfNeeded();
+function syncDayWithCalendar(){
+  const today = todayDM();
+  const lastReal = getLastRealDate();
+  if(!lastReal){
+    setLastRealDate(today);
+    return false;
+  }
+  if(lastReal===today){
+    return false;
+  }
+  return performDayRollover({auto:true});
+}
 
-  alert('Đã qua ngày.');
-  render('settings');
+function startDaySyncMonitoring(){
+  if(daySyncTimer!==null) return;
+  daySyncTimer=setInterval(()=>{
+    if(syncDayWithCalendar()){
+      render('tasks');
+    }
+  }, 60*1000);
 
-  autoSync()
-    .then(()=>fetchLeaderboardAndCache())
-    .catch(()=>{});
+  if(!daySyncVisHandler){
+    daySyncVisHandler=()=>{
+      if(!document.hidden && syncDayWithCalendar()){
+        render('tasks');
+      }
+    };
+    document.addEventListener('visibilitychange', daySyncVisHandler);
+  }
+}
+
+function stopDaySyncMonitoring(){
+  if(daySyncTimer!==null){
+    clearInterval(daySyncTimer);
+    daySyncTimer=null;
+  }
+  if(daySyncVisHandler){
+    document.removeEventListener('visibilitychange', daySyncVisHandler);
+    daySyncVisHandler=null;
+  }
 }
 
 /* ==============================
@@ -1079,6 +1148,9 @@ function attachSwipeHandlersForTasks(){
 const view = document.getElementById('view');
 const tabsBar = document.getElementById('tabsBar');
 let settingsUnlocked=false;
+let daySyncTimer=null;
+let daySyncVisHandler=null;
+let isRolloverRunning=false;
 
 function ensureSettingsAuth(){
   if(settingsUnlocked) return true;
@@ -1637,8 +1709,16 @@ function render(tab){
   buildTabsBar(tab);
 
   if(tab==='tasks'){
+    stopDaySyncMonitoring();
+    syncDayWithCalendar();
     viewTasks();
-  } else if(tab==='map'){
+    startDaySyncMonitoring();
+    return;
+  }
+
+  stopDaySyncMonitoring();
+
+  if(tab==='map'){
     viewMap();
   } else if(tab==='leaderboard'){
     viewLeaderboard();
@@ -1651,7 +1731,7 @@ function render(tab){
       render('tasks');
     }
   } else {
-    viewTasks();
+    render('tasks');
   }
 }
 
