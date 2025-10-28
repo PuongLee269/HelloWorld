@@ -211,6 +211,14 @@ h1{
   background:rgba(34,197,94,.18);
   color:#1f9d55;
 }
+.task-kind.recurring{
+  background:rgba(59,130,246,.18);
+  color:#2563eb;
+}
+.task-kind.recurring.negative{
+  background:rgba(248,113,113,.18);
+  color:#dc2626;
+}
 .task.done .task-kind{opacity:.7}
 .muted{color:var(--muted);font-size:14px}
 .top{
@@ -516,6 +524,19 @@ const LS = {
   REALDATE:'tq_real_date'
 };
 
+const ZONE_KIND_LABELS = {
+  'daily-positive':'Tăng E (Daily)',
+  'daily-negative':'Giảm E (Daily)',
+  'priority':'Quan trọng',
+  'regular':'Thông thường'
+};
+const ZONE_KIND_ORDER = ['daily-positive','daily-negative','priority','regular'];
+const DEFAULT_ZONES = ZONE_KIND_ORDER.map((kind, idx)=>({
+  name: ['Tăng E','Giảm E','Quan trọng','Thông thường'][idx],
+  kind,
+  bg:''
+}));
+
 /* ==============================
    HERO ELEMENTS
 ============================== */
@@ -719,20 +740,106 @@ Zone obj:
 {
   id,
   name,
-  bg: base64 img string,
-  point, bonus, penalty, maxPerDay
+  kind,
+  bg
 }
 */
-function getZones(){ return load(LS.ZONES,[]) }
+const DAILY_ZONE_KINDS = new Set(['daily-positive','daily-negative']);
+
+function normalizeZoneRecord(raw, idx, idBase){
+  if(!raw || typeof raw!=='object') return {changed:true, zone:null};
+  const zone = {...raw};
+  let changed=false;
+
+  if(typeof zone.id!=='number'){
+    zone.id = idBase + idx;
+    changed=true;
+  }
+
+  zone.name = typeof zone.name==='string' ? zone.name.trim() : '';
+  if(!zone.name){
+    zone.name = `Zone ${idx+1}`;
+    changed=true;
+  }
+
+  if(typeof zone.bg!=='string'){
+    zone.bg='';
+    changed=true;
+  }
+
+  if(!ZONE_KIND_LABELS[zone.kind]){
+    const fallbackKind = DEFAULT_ZONES.find(d=>d.name===zone.name)?.kind || 'regular';
+    zone.kind = fallbackKind;
+    changed=true;
+  }
+
+  return {changed, zone};
+}
+
+function getZones(){
+  const loaded = load(LS.ZONES, []);
+  const idBase = Date.now();
+  let zones = [];
+  let changed=false;
+
+  if(Array.isArray(loaded) && loaded.length){
+    loaded.forEach((item, idx)=>{
+      const {changed: rowChanged, zone} = normalizeZoneRecord(item, idx, idBase+idx*10);
+      if(rowChanged) changed=true;
+      if(zone) zones.push(zone);
+    });
+  }
+
+  if(!zones.length){
+    const base = Date.now();
+    zones = DEFAULT_ZONES.map((z, idx)=>({
+      id: base + idx,
+      name: z.name,
+      kind: z.kind,
+      bg: z.bg
+    }));
+    changed=true;
+  }
+
+  if(changed){
+    setZones(zones);
+  }
+
+  return zones;
+}
 function setZones(z){ save(LS.ZONES,z) }
+function sanitizeZoneInput(z){
+  return {
+    name: typeof z.name==='string' ? z.name.trim() : '',
+    kind: ZONE_KIND_LABELS[z.kind] ? z.kind : 'regular',
+    bg: typeof z.bg==='string' ? z.bg : ''
+  };
+}
+function renderZoneKindOptions(selected){
+  return ZONE_KIND_ORDER.map(kind=>`<option value="${kind}" ${kind===selected?'selected':''}>${ZONE_KIND_LABELS[kind]}</option>`).join('');
+}
 function addZone(z){
-  const L=getZones();
-  z.id=Date.now();
-  L.push(z);
-  setZones(L);
+  const list=getZones();
+  const clean = sanitizeZoneInput(z);
+  clean.id = Date.now() + Math.floor(Math.random()*1000);
+  if(!clean.name){
+    clean.name = `Zone ${list.length+1}`;
+  }
+  setZones([...list, clean]);
 }
 function updZone(id,patch){
-  setZones(getZones().map(z=>z.id===id?{...z,...patch}:z));
+  const clean={...patch};
+  if('name' in clean){
+    clean.name = (clean.name||'').trim();
+    if(!clean.name) delete clean.name;
+  }
+  if('bg' in clean && typeof clean.bg!=='string'){
+    delete clean.bg;
+  }
+  if('kind' in clean){
+    clean.kind = ZONE_KIND_LABELS[clean.kind] ? clean.kind : 'regular';
+  }
+  setZones(getZones().map(z=>z.id===id?{...z,...clean}:z));
 }
 function delZone(id){
   setZones(getZones().filter(z=>z.id!==id));
@@ -740,8 +847,11 @@ function delZone(id){
 
 function getRecurring(){ return load(LS.RECUR,[]) }
 function addRecurring(r){
-  r.id=Date.now();
-  save(LS.RECUR,[...getRecurring(),r]);
+  const rec = {...r};
+  rec.id = Date.now() + Math.floor(Math.random()*1000);
+  const list = [...getRecurring(), rec];
+  save(LS.RECUR, list);
+  return rec;
 }
 function delRecurring(id){
   save(LS.RECUR,getRecurring().filter(r=>r.id!==id));
@@ -828,6 +938,28 @@ function getZoneActiveTasks(tasks, zoneId){
   return tasks.filter(t=>t.zoneId==zoneId && isTaskActiveToday(t));
 }
 
+function zoneTaskCompletionDelta(zone){
+  return zone && zone.kind==='daily-negative' ? -1 : 1;
+}
+
+function describeTaskKind(task, zone){
+  if(task.kind==='recurring'){
+    return zone && zone.kind==='daily-negative' ? 'Daily (-)' : 'Daily';
+  }
+  return 'Đơn';
+}
+
+function taskKindClass(task, zone){
+  if(task.kind==='recurring'){
+    return zone && zone.kind==='daily-negative' ? 'task-kind recurring negative' : 'task-kind recurring';
+  }
+  return 'task-kind single';
+}
+
+function renderTaskKindBadge(task, zone){
+  return `<span class="${taskKindClass(task, zone)}">${describeTaskKind(task, zone)}</span>`;
+}
+
 function setTasks(a){ save(LS.TASKS,a) }
 
 /* ==============================
@@ -895,9 +1027,6 @@ function spawnRecurringIfNeeded(){
 
     const recKey = `${r.zoneId}|${String(r.text||'')}`;
     if(existingRecurring.has(r.id) || fallbackRecurringKeys.has(recKey)) continue;
-
-    const zoneCount = getZoneActiveTasks(tasks, r.zoneId).length;
-    if(z.maxPerDay && zoneCount>=z.maxPerDay) continue;
 
     const newTask = {
       id:Date.now()+Math.random(),
@@ -1003,17 +1132,16 @@ function performDayRollover(opts={}){
     const todaySim=getDay();
 
     for(const z of zones){
-      if(!z.maxPerDay) continue;
-      const zoneTasks = getZoneActiveTasks(tasks, z.id);
+      if(!DAILY_ZONE_KINDS.has(z.kind)) continue;
+      const zoneTasks = getZoneActiveTasks(tasks, z.id).filter(t=>t.kind==='recurring');
       const totalCount = zoneTasks.length;
-      const doneCount  = zoneTasks.filter(t=>t.done).length;
-
-      if(doneCount < z.maxPerDay){
-        addXP(-Number(z.penalty||0));
-      }
-      if(totalCount > 0 && doneCount === totalCount && !bonusGiven(z.id)){
-        addXP(Number(z.bonus||0));
-        markBonus(z.id);
+      if(totalCount===0) continue;
+      const incomplete = zoneTasks.filter(t=>!t.done).length;
+      const reward = 2 * totalCount;
+      const penalty = 3 * incomplete;
+      const delta = reward - penalty;
+      if(delta!==0){
+        addXP(delta);
       }
     }
 
@@ -1343,8 +1471,16 @@ function viewTasks(){
         return a.kind==='recurring' ? -1 : 1;
       });
     const activeList = list.filter(isTaskActiveToday);
-    const dailyDone = activeList.filter(t=>t.done).length;
-    return {z,list,dailyDone};
+    const activeDone = activeList.filter(t=>t.done).length;
+    return {
+      z,
+      list,
+      activeList,
+      activeDone,
+      activeTotal: activeList.length,
+      kindLabel: ZONE_KIND_LABELS[z.kind] || 'Zone',
+      progressText: activeList.length ? `${activeDone}/${activeList.length}` : '0'
+    };
   });
 
   view.innerHTML = `
@@ -1367,8 +1503,8 @@ function viewTasks(){
       return `
       <section class="zone">
         <header class="${headerClass}" style="${headerStyle}">
-          <div><b>${z.name}</b></div>
-          <div class="badge">Hoàn thành: ${g.dailyDone}/${z.maxPerDay||0}</div>
+          <div><b>${z.name}</b> <span class="badge">${g.kindLabel}</span></div>
+          <div class="badge">Hoàn thành hôm nay: ${g.progressText}</div>
         </header>
         <ul>
           ${g.list.length? g.list.map(t=>`
@@ -1377,7 +1513,7 @@ function viewTasks(){
                 <div class="left">
                   <input type="checkbox" data-id="${t.id}" ${t.done?'checked':''}>
                   <span class="txt">${t.text}</span>
-                  <span class="task-kind ${t.kind||'single'}">${t.kind==='recurring'?'Lặp':'Đơn'}</span>
+                  ${renderTaskKindBadge(t, z)}
                 </div>
               </div>
               <button class="del-btn" data-id="${t.id}">×</button>
@@ -1399,20 +1535,44 @@ function viewTasks(){
       alert('Đã đạt giới hạn task/ngày theo Level');
       return;
     }
-    const z = zones.find(z=>z.id==sel.value);
+    const zoneId = Number(sel.value);
+    const z = zones.find(z=>z.id==zoneId);
     if(!z) return;
-    const count = getZoneActiveTasks(currentTasks, z.id).length;
-    if(z.maxPerDay && count>=z.maxPerDay){
-      alert(`Zone "${z.name}" đã đủ ${z.maxPerDay} task hôm nay`);
-      return;
+
+    const isDailyZone = DAILY_ZONE_KINDS.has(z.kind);
+    const newTasks = [...currentTasks];
+
+    if(isDailyZone){
+      const recs = getRecurring();
+      const existingRec = recs.find(r=>r.zoneId==z.id && r.type==='daily' && (r.text||'')===text);
+      const rec = existingRec || addRecurring({
+        text,
+        zoneId:z.id,
+        type:'daily',
+        autoKind:z.kind
+      });
+      const duplicate = newTasks.some(t=>t.zoneId==z.id && t.kind==='recurring' && t.recurringId===rec.id);
+      if(!duplicate){
+        newTasks.push({
+          id:Date.now()+Math.random(),
+          text,
+          zoneId:z.id,
+          done:false,
+          kind:'recurring',
+          recurringId:rec.id
+        });
+      }
+    } else {
+      newTasks.push({
+        id:Date.now(),
+        text,
+        zoneId:z.id,
+        done:false,
+        kind:'single'
+      });
     }
-    setTasks([...currentTasks, {
-      id:Date.now(),
-      text,
-      zoneId:Number(sel.value),
-      done:false,
-      kind:'single'
-    }]);
+
+    setTasks(newTasks);
     inp.value='';
     render('tasks');
   }
@@ -1436,7 +1596,8 @@ function viewTasks(){
       if(!t) return;
       const z = zones.find(z=>z.id==t.zoneId);
       t.done = cb.checked;
-      addXP(cb.checked? Number(z.point||0) : -Number(z.point||0));
+      const delta = zoneTaskCompletionDelta(z);
+      addXP(cb.checked ? delta : -delta);
       setTasks(getTasks().map(x=>x.id===id?t:x));
       render('tasks');
     };
@@ -1561,16 +1722,15 @@ function viewSettings(){
     </div>
 
     <div class="card">
-      <h3>Zones & Điểm</h3>
+      <h3>Zones</h3>
       <div class="grid">
         <div class="row"><div>Tên Zone</div><input id="zName" placeholder="Công việc"></div>
+        <div class="row"><div>Loại Zone</div>
+          <select id="zKind">${renderZoneKindOptions('regular')}</select>
+        </div>
         <div class="row"><div>Hình nền Zone</div>
           <input id="zBg" type="file" accept="image/*">
         </div>
-        <div class="row"><div>Điểm/Task</div><input id="zPoint" type="number" value="10"></div>
-        <div class="row"><div>Bonus khi đạt Max</div><input id="zBonus" type="number" value="100"></div>
-        <div class="row"><div>Penalty nếu KHÔNG đạt</div><input id="zPenalty" type="number" value="10"></div>
-        <div class="row"><div>Số Task tối đa/ngày</div><input id="zMax" type="number" value="3"></div>
         <div class="row"><div></div><button class="btn-primary" id="addZone">+ Thêm Zone</button></div>
       </div>
 
@@ -1579,11 +1739,8 @@ function viewSettings(){
           <thead>
             <tr>
               <th>Tên</th>
+              <th>Loại</th>
               <th>Nền</th>
-              <th>Điểm</th>
-              <th>Bonus</th>
-              <th>Penalty</th>
-              <th>Max/ngày</th>
               <th></th>
             </tr>
           </thead>
@@ -1592,13 +1749,12 @@ function viewSettings(){
               <tr data-id="${z.id}">
                 <td><input name="name" value="${z.name}"></td>
                 <td>
+                  <select name="kind">${renderZoneKindOptions(z.kind)}</select>
+                </td>
+                <td>
                   <div class="thumb" style="background-image:url('${z.bg||''}')"></div>
                   <input class="bgUpload" data-id="${z.id}" type="file" accept="image/*" style="margin-top:6px">
                 </td>
-                <td><input name="point" type="number" value="${z.point||0}"></td>
-                <td><input name="bonus" type="number" value="${z.bonus||0}"></td>
-                <td><input name="penalty" type="number" value="${z.penalty||0}"></td>
-                <td><input name="maxPerDay" type="number" value="${z.maxPerDay||0}"></td>
                 <td><button class="btn-danger zdel" data-id="${z.id}">Xoá</button></td>
               </tr>
             `).join('')}
@@ -1688,25 +1844,24 @@ function viewSettings(){
 
   /* Zone thêm mới */
   document.getElementById('addZone').onclick=()=>{
-    const nameVal=document.getElementById('zName').value.trim();
+    const nameInp=document.getElementById('zName');
+    const kindSel=document.getElementById('zKind');
+    const nameVal=nameInp.value.trim();
     if(!nameVal){ alert('Nhập tên Zone'); return; }
 
     const file=document.getElementById('zBg').files[0];
-    const pointVal=Number(document.getElementById('zPoint').value||0);
-    const bonusVal=Number(document.getElementById('zBonus').value||0);
-    const penVal=Number(document.getElementById('zPenalty').value||0);
-    const maxVal=Number(document.getElementById('zMax').value||0);
+    const kindVal=kindSel.value;
 
     function finishAdd(bgData){
       const z={
         name:nameVal,
-        bg:bgData||'',
-        point:pointVal,
-        bonus:bonusVal,
-        penalty:penVal,
-        maxPerDay:maxVal
+        kind:kindVal,
+        bg:bgData||''
       };
       addZone(z);
+      nameInp.value='';
+      kindSel.value='regular';
+      document.getElementById('zBg').value='';
       viewSettings();
     }
 
@@ -1717,17 +1872,18 @@ function viewSettings(){
     }
   };
 
-  /* Zone chỉnh sửa text/số */
-  document.getElementById('zoneT').oninput=(e)=>{
+  /* Zone chỉnh sửa */
+  const zoneTable=document.getElementById('zoneT');
+  const handleZoneChange=(e)=>{
     const tr=e.target.closest('tr[data-id]'); if(!tr) return;
     const id=Number(tr.dataset.id);
     const name=e.target.name;
-    let val=e.target.value;
-    if(['point','bonus','penalty','maxPerDay'].includes(name)){
-      val=Number(val||0);
-    }
+    if(!name) return;
+    const val=e.target.value;
     updZone(id,{[name]:val});
   };
+  zoneTable.oninput=handleZoneChange;
+  zoneTable.onchange=handleZoneChange;
 
   /* Zone đổi hình nền */
   document.querySelectorAll('.bgUpload').forEach(inp=>{
