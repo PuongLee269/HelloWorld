@@ -1166,30 +1166,46 @@ async function autoSync(){
 
 async function fetchLeaderboardAndCache(){
   const cfg = getSyncCfg();
-  if(!cfg.endpoint) return;
+  if (!cfg.endpoint) return;
 
+  // Tăng timeout và xử lý AbortError êm
   const controller = new AbortController();
-  const t = setTimeout(()=>controller.abort(),8000);
-  try{
-    const r = await fetch(cfg.endpoint, { signal: controller.signal });
+  const timeoutMs = 15000; // 15s (trước là 8000)
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const r = await fetch(cfg.endpoint, {
+      signal: controller.signal,
+      cache: 'no-store' // tránh cache treo
+    });
     clearTimeout(t);
-    if(!r.ok) throw new Error('HTTP '+r.status);
+
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+
     const data = await r.json();
-    if(Array.isArray(data.lb)){
-      setLBCache({ ts:Date.now(), list:data.lb });
+    if (Array.isArray(data.lb)) {
+      setLBCache({ ts: Date.now(), list: data.lb });
     }
-    if(Array.isArray(data.public_tasks)){
+    if (Array.isArray(data.public_tasks)) {
       setPublicTasks(data.public_tasks);
     }
-  }catch(e){
+  } catch (e) {
     clearTimeout(t);
+    // CHỈ SỬA LẠI 3 DÒNG NÀY: AbortError thì im lặng, không log cảnh báo
+    if (e && e.name === 'AbortError') {
+      // console.debug('Leaderboard fetch timed out');
+      return;
+    }
     console.warn('fetchLeaderboardAndCache failed', e);
   }
 }
 
+
 function backgroundBoardRefresh(){
-  fetchLeaderboardAndCache().catch(()=>{});
+  // Gọi nhẹ, không ném lỗi ra console
+  fetchLeaderboardAndCache().catch(() => {});
 }
+
 
 /* ==============================
    DANGER LOCAL WIPE
