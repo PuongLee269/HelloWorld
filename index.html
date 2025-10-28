@@ -655,8 +655,20 @@ async function getTaskPoints(taskText, zoneKind) {
     const raw = String(data.reason || "").trim();
     const reason = raw.split(/\s+/).slice(0, 10).join(" ");
 
-    console.log("AI Score:", taskText, "=>", { points, reason, category: data.category });
-    return { points, reason };
+    let normalizedPoints = points;
+    let normalizedReason = reason;
+
+    if (zoneKind === "noise") {
+      if (normalizedPoints > 0) {
+        normalizedPoints = 0;
+        normalizedReason = "Sai Zone Noise, không trừ";
+      } else if (normalizedPoints < 0) {
+        normalizedPoints = Math.max(-3, Math.min(-1, normalizedPoints));
+      }
+    }
+
+    console.log("AI Score:", taskText, "=>", { points: normalizedPoints, reason: normalizedReason, category: data.category });
+    return { points: normalizedPoints, reason: normalizedReason };
   } catch (err) {
     console.error("AI proxy failed:", err);
     return { points: 0, reason: "" };
