@@ -521,7 +521,8 @@ const LS = {
   SPAWN:'tq_spawned_day',
   LBCACHE:'tq_lb_cache',
   HIST:'tq_hist',
-  REALDATE:'tq_real_date'
+  REALDATE:'tq_real_date',
+  POINT_RULES:'tq_point_rules'
 };
 
 const ZONE_KIND_LABELS = {
@@ -536,6 +537,22 @@ const DEFAULT_ZONES = ZONE_KIND_ORDER.map((kind, idx)=>({
   kind,
   bg:''
 }));
+
+const DEFAULT_POINT_RULES = {
+  zoneCompletion: {
+    default: 1,
+    regular: 1,
+    priority: 1,
+    'daily-positive': 1,
+    'daily-negative': -1
+  },
+  rollover: {
+    rewardPerCompleted: 2,
+    penaltyPerIncomplete: -3
+  }
+};
+
+let cachedPointRules = null;
 
 /* ==============================
    HERO ELEMENTS
@@ -571,6 +588,55 @@ const LEVELS = [
 ============================== */
 function load(key, def){ try{ return JSON.parse(localStorage.getItem(key)) ?? def }catch{ return def } }
 function save(key, val){ localStorage.setItem(key, JSON.stringify(val)) }
+
+function clonePointRules(src){
+  return {
+    zoneCompletion: { ...(src?.zoneCompletion||{}) },
+    rollover: { ...(src?.rollover||{}) }
+  };
+}
+
+function normalizePointRules(input){
+  const base = clonePointRules(DEFAULT_POINT_RULES);
+  if(!input || typeof input!=='object') return base;
+
+  if(input.zoneCompletion && typeof input.zoneCompletion==='object'){
+    for(const [key, value] of Object.entries(input.zoneCompletion)){
+      if(typeof value==='number' && Number.isFinite(value)){
+        base.zoneCompletion[key]=value;
+      }
+    }
+  }
+
+  if(input.rollover && typeof input.rollover==='object'){
+    for(const [key, value] of Object.entries(input.rollover)){
+      if(typeof value==='number' && Number.isFinite(value)){
+        base.rollover[key]=value;
+      }
+    }
+  }
+
+  return base;
+}
+
+function getPointRules(){
+  if(!cachedPointRules){
+    const stored = load(LS.POINT_RULES, null);
+    cachedPointRules = normalizePointRules(stored);
+  }
+  return cachedPointRules;
+}
+
+function setPointRules(next){
+  cachedPointRules = normalizePointRules(next);
+  save(LS.POINT_RULES, cachedPointRules);
+  return cachedPointRules;
+}
+
+function formatSignedNumber(n){
+  const val = Number(n)||0;
+  return `${val>=0?'+':''}${val}`;
+}
 function todayDM(){
   const d=new Date();
   const dd=String(d.getDate()).padStart(2,'0');
@@ -939,7 +1005,14 @@ function getZoneActiveTasks(tasks, zoneId){
 }
 
 function zoneTaskCompletionDelta(zone){
-  return zone && zone.kind==='daily-negative' ? -1 : 1;
+  const rules = getPointRules();
+  const map = rules.zoneCompletion || {};
+  const kind = zone && typeof zone.kind==='string' ? zone.kind : 'regular';
+  if(typeof map[kind]==='number') return map[kind];
+  if(typeof map.default==='number') return map.default;
+  if(typeof map.regular==='number') return map.regular;
+  const fallback = Object.values(map).find(v=>typeof v==='number');
+  return typeof fallback==='number' ? fallback : 1;
 }
 
 function describeTaskKind(task, zone){
@@ -1101,6 +1174,8 @@ function backgroundBoardRefresh(){
 function wipeLocalPlayer(){
   localStorage.removeItem(LS.PROFILE);
   localStorage.removeItem(LS.LBCACHE);
+  localStorage.removeItem(LS.POINT_RULES);
+  cachedPointRules=null;
   alert('Đã xoá hồ sơ local. Reload trang để tạo người chơi mới.');
   location.reload();
 }
@@ -1124,6 +1199,9 @@ function performDayRollover(opts={}){
     const zones=getZones();
     const tasks=getTasks();
     const todaySim=getDay();
+    const rolloverRules = getPointRules().rollover || {};
+    const rewardPerCompleted = Number(rolloverRules.rewardPerCompleted ?? 0);
+    const penaltyPerIncomplete = Number(rolloverRules.penaltyPerIncomplete ?? 0);
 
     for(const z of zones){
       if(!DAILY_ZONE_KINDS.has(z.kind)) continue;
@@ -1131,9 +1209,8 @@ function performDayRollover(opts={}){
       const totalCount = zoneTasks.length;
       if(totalCount===0) continue;
       const incomplete = zoneTasks.filter(t=>!t.done).length;
-      const reward = 2 * totalCount;
-      const penalty = 3 * incomplete;
-      const delta = reward - penalty;
+      const completed = totalCount - incomplete;
+      const delta = (completed * rewardPerCompleted) + (incomplete * penaltyPerIncomplete);
       if(delta!==0){
         addXP(delta);
       }
@@ -1674,6 +1751,16 @@ function viewSettings(){
   const recs=getRecurring();
   const {level,xp,need}=getLevelInfo();
   const dateNowDM=todayDM();
+  const pointRules=getPointRules();
+  const defaultRules=DEFAULT_POINT_RULES;
+  const zoneDefault=pointRules.zoneCompletion?.default ?? pointRules.zoneCompletion?.regular ?? defaultRules.zoneCompletion.default;
+  const zoneNegative=pointRules.zoneCompletion?.['daily-negative'] ?? defaultRules.zoneCompletion['daily-negative'];
+  const rewardCompleted=pointRules.rollover?.rewardPerCompleted ?? defaultRules.rollover.rewardPerCompleted;
+  const penaltyIncomplete=pointRules.rollover?.penaltyPerIncomplete ?? defaultRules.rollover.penaltyPerIncomplete;
+  const defaultZoneDefault=defaultRules.zoneCompletion?.default ?? 1;
+  const defaultZoneNegative=defaultRules.zoneCompletion?.['daily-negative'] ?? -1;
+  const defaultReward=defaultRules.rollover?.rewardPerCompleted ?? 0;
+  const defaultPenalty=defaultRules.rollover?.penaltyPerIncomplete ?? 0;
 
   view.innerHTML = `
     <div class="card" style="margin-top:0">
@@ -1695,6 +1782,34 @@ function viewSettings(){
           <button class="btn-danger" id="btnReset">Reset điểm</button>
         </div>
       </div>
+    </div>
+
+    <div class="card">
+      <h3>Quy tắc điểm thưởng/phạt</h3>
+      <div class="muted" style="font-size:13px;margin-bottom:12px">
+        <div><b>Mặc định</b></div>
+        <ul style="margin:6px 0 0 18px;padding:0;line-height:1.45">
+          <li>Hoàn thành task zone thường: ${formatSignedNumber(defaultZoneDefault)} E</li>
+          <li>Hoàn thành task zone giảm E: ${formatSignedNumber(defaultZoneNegative)} E</li>
+          <li>Qua ngày - mỗi task daily hoàn thành: ${formatSignedNumber(defaultReward)} E</li>
+          <li>Qua ngày - mỗi task daily chưa hoàn thành: ${formatSignedNumber(defaultPenalty)} E</li>
+        </ul>
+      </div>
+      <div class="muted" style="font-size:13px;margin-bottom:12px">
+        <div><b>Đang áp dụng</b></div>
+        <ul style="margin:6px 0 0 18px;padding:0;line-height:1.45">
+          <li>Zone thường / tăng / quan trọng: ${formatSignedNumber(zoneDefault)} E</li>
+          <li>Zone giảm E: ${formatSignedNumber(zoneNegative)} E</li>
+          <li>Qua ngày (task daily hoàn thành): ${formatSignedNumber(rewardCompleted)} E</li>
+          <li>Qua ngày (task daily chưa hoàn thành): ${formatSignedNumber(penaltyIncomplete)} E</li>
+        </ul>
+      </div>
+      <div class="muted" style="font-size:12px;margin-bottom:12px">Nhập số âm nếu muốn trừ điểm.</div>
+      <div class="row"><div>Task zone thường / tăng / quan trọng</div><input id="ruleZoneDefault" type="number" step="0.1" inputmode="decimal" value="${zoneDefault}"></div>
+      <div class="row"><div>Task zone giảm E</div><input id="ruleZoneNegative" type="number" step="0.1" inputmode="decimal" value="${zoneNegative}"></div>
+      <div class="row"><div>Qua ngày - thưởng mỗi task daily hoàn thành</div><input id="ruleDailyReward" type="number" step="0.1" inputmode="decimal" value="${rewardCompleted}"></div>
+      <div class="row"><div>Qua ngày - phạt mỗi task daily chưa hoàn thành</div><input id="ruleDailyPenalty" type="number" step="0.1" inputmode="decimal" value="${penaltyIncomplete}"></div>
+      <div class="row"><div></div><button class="btn-primary" id="savePointRules">Lưu quy tắc</button></div>
     </div>
 
     <div class="card">
@@ -1822,6 +1937,51 @@ function viewSettings(){
   /* Ngày & Điểm buttons */
   document.getElementById('btnEnd').onclick = ()=>{ handleEndDay(); };
   document.getElementById('btnReset').onclick = ()=>{ handleResetPoints(); };
+
+  /* Quy tắc điểm */
+  const savePointRulesBtn=document.getElementById('savePointRules');
+  if(savePointRulesBtn){
+    savePointRulesBtn.onclick=()=>{
+      const zoneDefaultEl=document.getElementById('ruleZoneDefault');
+      const zoneNegativeEl=document.getElementById('ruleZoneNegative');
+      const rewardEl=document.getElementById('ruleDailyReward');
+      const penaltyEl=document.getElementById('ruleDailyPenalty');
+      const entries=[
+        {el:zoneDefaultEl, value:Number(zoneDefaultEl.value), label:'Điểm task zone thường / tăng / quan trọng'},
+        {el:zoneNegativeEl, value:Number(zoneNegativeEl.value), label:'Điểm task zone giảm E'},
+        {el:rewardEl, value:Number(rewardEl.value), label:'Thưởng qua ngày cho task daily hoàn thành'},
+        {el:penaltyEl, value:Number(penaltyEl.value), label:'Phạt qua ngày cho task daily chưa hoàn thành'}
+      ];
+      for(const item of entries){
+        if(!Number.isFinite(item.value)){
+          alert(`Giá trị không hợp lệ: ${item.label}`);
+          item.el.focus();
+          return;
+        }
+      }
+
+      const current=getPointRules();
+      setPointRules({
+        zoneCompletion:{
+          ...current.zoneCompletion,
+          default:entries[0].value,
+          regular:entries[0].value,
+          priority:entries[0].value,
+          'daily-positive':entries[0].value,
+          'daily-negative':entries[1].value
+        },
+        rollover:{
+          ...current.rollover,
+          rewardPerCompleted:entries[2].value,
+          penaltyPerIncomplete:entries[3].value
+        }
+      });
+
+      alert('Đã cập nhật quy tắc điểm.');
+      renderHero();
+      render('settings');
+    };
+  }
 
   /* Hồ sơ người chơi */
   document.getElementById('saveName').onclick=()=>{
