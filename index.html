@@ -1643,14 +1643,9 @@ async function viewTasks(){
         ? `background-image:linear-gradient(0deg,rgba(0,0,0,.5),rgba(0,0,0,.15)),url('${z.bg}');`
         : '';
       const isPublic = z.kind === 'public';
-      return `
-      <section class="zone">
-        <header class="${headerClass}" style="${headerStyle}">
-          <div><b>${z.name}</b> <span class="badge">${g.kindLabel}</span></div>
-          <div class="badge">${g.progressText}</div>
-        </header>
-        <ul>
-          ${g.list.length? g.list.map(t=>{
+
+      const listHtml = g.list.length
+        ? g.list.map(t=>{
             if (isPublic) {
               return `
                 <li class="task" data-public="true" data-text="${t.text}" data-points="${t.points}">
@@ -1663,26 +1658,33 @@ async function viewTasks(){
                   </div>
                 </li>
               `;
-           } else {
-				  return `
-				    <li class="task ${t.done?'done':''}" data-id="${t.id}" data-kind="${t.kind||'single'}">
-				      <div class="task-inner">
-				        <div class="left">
-				          <input type="checkbox" data-id="${t.id}" ${t.done?'checked':''}>
-				          <span class="txt">${t.text}</span>
-				          ${renderTaskKindBadge(t, z)}
-				          ${renderTaskPoints(t.points, t.aiReason)}
-				        </div>
-				      </div>
-				      ${t.aiReason ? `<div class="ai-reason">${t.aiReason}</div>` : ''}
-				      <button class="del-btn" data-id="${t.id}">×</button>
-				    </li>
-				  `;
-				}
-
-              `;
             }
-          }).join('') : `<li class="task"><div class="task-inner"><span class="muted">Chưa có task trong Zone này.</span></div></li>`}
+
+            return `
+              <li class="task ${t.done?'done':''}" data-id="${t.id}" data-kind="${t.kind||'single'}">
+                <div class="task-inner">
+                  <div class="left">
+                    <input type="checkbox" data-id="${t.id}" ${t.done?'checked':''}>
+                    <span class="txt">${t.text}</span>
+                    ${renderTaskKindBadge(t, z)}
+                    ${renderTaskPoints(t.points, t.aiReason)}
+                  </div>
+                </div>
+                ${t.aiReason ? `<div class="ai-reason">${t.aiReason}</div>` : ''}
+                <button class="del-btn" data-id="${t.id}">×</button>
+              </li>
+            `;
+          }).join('')
+        : '<li class="task"><div class="task-inner"><span class="muted">Chưa có task trong Zone này.</span></div></li>';
+
+      return `
+      <section class="zone">
+        <header class="${headerClass}" style="${headerStyle}">
+          <div><b>${z.name}</b> <span class="badge">${g.kindLabel}</span></div>
+          <div class="badge">${g.progressText}</div>
+        </header>
+        <ul>
+          ${listHtml}
         </ul>
       </section>`;
     }).join('')}
