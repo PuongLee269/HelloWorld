@@ -1593,9 +1593,16 @@ async function viewTasks(){
   }
 
   const groups = zones.map(z=>{
+    const zoneTasks = tasks
+      .filter(t=>t.zoneId==z.id)
+      .sort((a,b)=>{
+        if(a.kind===b.kind) return Number(a.done)-Number(b.done);
+        return a.kind==='recurring' ? -1 : 1;
+      });
+
     let list;
     if (z.kind === 'public') {
-      list = publicTasks.map(pt => ({
+      const suggestionTasks = publicTasks.map(pt => ({
         id: `public_${pt.id}`,
         text: pt.text,
         points: Number(pt.points) || 0,
@@ -1604,13 +1611,9 @@ async function viewTasks(){
         isPublic: true,
         done: false // Public tasks are suggestions, not done
       }));
+      list = [...zoneTasks, ...suggestionTasks];
     } else {
-      list = tasks
-        .filter(t=>t.zoneId==z.id)
-        .sort((a,b)=>{
-          if(a.kind===b.kind) return Number(a.done)-Number(b.done);
-          return a.kind==='recurring' ? -1 : 1;
-        });
+      list = zoneTasks;
     }
     const activeList = list.filter(isTaskActiveToday);
     const activeDone = activeList.filter(t=>t.done).length;
@@ -1632,7 +1635,7 @@ async function viewTasks(){
 
     <div class="creator">
       <input id="taskText" placeholder="Thêm nhiệm vụ… (Enter)">
-      <select id="taskZone">${zones.filter(z => z.kind !== 'public').map(z=>`<option value="${z.id}">${z.name}</option>`).join('')}</select>
+      <select id="taskZone">${zones.map(z=>`<option value="${z.id}">${z.name}</option>`).join('')}</select>
       <button class="btn-primary" id="btnAdd">Thêm</button>
     </div>
 
@@ -1642,11 +1645,9 @@ async function viewTasks(){
       const headerStyle = z.bg
         ? `background-image:linear-gradient(0deg,rgba(0,0,0,.5),rgba(0,0,0,.15)),url('${z.bg}');`
         : '';
-      const isPublic = z.kind === 'public';
-
       const listHtml = g.list.length
         ? g.list.map(t=>{
-            if (isPublic) {
+            if (t.isPublic) {
               return `
                 <li class="task" data-public="true" data-text="${t.text}" data-points="${t.points}">
                   <div class="task-inner">
@@ -1708,13 +1709,7 @@ async function viewTasks(){
       }
     }
 
-    // Public zone add disabled
-    if (z.kind === 'public') {
-      alert('Liên hệ admin để thêm task công khai.');
-      return;
-    }
-
-	const ai = await getTaskPoints(text, z.kind);
+    const ai = await getTaskPoints(text, z.kind);
     const currentTasks = getTasks();
     const newTasks = [...currentTasks];
 
