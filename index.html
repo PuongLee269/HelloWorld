@@ -555,15 +555,15 @@ const heroRefs = heroEl ? {
    LEVEL CONFIG
 ============================== */
 const LEVELS = [
-  {lvl:1, cap:5,  need:100},
-  {lvl:2, cap:7,  need:250},
-  {lvl:3, cap:9,  need:500},
-  {lvl:4, cap:10, need:800},
-  {lvl:5, cap:12, need:1200},
-  {lvl:6, cap:14, need:1700},
-  {lvl:7, cap:16, need:2300},
-  {lvl:8, cap:18, need:3000},
-  {lvl:9, cap:20, need:3800},
+  {lvl:1, need:100},
+  {lvl:2, need:250},
+  {lvl:3, need:500},
+  {lvl:4, need:800},
+  {lvl:5, need:1200},
+  {lvl:6, need:1700},
+  {lvl:7, need:2300},
+  {lvl:8, need:3000},
+  {lvl:9, need:3800},
 ];
 
 /* ==============================
@@ -619,7 +619,7 @@ function addXP(delta){
 function getLevelInfo(){
   const p=getProfile();
   const cfg = LEVELS.find(x=>x.lvl===p.level) || lastLevelCfg();
-  return {level:p.level, xp:p.xp, need:cfg.need||0, cap:cfg.cap};
+  return {level:p.level, xp:p.xp, need:cfg.need||0};
 }
 function resetPoints(){
   const p=getProfile(); p.level=1; p.xp=0; save(LS.PROFILE,p);
@@ -1001,9 +1001,6 @@ function spawnRecurringIfNeeded(){
   const recs = getRecurring();
   const zones = getZones();
   const tasks = getTasks();
-  const {cap} = getLevelInfo();
-
-  let activeCount = tasks.filter(isTaskActiveToday).length;
   const existingRecurring = new Set(
     tasks
       .filter(t=>t.kind==='recurring' && typeof t.recurringId==='number')
@@ -1019,8 +1016,6 @@ function spawnRecurringIfNeeded(){
     const match = r.type==='daily' ||
       (r.type==='weekly' && Array.isArray(r.days)&&r.days.includes(weekday));
     if(!match) continue;
-
-    if(activeCount>=cap) break;
 
     const z = zones.find(z=>z.id==r.zoneId);
     if(!z) continue;
@@ -1040,7 +1035,6 @@ function spawnRecurringIfNeeded(){
     tasks.push(newTask);
     existingRecurring.add(r.id);
     fallbackRecurringKeys.add(recKey);
-    activeCount++;
   }
 
   setTasks(tasks);
@@ -1460,7 +1454,6 @@ function viewTasks(){
 
   const zones=getZones();
   const tasks=getTasks();
-  const {cap}=getLevelInfo();
   const dateNowDM = todayDM();
 
   const groups = zones.map(z=>{
@@ -1530,11 +1523,6 @@ function viewTasks(){
   function addNow(){
     const text=(inp.value||'').trim(); if(!text) return;
     const currentTasks = getTasks();
-    const activeTotal = currentTasks.filter(isTaskActiveToday).length;
-    if(activeTotal>=cap){
-      alert('Đã đạt giới hạn task/ngày theo Level');
-      return;
-    }
     const zoneId = Number(sel.value);
     const z = zones.find(z=>z.id==zoneId);
     if(!z) return;
@@ -1684,7 +1672,7 @@ function viewSettings(){
   const p=getProfile();
   const zones=getZones();
   const recs=getRecurring();
-  const {level,xp,need,cap}=getLevelInfo();
+  const {level,xp,need}=getLevelInfo();
   const dateNowDM=todayDM();
 
   view.innerHTML = `
@@ -1696,7 +1684,6 @@ function viewSettings(){
           <div class="pill">Ngày: <b>${dateNowDM}</b></div>
           <div class="pill">Level: <b>${level}</b></div>
           <div class="pill">E: <b>${xp}</b>${need?` / ${need}`:''}</div>
-          <div class="pill">Giới hạn/ngày: <b>${cap}</b></div>
         </div>
       </div>
       <div class="bar"><div class="fill" style="width:${need?Math.min(100,Math.round(xp/need*100)):100}%;"></div></div>
