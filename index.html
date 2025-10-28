@@ -194,6 +194,13 @@ h1{
   color:#1b1e2e;
   box-shadow:0 6px 16px rgba(0,0,0,.08);
 }
+.task-points {
+  font-weight: bold;
+  margin-left: 8px;
+  font-size: 14px;
+}
+.task-points.positive { color: #16a34a; }
+.task-points.negative { color: #dc2626; }
 .task-kind{
   display:inline-flex;
   align-items:center;
@@ -207,22 +214,18 @@ h1{
   background:rgba(139,124,255,.18);
   color:#5a4cc1;
 }
-.task-kind.once{
+.task-kind.single{
   background:rgba(34,197,94,.18);
   color:#1f9d55;
 }
-.task-kind.daily{
+.task-kind.recurring{
   background:rgba(59,130,246,.18);
   color:#2563eb;
 }
-.task-score{
-  margin-left:8px;
-  font-size:13px;
-  font-weight:600;
+.task-kind.recurring.negative{
+  background:rgba(248,113,113,.18);
+  color:#dc2626;
 }
-.task-score.positive{color:#16a34a;}
-.task-score.negative{color:#dc2626;}
-.task-score.pending{color:#9ca3af;}
 .task.done .task-kind{opacity:.7}
 .muted{color:var(--muted);font-size:14px}
 .top{
@@ -353,23 +356,6 @@ li.task{
 .done .txt{text-decoration:line-through;color:#9aa}
 .creator{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
 .left input[type="checkbox"]{transform:scale(1.25)}
-.task-actions{display:flex;align-items:center;gap:8px;margin-left:auto;}
-.assign-btn{
-  min-width:32px;
-  height:32px;
-  border-radius:10px;
-  border:1px solid rgba(139,124,255,.2);
-  background:rgba(139,124,255,.12);
-  color:#5a4cc1;
-  font-size:18px;
-  font-weight:600;
-  cursor:pointer;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  box-shadow:0 4px 10px rgba(0,0,0,.08);
-}
-.assign-btn:hover{background:rgba(139,124,255,.22);} 
 
 .del-btn{
   position:absolute;
@@ -409,6 +395,14 @@ li.task.dragging .del-btn{
   transition:none;
 }
 
+/* public task add button */
+.add-to-priority {
+  padding: 4px 8px;
+  font-size: 12px;
+  min-height: auto;
+  min-width: auto;
+  height: auto;
+}
 
 /* Leaderboard table */
 .table-wrap{
@@ -508,8 +502,6 @@ th{
 const CONFIG = {
   ENDPOINT:'https://script.google.com/macros/s/AKfycbyQ3imjnhKrzmuz4-KbPNsHzpYGY_Mv45os1bZEPoQrQ-UM8RjJvCznfP5x6RB6QX_Qpw/exec',
   SETTINGS_PASS:'1000',
-  AI_SCORE_ENDPOINT:'',
-  AI_SCORE_PROMPT:'',
   HERO_LEVELS:[
     {
       minLevel:1,
@@ -543,48 +535,83 @@ const LS = {
   BONUS:'tq_bonus_flags',
   SPAWN:'tq_spawned_day',
   LBCACHE:'tq_lb_cache',
+  PUBLIC_TASKS:'tq_public_tasks',
   HIST:'tq_hist',
-  REALDATE:'tq_real_date',
-  POINT_RULES:'tq_point_rules',
-  DAILY_SCORES:'tq_daily_scores'
+  REALDATE:'tq_real_date'
 };
 
 const ZONE_KIND_LABELS = {
-  'zone-e':'Zone E',
+  'e':'Zone E',
   'priority':'Zone Quan trọng',
-  'regular':'Zone Thường',
   'noise':'Zone Noise',
-  'shared':'Zone Giao việc'
+  'regular':'Zone Thường',
+  'public':'Zone Giao việc'
 };
-const LEGACY_ZONE_KIND = {
-  'daily-positive':'zone-e',
-  'daily-negative':'noise'
-};
-const ZONE_KIND_ORDER = ['zone-e','priority','regular','noise','shared'];
-const DEFAULT_ZONES = [
-  {name:'Zone E', kind:'zone-e', bg:''},
-  {name:'Zone Quan trọng', kind:'priority', bg:''},
-  {name:'Zone Noise', kind:'noise', bg:''},
-  {name:'Zone Thường', kind:'regular', bg:''},
-  {name:'Zone Giao việc', kind:'shared', bg:''}
-];
+const ZONE_KIND_ORDER = ['e','priority','noise','regular','public'];
+const DEFAULT_ZONES = ZONE_KIND_ORDER.map((kind)=>({
+  name: ZONE_KIND_LABELS[kind],
+  kind,
+  bg:''
+}));
 
-const DEFAULT_POINT_RULES = {
-  zoneCompletion: {
-    default: 1,
-    regular: 1,
-    priority: 1,
-    'zone-e': 2,
-    noise: -1,
-    shared: 0
-  },
-  rollover: {
-    rewardPerCompleted: 0,
-    penaltyPerIncomplete: 0
-  }
-};
+const DAILY_ZONE_KINDS = new Set(['e','noise']);
 
-let cachedPointRules = null;
+let cachedPublicTasks = null;
+
+const AI_PROMPT_TEMPLATE = `
+Bạn là động cơ chấm điểm nhiệm vụ cho một ứng dụng phát triển bản thân. 
+Mục tiêu: chấm điểm từng task dựa trên ảnh hưởng lên Entropy cá nhân và Zone do người dùng chọn.
+
+ĐẦU VÀO:
+- Mô tả task: "{TASK}"
+- Zone do người dùng chọn: "{ZONE}" 
+  (chỉ một trong: "Zone E" | "Zone Quan trọng" | "Zone Noise" | "Zone Thường")
+
+ĐẦU RA:
+Trả về DUY NHẤT một JSON với đúng các trường và giá trị hợp lệ sau:
+{
+  "zone": "Zone E" | "Zone Quan trọng" | "Zone Noise" | "Zone Thường",
+  "category": "E3" | "E2" | "E1" | "Neutral" | "NoiseLight" | "NoiseMid" | "NoiseHigh",
+  "points": số nguyên từ -3 đến 3,
+  "reason": "giải thích ngắn gọn tối đa 12 từ"
+}
+
+QUY TẮC CHUNG:
+- E3 = +3: tăng năng lượng mạnh, tác động dài hạn.
+- E2 = +2: cải thiện rõ rệt năng lượng/học hỏi/năng suất.
+- E1 = +1: duy trì nhỏ nhưng có ích.
+- Neutral = 0: trung tính, không tăng cũng không giảm.
+- NoiseLight = -1: tiêu hao nhẹ, xao lạc ngắn.
+- NoiseMid = -2: tiêu hao vừa, kéo dài, ít giá trị.
+- NoiseHigh = -3: tiêu hao mạnh, dễ gây nghiện/hại sức khỏe.
+
+RÀNG BUỘC THEO ZONE (bắt buộc):
+- "Zone E": chỉ chọn 1 trong {E3, E2, E1}. Điểm tương ứng {+3, +2, +1}.
+- "Zone Quan trọng": chọn {E2, E1, Neutral}. Không được +3. Điểm tối đa +2.
+- "Zone Noise": chỉ chọn {NoiseHigh, NoiseMid, NoiseLight}. Điểm {−3, −2, −1}.
+- "Zone Thường": chọn {E1, Neutral}. Điểm tối đa +1.
+
+LƯU Ý ĐÁNH GIÁ:
+- Ưu tiên dùng thông tin thời lượng/mục đích trong mô tả nếu có 
+  (ví dụ >60 phút, mốc hoàn thành, tính lặp lại).
+- Nếu mô tả mơ hồ: hạ một bậc thang điểm trong phạm vi Zone.
+- Luôn tôn trọng Zone người dùng chọn để giữ công bằng khi xếp hạng.
+
+ĐỊNH DẠNG XUẤT:
+- Chỉ xuất JSON thuần, không kèm văn bản khác, không kèm backticks.
+
+Ví dụ:
+Input: "Đọc sách 30 phút", Zone: "Zone E"
+Output:
+{
+  "zone": "Zone E",
+  "category": "E2",
+  "points": 2,
+  "reason": "Học tập tăng năng lượng tinh thần"
+}
+
+Bây giờ hãy chấm task ở trên.
+`;
 
 /* ==============================
    HERO ELEMENTS
@@ -621,55 +648,9 @@ const LEVELS = [
 function load(key, def){ try{ return JSON.parse(localStorage.getItem(key)) ?? def }catch{ return def } }
 function save(key, val){ localStorage.setItem(key, JSON.stringify(val)) }
 
-function clonePointRules(src){
-  return {
-    zoneCompletion: { ...(src?.zoneCompletion||{}) },
-    rollover: { ...(src?.rollover||{}) }
-  };
-}
-
-function normalizePointRules(input){
-  const base = clonePointRules(DEFAULT_POINT_RULES);
-  if(!input || typeof input!=='object') return base;
-
-  if(input.zoneCompletion && typeof input.zoneCompletion==='object'){
-    for(const [key, value] of Object.entries(input.zoneCompletion)){
-      if(typeof value==='number' && Number.isFinite(value)){
-        base.zoneCompletion[key]=value;
-      }
-    }
-  }
-
-  if(input.rollover && typeof input.rollover==='object'){
-    for(const [key, value] of Object.entries(input.rollover)){
-      if(typeof value==='number' && Number.isFinite(value)){
-        base.rollover[key]=value;
-      }
-    }
-  }
-
-  return base;
-}
-
-function getPointRules(){
-  if(!cachedPointRules){
-    const stored = load(LS.POINT_RULES, null);
-    cachedPointRules = normalizePointRules(stored);
-  }
-  return cachedPointRules;
-}
-
-function setPointRules(next){
-  cachedPointRules = normalizePointRules(next);
-  save(LS.POINT_RULES, cachedPointRules);
-  return cachedPointRules;
-}
-
 function formatSignedNumber(n){
   const val = Number(n)||0;
-  if(val>0) return `+${val}`;
-  if(val<0) return `${val}`;
-  return '0';
+  return `${val>=0?'+':''}${val}`;
 }
 function todayDM(){
   const d=new Date();
@@ -686,6 +667,53 @@ function setLastRealDate(val){
   }
 }
 function lastLevelCfg(){ return LEVELS[LEVELS.length-1]; }
+
+/* ==============================
+   AI TASK SCORING (PLACEHOLDER)
+============================== */
+/* ==============================
+   AI TASK SCORING (PLACEHOLDER)
+============================== */
+async function getTaskPoints(taskText, zoneKind) {
+  const endpoint = "https://todo-quest-proxy2609.vercel.app/api/score";
+
+  // Map zoneKind (e.g. 'e') sang label (e.g. "Zone E")
+  const zoneLabel = ZONE_KIND_LABELS[zoneKind] || "Zone Thường";  // Fallback
+
+  // Ghép prompt động
+  const fullPrompt = AI_PROMPT_TEMPLATE
+    .replace('{TASK}', taskText)
+    .replace('{ZONE}', zoneLabel);
+
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ 
+        text: taskText, 
+        zone: zoneKind,  // Giữ nguyên cho proxy nếu cần
+        prompt: fullPrompt  // Gửi prompt đầy đủ cho proxy dùng
+      })
+    });
+
+    const data = await response.json();
+
+    // Parse JSON từ AI (mong đợi {points: ..., category: ..., reason: ...})
+    // Fallback nếu không có points
+    const points = Number(data.points) || 0;
+    const category = data.category || 'Neutral';
+    const reason = data.reason || 'Không xác định';
+
+    console.log("AI Score:", taskText, "=>", { points, category, reason });  // Log đầy đủ để debug
+    return points;  // Chỉ return points như cũ
+  } catch (error) {
+    console.error("Proxy API failed:", error);
+    return 0;
+  }
+}
+
 
 /* ==============================
    PROFILE / LEVEL / XP ("E")
@@ -833,87 +861,8 @@ function clearFlagsFor(day){
 }
 
 /* ==============================
-   DAILY SCORE TRACKING
-============================== */
-function createDailyScoreEntry(){
-  return { total:0, noise:0 };
-}
-function pruneDailyScoreStore(store){
-  const keys = Object.keys(store||{}).map(k=>Number(k)).filter(Number.isFinite).sort((a,b)=>a-b);
-  const limit = 60;
-  if(keys.length>limit){
-    const removeCount = keys.length - limit;
-    for(let i=0;i<removeCount;i++){
-      delete store[keys[i]];
-    }
-  }
-}
-function loadDailyScores(){
-  const raw = load(LS.DAILY_SCORES, {});
-  return raw && typeof raw==='object' ? {...raw} : {};
-}
-function saveDailyScores(data){
-  save(LS.DAILY_SCORES, data);
-}
-function getDailyScore(day){
-  const d = Number(day ?? getDay());
-  if(!Number.isFinite(d)) return createDailyScoreEntry();
-  const all = loadDailyScores();
-  const raw = all[d];
-  return {
-    total: Number(raw?.total) || 0,
-    noise: Number(raw?.noise) || 0
-  };
-}
-function resetDailyScore(day){
-  const d = Number(day ?? getDay());
-  if(!Number.isFinite(d)) return;
-  const all = loadDailyScores();
-  all[d] = createDailyScoreEntry();
-  pruneDailyScoreStore(all);
-  saveDailyScores(all);
-}
-function adjustDailyScore(delta, zoneKind, dayOverride){
-  const amount = Number(delta);
-  if(!Number.isFinite(amount) || amount===0) return;
-  const d = Number(dayOverride ?? getDay());
-  if(!Number.isFinite(d)) return;
-  const all = loadDailyScores();
-  const entryRaw = all[d];
-  const entry = entryRaw && typeof entryRaw==='object' ? {...entryRaw} : createDailyScoreEntry();
-  entry.total = Number(entry.total) || 0;
-  entry.noise = Number(entry.noise) || 0;
-  entry.total += amount;
-  if(zoneKind==='noise'){
-    entry.noise += amount;
-  }
-  all[d] = entry;
-  pruneDailyScoreStore(all);
-  saveDailyScores(all);
-}
-
-function applyScoreDelta(delta, meta={}){
-  const amount = Number(delta);
-  if(!Number.isFinite(amount) || amount===0) return 0;
-  addXP(amount);
-  adjustDailyScore(amount, meta.zoneKind || null, meta.dayOverride);
-  return amount;
-}
-
-/* ==============================
    ZONES / TASKS / RECURRING
 ============================== */
-/*
-Zone obj:
-{
-  id,
-  name,
-  kind,
-  bg
-}
-*/
-const DAILY_ZONE_KINDS = new Set(['zone-e']);
-
 function normalizeZoneRecord(raw, idx, idBase){
   if(!raw || typeof raw!=='object') return {changed:true, zone:null};
   const zone = {...raw};
@@ -934,8 +883,6 @@ function normalizeZoneRecord(raw, idx, idBase){
     zone.bg='';
     changed=true;
   }
-
-  zone.kind = LEGACY_ZONE_KIND[zone.kind] || zone.kind;
 
   if(!ZONE_KIND_LABELS[zone.kind]){
     const fallbackKind = DEFAULT_ZONES.find(d=>d.name===zone.name)?.kind || 'regular';
@@ -979,10 +926,9 @@ function getZones(){
 }
 function setZones(z){ save(LS.ZONES,z) }
 function sanitizeZoneInput(z){
-  const rawKind = LEGACY_ZONE_KIND[z.kind] || z.kind;
   return {
     name: typeof z.name==='string' ? z.name.trim() : '',
-    kind: ZONE_KIND_LABELS[rawKind] ? rawKind : 'regular',
+    kind: ZONE_KIND_LABELS[z.kind] ? z.kind : 'regular',
     bg: typeof z.bg==='string' ? z.bg : ''
   };
 }
@@ -1008,7 +954,6 @@ function updZone(id,patch){
     delete clean.bg;
   }
   if('kind' in clean){
-    clean.kind = LEGACY_ZONE_KIND[clean.kind] || clean.kind;
     clean.kind = ZONE_KIND_LABELS[clean.kind] ? clean.kind : 'regular';
   }
   setZones(getZones().map(z=>z.id===id?{...z,...clean}:z));
@@ -1017,57 +962,19 @@ function delZone(id){
   setZones(getZones().filter(z=>z.id!==id));
 }
 
-function getRecurring(){
-  const raw = load(LS.RECUR, []);
-  if(!Array.isArray(raw)) return [];
-  let changed=false;
-  const list = raw.map(item=>{
-    if(!item || typeof item!=='object'){
-      changed=true;
-      return null;
-    }
-    const rec = {...item};
-    if(typeof rec.score!=='number' || !Number.isFinite(rec.score)){
-      if('score' in rec){
-        delete rec.score;
-        changed=true;
-      }
-    }
-    return rec;
-  }).filter(Boolean);
-  if(changed){
-    save(LS.RECUR, list);
-  }
-  return list;
-}
-function setRecurring(list){ save(LS.RECUR, list); }
-function addRecurring(r){
+async function addRecurring(r){
   const rec = {...r};
   rec.id = Date.now() + Math.floor(Math.random()*1000);
+  rec.points = await getTaskPoints(rec.text);
   const list = [...getRecurring(), rec];
-  setRecurring(list);
+  save(LS.RECUR, list);
   return rec;
 }
 function delRecurring(id){
-  setRecurring(getRecurring().filter(r=>r.id!==id));
+  save(LS.RECUR,getRecurring().filter(r=>r.id!==id));
 }
-function updateRecurringScore(recId, score){
-  if(typeof recId!=='number' || !Number.isFinite(score)) return;
-  const list = getRecurring();
-  let changed=false;
-  const next = list.map(rec=>{
-    if(rec.id===recId){
-      if(rec.score!==score){
-        rec = {...rec, score};
-        changed=true;
-      }
-    }
-    return rec;
-  });
-  if(changed){
-    setRecurring(next);
-  }
-}
+
+function getRecurring(){ return load(LS.RECUR,[]) }
 
 function getTasks(){
   const raw = load(LS.TASKS, []);
@@ -1075,11 +982,7 @@ function getTasks(){
 
   const recs = getRecurring();
   const recIndex = new Map();
-  const recById = new Map();
   for(const r of recs){
-    if(typeof r.id==='number'){
-      recById.set(r.id, r);
-    }
     const key = `${Number(r.zoneId)}|${String(r.text||'')}`;
     if(!recIndex.has(key)) recIndex.set(key, []);
     recIndex.get(key).push(r);
@@ -1096,6 +999,7 @@ function getTasks(){
     let kind = item.kind==='recurring' ? 'recurring' : (item.kind==='single' ? 'single' : null);
     let recurringId = typeof item.recurringId==='number' ? item.recurringId : null;
     let done = !!item.done;
+    let points = Number(item.points) || 0;
 
     if(kind===null){
       const key = `${zoneId}|${String(item.text||'')}`;
@@ -1121,31 +1025,20 @@ function getTasks(){
       }
     }
 
-    const next = { ...item, zoneId, done, kind };
+    const next = { ...item, zoneId, done, kind, points };
     if(kind==='recurring'){
       const existing = typeof next.recurringId==='number' ? next.recurringId : null;
       next.recurringId = recurringId!=null ? recurringId : existing;
+      // Set points from recurring
+      const rec = recs.find(r => r.id === next.recurringId);
+      if (rec) {
+        next.points = Number(rec.points) || 0;
+      }
     }else if('recurringId' in next){
       delete next.recurringId;
     }
 
-    let nextScore = Number(item.aiScore);
-    if(!Number.isFinite(nextScore)){
-      nextScore = null;
-    }
-    if(kind==='recurring' && recurringId!=null && nextScore==null){
-      const rec = recById.get(recurringId);
-      if(rec && typeof rec.score==='number' && Number.isFinite(rec.score)){
-        nextScore = rec.score;
-      }
-    }
-    if(nextScore!=null){
-      next.aiScore = nextScore;
-    } else if('aiScore' in next){
-      delete next.aiScore;
-    }
-
-    if(item.zoneId!==next.zoneId || item.done!==next.done || item.kind!==next.kind || (kind==='recurring' && item.recurringId!==next.recurringId) || (kind!=='recurring' && 'recurringId' in item) || item.aiScore!==next.aiScore){
+    if(item.zoneId!==next.zoneId || item.done!==next.done || item.kind!==next.kind || (kind==='recurring' && item.recurringId!==next.recurringId) || (kind!=='recurring' && 'recurringId' in item) || item.points !== next.points){
       changed=true;
     }
 
@@ -1170,119 +1063,46 @@ function getZoneActiveTasks(tasks, zoneId){
   return tasks.filter(t=>t.zoneId==zoneId && isTaskActiveToday(t));
 }
 
-function zoneTaskCompletionDelta(zone){
-  const rules = getPointRules();
-  const map = rules.zoneCompletion || {};
-  const kind = zone && typeof zone.kind==='string' ? zone.kind : 'regular';
-  if(typeof map[kind]==='number') return map[kind];
-  if(typeof map.default==='number') return map.default;
-  if(typeof map.regular==='number') return map.regular;
-  const fallback = Object.values(map).find(v=>typeof v==='number');
-  return typeof fallback==='number' ? fallback : 1;
-}
-
-function describeTaskKind(task){
+function describeTaskKind(task, zone){
   if(task.kind==='recurring'){
-    return 'Hằng ngày';
+    return zone && zone.kind==='noise' ? 'Hằng ngày (-)' : 'Hằng ngày';
   }
   return 'Một lần';
 }
 
-function taskKindClass(task){
+function taskKindClass(task, zone){
   if(task.kind==='recurring'){
-    return 'task-kind daily';
+    return zone && zone.kind==='noise' ? 'task-kind recurring negative' : 'task-kind recurring';
   }
-  return 'task-kind once';
+  return 'task-kind single';
 }
 
-function renderTaskKindBadge(task){
-  return `<span class="${taskKindClass(task)}">${describeTaskKind(task)}</span>`;
+function renderTaskKindBadge(task, zone){
+  return `<span class="${taskKindClass(task, zone)}">${describeTaskKind(task, zone)}</span>`;
+}
+
+function renderTaskPoints(points) {
+  const sign = points >= 0 ? '+' : '';
+  const className = points >= 0 ? 'positive' : 'negative';
+  // Giả sử bạn lưu reason tạm (cần chỉnh thêm ở getTaskPoints nếu muốn)
+  const reason = ''; // Hoặc lấy từ đâu đó nếu cần
+  return `<span class="task-points ${className}" title="${reason}">${sign}${points}</span>`;
 }
 
 function setTasks(a){ save(LS.TASKS,a) }
 
-function parseNumericScore(raw){
-  if(typeof raw==='number' && Number.isFinite(raw)) return raw;
-  if(typeof raw==='string'){
-    const match = raw.match(/-?\d+(?:\.\d+)?/);
-    if(match){
-      const num = Number(match[0]);
-      if(Number.isFinite(num)) return num;
-    }
+/* ==============================
+   PUBLIC TASKS
+============================== */
+function getPublicTasks() {
+  if (cachedPublicTasks === null) {
+    cachedPublicTasks = load(LS.PUBLIC_TASKS, []);
   }
-  return null;
+  return cachedPublicTasks;
 }
-
-async function evaluateTaskScoreWithAI({text, zoneKind, taskType}){
-  const zone = zoneKind || 'regular';
-  const endpoint = (CONFIG.AI_SCORE_ENDPOINT||'').trim();
-  const prompt = (CONFIG.AI_SCORE_PROMPT||'').trim();
-  if(endpoint){
-    try{
-      const payload = {
-        prompt,
-        task: text,
-        zoneKind: zone,
-        taskType
-      };
-      const res = await fetch(endpoint, {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify(payload)
-      });
-      if(res.ok){
-        const contentType = res.headers.get('content-type')||'';
-        let bodyData=null;
-        if(contentType.includes('application/json')){
-          bodyData = await res.json();
-        } else {
-          const textBody = await res.text();
-          bodyData = {score:textBody};
-        }
-        const candidates = [
-          bodyData?.score,
-          bodyData?.points,
-          bodyData?.result,
-          bodyData?.value
-        ];
-        for(const val of candidates){
-          const parsed = parseNumericScore(val);
-          if(parsed!=null) return parsed;
-        }
-      }
-    }catch(err){
-      console.warn('evaluateTaskScoreWithAI failed', err);
-    }
-  }
-  return zoneTaskCompletionDelta({kind:zone});
-}
-
-async function ensureTaskScore(task, zone){
-  if(!task) return null;
-  if(typeof task.aiScore==='number' && Number.isFinite(task.aiScore)){
-    return task.aiScore;
-  }
-  const zoneKind = zone && typeof zone.kind==='string' ? zone.kind : 'regular';
-  if(task.kind==='recurring' && typeof task.recurringId==='number'){
-    const rec = getRecurring().find(r=>r.id===task.recurringId);
-    if(rec && typeof rec.score==='number' && Number.isFinite(rec.score)){
-      task.aiScore = rec.score;
-      return rec.score;
-    }
-  }
-  const score = await evaluateTaskScoreWithAI({
-    text: task.text || '',
-    zoneKind,
-    taskType: task.kind==='recurring' ? 'daily' : 'single'
-  });
-  if(Number.isFinite(score)){
-    task.aiScore = score;
-    if(task.kind==='recurring' && typeof task.recurringId==='number'){
-      updateRecurringScore(task.recurringId, score);
-    }
-    return score;
-  }
-  return null;
+function setPublicTasks(tasks) {
+  cachedPublicTasks = tasks;
+  save(LS.PUBLIC_TASKS, tasks);
 }
 
 /* ==============================
@@ -1352,7 +1172,8 @@ function spawnRecurringIfNeeded(){
       zoneId:r.zoneId,
       done:false,
       kind:'recurring',
-      recurringId:r.id
+      recurringId:r.id,
+      points: Number(r.points) || 0
     };
 
     tasks.push(newTask);
@@ -1405,8 +1226,11 @@ async function fetchLeaderboardAndCache(){
     clearTimeout(t);
     if(!r.ok) throw new Error('HTTP '+r.status);
     const data = await r.json();
-    if(Array.isArray(data)){
-      setLBCache({ ts:Date.now(), list:data });
+    if(Array.isArray(data.lb)){
+      setLBCache({ ts:Date.now(), list:data.lb });
+    }
+    if(Array.isArray(data.public_tasks)){
+      setPublicTasks(data.public_tasks);
     }
   }catch(e){
     clearTimeout(t);
@@ -1424,9 +1248,7 @@ function backgroundBoardRefresh(){
 function wipeLocalPlayer(){
   localStorage.removeItem(LS.PROFILE);
   localStorage.removeItem(LS.LBCACHE);
-  localStorage.removeItem(LS.POINT_RULES);
-  localStorage.removeItem(LS.DAILY_SCORES);
-  cachedPointRules=null;
+  localStorage.removeItem(LS.PUBLIC_TASKS);
   alert('Đã xoá hồ sơ local. Reload trang để tạo người chơi mới.');
   location.reload();
 }
@@ -1450,51 +1272,36 @@ function performDayRollover(opts={}){
     const zones=getZones();
     const tasks=getTasks();
     const todaySim=getDay();
-    const rolloverRules = getPointRules().rollover || {};
-    const rewardPerCompleted = Number(rolloverRules.rewardPerCompleted ?? 0);
-    const penaltyPerIncomplete = Number(rolloverRules.penaltyPerIncomplete ?? 0);
 
-    for(const z of zones){
-      if(!DAILY_ZONE_KINDS.has(z.kind)) continue;
-      const zoneTasks = getZoneActiveTasks(tasks, z.id).filter(t=>t.kind==='recurring');
-      const totalCount = zoneTasks.length;
-      if(totalCount===0) continue;
-      const incomplete = zoneTasks.filter(t=>!t.done).length;
-      const completed = totalCount - incomplete;
-      const delta = (completed * rewardPerCompleted) + (incomplete * penaltyPerIncomplete);
-      if(delta!==0){
-        applyScoreDelta(delta, {zoneKind: z.kind, dayOverride: todaySim});
+    // Calculate productivity bonus
+    const todayTasks = tasks.filter(t => isTaskActiveToday(t) && t.done);
+    let totalDayPoints = 0;
+    let noisePoints = 0;
+    const noiseZone = zones.find(z => z.kind === 'noise');
+    todayTasks.forEach(t => {
+      totalDayPoints += t.points || 0;
+      if (t.zoneId === noiseZone?.id) {
+        noisePoints += t.points || 0;
       }
+    });
+    if (totalDayPoints >= 10 && noisePoints >= -1) {
+      let bonus = 3;
+      if (totalDayPoints >= 15) bonus = 5;
+      if (totalDayPoints >= 20) bonus = 8;
+      addXP(bonus);
     }
 
-    const todayScore = getDailyScore(todaySim);
-    const totalToday = todayScore.total;
-    const noiseToday = todayScore.noise;
-    let bonus = 0;
-    if(noiseToday >= -1 && totalToday >= 10){
-      if(totalToday >= 20){
-        bonus = 8;
-      } else if(totalToday >= 15){
-        bonus = 5;
-      } else {
-        bonus = 3;
-      }
-    }
-    if(bonus){
-      applyScoreDelta(bonus, {zoneKind:'bonus', dayOverride: todaySim});
-    }
+    // Daily penalty
+    addXP(-5);
 
     pushHistSnapshot();
 
     clearFlagsFor(todaySim);
-    const nextSim = nextDay();
+    nextDay();
     const remaining = tasks.filter(t=>t.kind!=='recurring');
     setTasks(remaining);
     localStorage.removeItem(LS.SPAWN);
     spawnRecurringIfNeeded();
-
-    resetDailyScore(nextSim);
-    applyScoreDelta(-5, {zoneKind:'penalty', dayOverride: nextSim});
 
     setLastRealDate(todayDM());
 
@@ -1618,7 +1425,7 @@ function drawChart(canvasId, values){
    SWIPE TASK HANDLERS
 ============================== */
 function attachSwipeHandlersForTasks(){
-  const rows = [...document.querySelectorAll('li.task')];
+  const rows = [...document.querySelectorAll('li.task:not([data-public="true"])')];
 
   rows.forEach(li=>{
     const inner  = li.querySelector('.task-inner');
@@ -1797,22 +1604,39 @@ function buildTabsBar(active){
 }
 
 /* TASKS */
-
-function viewTasks(){
+async function viewTasks(){
   spawnRecurringIfNeeded();
 
   const zones=getZones();
   const tasks=getTasks();
+  const publicTasks = getPublicTasks();
   const dateNowDM = todayDM();
-  const zoneMap = new Map(zones.map(z=>[z.id,z]));
+  const priorityZone = zones.find(z => z.kind === 'priority');
+  if (!priorityZone) {
+    alert('Zone Quan trọng không tồn tại!');
+    return;
+  }
 
   const groups = zones.map(z=>{
-    const list = tasks
-      .filter(t=>t.zoneId==z.id)
-      .sort((a,b)=>{
-        if(a.kind===b.kind) return Number(a.done)-Number(b.done);
-        return a.kind==='recurring' ? -1 : 1;
-      });
+    let list;
+    if (z.kind === 'public') {
+      list = publicTasks.map(pt => ({
+        id: `public_${pt.id}`,
+        text: pt.text,
+        points: Number(pt.points) || 0,
+        kind: 'single',
+        zoneId: z.id,
+        isPublic: true,
+        done: false // Public tasks are suggestions, not done
+      }));
+    } else {
+      list = tasks
+        .filter(t=>t.zoneId==z.id)
+        .sort((a,b)=>{
+          if(a.kind===b.kind) return Number(a.done)-Number(b.done);
+          return a.kind==='recurring' ? -1 : 1;
+        });
+    }
     const activeList = list.filter(isTaskActiveToday);
     const activeDone = activeList.filter(t=>t.done).length;
     return {
@@ -1822,7 +1646,7 @@ function viewTasks(){
       activeDone,
       activeTotal: activeList.length,
       kindLabel: ZONE_KIND_LABELS[z.kind] || 'Zone',
-      progressText: activeList.length ? `${activeDone}/${activeList.length}` : '0'
+      progressText: z.kind === 'public' ? 'Gợi ý' : (activeList.length ? `${activeDone}/${activeList.length}` : '0')
     };
   });
 
@@ -1833,7 +1657,7 @@ function viewTasks(){
 
     <div class="creator">
       <input id="taskText" placeholder="Thêm nhiệm vụ… (Enter)">
-      <select id="taskZone">${zones.map(z=>`<option value="${z.id}">${z.name}</option>`).join('')}</select>
+      <select id="taskZone">${zones.filter(z => z.kind !== 'public').map(z=>`<option value="${z.id}">${z.name}</option>`).join('')}</select>
       <button class="btn-primary" id="btnAdd">Thêm</button>
     </div>
 
@@ -1843,34 +1667,42 @@ function viewTasks(){
       const headerStyle = z.bg
         ? `background-image:linear-gradient(0deg,rgba(0,0,0,.5),rgba(0,0,0,.15)),url('${z.bg}');`
         : '';
+      const isPublic = z.kind === 'public';
       return `
       <section class="zone">
         <header class="${headerClass}" style="${headerStyle}">
           <div><b>${z.name}</b> <span class="badge">${g.kindLabel}</span></div>
-          <div class="badge">Hoàn thành hôm nay: ${g.progressText}</div>
+          <div class="badge">${g.progressText}</div>
         </header>
         <ul>
           ${g.list.length? g.list.map(t=>{
-            const scoreVal = Number(t.aiScore);
-            const hasScore = Number.isFinite(scoreVal);
-            const scoreClass = hasScore ? (scoreVal>=0?'positive':'negative') : 'pending';
-            const scoreText = hasScore ? formatSignedNumber(scoreVal) : '…';
-            const isShared = z.kind==='shared';
-            return `
-            <li class="task ${t.done?'done':''}" data-id="${t.id}" data-kind="${t.kind||'single'}">
-              <div class="task-inner">
-                <div class="left">
-                  <input type="checkbox" data-id="${t.id}" ${t.done?'checked':''} ${isShared?'disabled':''}>
-                  <span class="txt">${t.text}</span>
-                  ${renderTaskKindBadge(t)}
-                </div>
-                <div class="task-actions">
-                  <span class="task-score ${scoreClass}">${scoreText}</span>
-                  ${isShared?`<button class="assign-btn" data-id="${t.id}" title="Thêm vào Zone Quan trọng">+</button>`:''}
-                </div>
-              </div>
-              <button class="del-btn" data-id="${t.id}">×</button>
-            </li>`;
+            if (isPublic) {
+              return `
+                <li class="task" data-public="true" data-text="${t.text}" data-points="${t.points}">
+                  <div class="task-inner">
+                    <div class="left">
+                      <span class="txt">${t.text}</span>
+                      ${renderTaskPoints(t.points)}
+                      <button class="btn-primary add-to-priority" data-text="${t.text}" data-points="${t.points}">+</button>
+                    </div>
+                  </div>
+                </li>
+              `;
+            } else {
+              return `
+                <li class="task ${t.done?'done':''}" data-id="${t.id}" data-kind="${t.kind||'single'}">
+                  <div class="task-inner">
+                    <div class="left">
+                      <input type="checkbox" data-id="${t.id}" ${t.done?'checked':''}>
+                      <span class="txt">${t.text}</span>
+                      ${renderTaskKindBadge(t, z)}
+                      ${renderTaskPoints(t.points)}
+                    </div>
+                  </div>
+                  <button class="del-btn" data-id="${t.id}">×</button>
+                </li>
+              `;
+            }
           }).join('') : `<li class="task"><div class="task-inner"><span class="muted">Chưa có task trong Zone này.</span></div></li>`}
         </ul>
       </section>`;
@@ -1883,64 +1715,67 @@ function viewTasks(){
   async function addNow(){
     const text=(inp.value||'').trim(); if(!text) return;
     const zoneId = Number(sel.value);
-    const z = zones.find(zone=>zone.id==zoneId);
+    const z = zones.find(z=>z.id==zoneId);
     if(!z) return;
 
-    const currentTasks = getTasks();
-    if(z.kind==='zone-e'){
-      const activeInZone = getZoneActiveTasks(currentTasks, z.id);
-      if(activeInZone.length>=5){
-        alert('Zone E chỉ cho phép tối đa 5 task trong ngày.');
+    // Limit for Zone E
+    if (z.kind === 'e') {
+      const activeInE = getZoneActiveTasks(getTasks(), z.id).length;
+      if (activeInE >= 5) {
+        alert('Zone E chỉ tối đa 5 task/ngày!');
         return;
       }
     }
 
+    // Public zone add disabled
+    if (z.kind === 'public') {
+      alert('Liên hệ admin để thêm task công khai.');
+      return;
+    }
+
+    const points = await getTaskPoints(text);
+    const currentTasks = getTasks();
     const newTasks = [...currentTasks];
-    let newTask=null;
+
     if(DAILY_ZONE_KINDS.has(z.kind)){
       const recs = getRecurring();
       const existingRec = recs.find(r=>r.zoneId==z.id && r.type==='daily' && (r.text||'')===text);
-      const rec = existingRec || addRecurring({
+      const rec = existingRec || await addRecurring({
         text,
         zoneId:z.id,
         type:'daily',
         autoKind:z.kind
       });
       const duplicate = newTasks.some(t=>t.zoneId==z.id && t.kind==='recurring' && t.recurringId===rec.id);
-      if(duplicate){
-        alert('Task đã tồn tại trong Zone này.');
-        return;
+      if(!duplicate){
+        newTasks.push({
+          id:Date.now()+Math.random(),
+          text,
+          zoneId:z.id,
+          done:false,
+          kind:'recurring',
+          recurringId:rec.id,
+          points: Number(rec.points) || points
+        });
       }
-      newTask={
-        id:Date.now()+Math.random(),
-        text,
-        zoneId:z.id,
-        done:false,
-        kind:'recurring',
-        recurringId:rec.id
-      };
-      newTasks.push(newTask);
     } else {
-      newTask={
-        id:Date.now()+Math.random(),
+      newTasks.push({
+        id:Date.now(),
         text,
         zoneId:z.id,
         done:false,
-        kind:'single'
-      };
-      newTasks.push(newTask);
+        kind:'single',
+        points
+      });
     }
 
-    await ensureTaskScore(newTask, z);
     setTasks(newTasks);
     inp.value='';
     render('tasks');
   }
 
-  const handleAdd = ()=>{ addNow().catch(err=>console.error(err)); };
-
-  document.getElementById('btnAdd').onclick=handleAdd;
-  inp.onkeydown=(e)=>{ if(e.key==='Enter') handleAdd(); };
+  document.getElementById('btnAdd').onclick = addNow;
+  inp.onkeydown=(e)=>{ if(e.key==='Enter') addNow(); };
 
   window.onkeydown=(e)=>{
     const tag=(document.activeElement?.tagName||'').toLowerCase();
@@ -1950,92 +1785,43 @@ function viewTasks(){
     }
   };
 
+  // tick task
   view.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
-    cb.onchange=async()=>{
+    cb.onchange=()=>{
       const id=Number(cb.dataset.id);
-      const list = getTasks();
-      const task = list.find(t=>t.id===id);
-      if(!task){
-        render('tasks');
-        return;
-      }
-      const zone = zoneMap.get(task.zoneId) || zones.find(z=>z.id==task.zoneId);
-      await ensureTaskScore(task, zone);
-      const scoreVal = Number(task.aiScore)||0;
-      task.done = cb.checked;
-      if(scoreVal!==0){
-        applyScoreDelta(cb.checked ? scoreVal : -scoreVal, {zoneKind: zone?.kind});
-      }
-      setTasks(list);
+      const t = getTasks().find(t=>t.id===id);
+      if(!t) return;
+      const z = zones.find(z=>z.id==t.zoneId);
+      t.done = cb.checked;
+      const delta = cb.checked ? (t.points || 0) : -(t.points || 0);
+      addXP(delta);
+      setTasks(getTasks().map(x=>x.id===id?t:x));
       render('tasks');
     };
   });
 
-  const adoptButtons = view.querySelectorAll('.assign-btn');
-  if(adoptButtons.length){
-    adoptButtons.forEach(btn=>{
-      btn.onclick=async(e)=>{
-        e.preventDefault();
-        const id=Number(btn.dataset.id);
-        const importantZone = zones.find(z=>z.kind==='priority');
-        if(!importantZone){
-          alert('Chưa cấu hình Zone Quan trọng.');
-          return;
-        }
-        const allTasks = getTasks();
-        const source = allTasks.find(t=>t.id===id);
-        if(!source){
-          render('tasks');
-          return;
-        }
-        const exists = allTasks.some(t=>t.zoneId===importantZone.id && (t.text||'')===(source.text||''));
-        if(exists){
-          alert('Task đã có trong Zone Quan trọng.');
-          return;
-        }
-        const newTask={
-          id:Date.now()+Math.random(),
-          text:source.text,
-          zoneId:importantZone.id,
-          done:false,
-          kind:'single',
-          aiScore: Number.isFinite(Number(source.aiScore)) ? Number(source.aiScore) : undefined
-        };
-        await ensureTaskScore(newTask, importantZone);
-        allTasks.push(newTask);
-        setTasks(allTasks);
-        render('tasks');
+  // add to priority from public
+  view.querySelectorAll('.add-to-priority').forEach(btn => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
+      const text = btn.dataset.text;
+      const points = Number(btn.dataset.points) || 0;
+      const currentTasks = getTasks();
+      const newTask = {
+        id: Date.now(),
+        text,
+        zoneId: priorityZone.id,
+        done: false,
+        kind: 'single',
+        points
       };
-    });
-  }
+      setTasks([...currentTasks, newTask]);
+      alert('Đã thêm vào Zone Quan trọng!');
+      render('tasks');
+    };
+  });
 
   attachSwipeHandlersForTasks();
-
-  const pendingIds = tasks.filter(t=>typeof t.aiScore!=='number').map(t=>t.id);
-  if(pendingIds.length){
-    (async()=>{
-      const latestTasks = getTasks();
-      const latestZones = getZones();
-      const latestZoneMap = new Map(latestZones.map(z=>[z.id,z]));
-      let changed=false;
-      for(const id of pendingIds){
-        const task = latestTasks.find(t=>t.id===id);
-        if(!task) continue;
-        const zone = latestZoneMap.get(task.zoneId);
-        const score = await ensureTaskScore(task, zone);
-        if(Number.isFinite(score) && task.aiScore!==score){
-          task.aiScore = score;
-          changed=true;
-        }
-      }
-      if(changed){
-        setTasks(latestTasks);
-        if(currentTab==='tasks'){
-          viewTasks();
-        }
-      }
-    })();
-  }
 }
 
 /* LEADERBOARD */
@@ -2118,22 +1904,6 @@ function viewSettings(){
   const recs=getRecurring();
   const {level,xp,need}=getLevelInfo();
   const dateNowDM=todayDM();
-  const pointRules=getPointRules();
-  const defaultRules=DEFAULT_POINT_RULES;
-  const zoneDefault=pointRules.zoneCompletion?.default ?? pointRules.zoneCompletion?.regular ?? defaultRules.zoneCompletion.default;
-  const zonePriority=pointRules.zoneCompletion?.priority ?? zoneDefault;
-  const zoneRegular=pointRules.zoneCompletion?.regular ?? zoneDefault;
-  const zoneE=pointRules.zoneCompletion?.['zone-e'] ?? defaultRules.zoneCompletion['zone-e'];
-  const zoneNoise=pointRules.zoneCompletion?.noise ?? defaultRules.zoneCompletion.noise;
-  const zoneShared=pointRules.zoneCompletion?.shared ?? defaultRules.zoneCompletion.shared;
-  const rewardCompleted=pointRules.rollover?.rewardPerCompleted ?? defaultRules.rollover.rewardPerCompleted;
-  const penaltyIncomplete=pointRules.rollover?.penaltyPerIncomplete ?? defaultRules.rollover.penaltyPerIncomplete;
-  const defaultZoneDefault=defaultRules.zoneCompletion?.default ?? 1;
-  const defaultZoneE=defaultRules.zoneCompletion?.['zone-e'] ?? defaultZoneDefault;
-  const defaultZoneNoise=defaultRules.zoneCompletion?.noise ?? -1;
-  const defaultZoneShared=defaultRules.zoneCompletion?.shared ?? 0;
-  const defaultReward=defaultRules.rollover?.rewardPerCompleted ?? 0;
-  const defaultPenalty=defaultRules.rollover?.penaltyPerIncomplete ?? 0;
 
   view.innerHTML = `
     <div class="card" style="margin-top:0">
@@ -2155,42 +1925,6 @@ function viewSettings(){
           <button class="btn-danger" id="btnReset">Reset điểm</button>
         </div>
       </div>
-    </div>
-
-    <div class="card">
-      <h3>Quy tắc điểm thưởng/phạt</h3>
-      <div class="muted" style="font-size:13px;margin-bottom:12px">
-        <div><b>Mặc định</b></div>
-        <ul style="margin:6px 0 0 18px;padding:0;line-height:1.45">
-          <li>Zone E: ${formatSignedNumber(defaultZoneE)} E</li>
-          <li>Zone Quan trọng / Zone Thường: ${formatSignedNumber(defaultZoneDefault)} E</li>
-          <li>Zone Noise: ${formatSignedNumber(defaultZoneNoise)} E</li>
-          <li>Zone Giao việc: ${formatSignedNumber(defaultZoneShared)} E</li>
-          <li>Qua ngày - mỗi task daily hoàn thành: ${formatSignedNumber(defaultReward)} E</li>
-          <li>Qua ngày - mỗi task daily chưa hoàn thành: ${formatSignedNumber(defaultPenalty)} E</li>
-        </ul>
-      </div>
-      <div class="muted" style="font-size:13px;margin-bottom:12px">
-        <div><b>Đang áp dụng</b></div>
-        <ul style="margin:6px 0 0 18px;padding:0;line-height:1.45">
-          <li>Zone E: ${formatSignedNumber(zoneE)} E</li>
-          <li>Zone Quan trọng: ${formatSignedNumber(zonePriority)} E</li>
-          <li>Zone Thường: ${formatSignedNumber(zoneRegular)} E</li>
-          <li>Zone Noise: ${formatSignedNumber(zoneNoise)} E</li>
-          <li>Zone Giao việc: ${formatSignedNumber(zoneShared)} E</li>
-          <li>Qua ngày (task daily hoàn thành): ${formatSignedNumber(rewardCompleted)} E</li>
-          <li>Qua ngày (task daily chưa hoàn thành): ${formatSignedNumber(penaltyIncomplete)} E</li>
-        </ul>
-      </div>
-      <div class="muted" style="font-size:12px;margin-bottom:12px">Nhập số âm nếu muốn trừ điểm.</div>
-      <div class="row"><div>Task Zone E</div><input id="ruleZoneE" type="number" step="0.1" inputmode="decimal" value="${zoneE}"></div>
-      <div class="row"><div>Task Zone Quan trọng</div><input id="ruleZonePriority" type="number" step="0.1" inputmode="decimal" value="${zonePriority}"></div>
-      <div class="row"><div>Task Zone Thường</div><input id="ruleZoneDefault" type="number" step="0.1" inputmode="decimal" value="${zoneRegular}"></div>
-      <div class="row"><div>Task Zone Noise</div><input id="ruleZoneNoise" type="number" step="0.1" inputmode="decimal" value="${zoneNoise}"></div>
-      <div class="row"><div>Task Zone Giao việc</div><input id="ruleZoneShared" type="number" step="0.1" inputmode="decimal" value="${zoneShared}"></div>
-      <div class="row"><div>Qua ngày - thưởng mỗi task daily hoàn thành</div><input id="ruleDailyReward" type="number" step="0.1" inputmode="decimal" value="${rewardCompleted}"></div>
-      <div class="row"><div>Qua ngày - phạt mỗi task daily chưa hoàn thành</div><input id="ruleDailyPenalty" type="number" step="0.1" inputmode="decimal" value="${penaltyIncomplete}"></div>
-      <div class="row"><div></div><button class="btn-primary" id="savePointRules">Lưu quy tắc</button></div>
     </div>
 
     <div class="card">
@@ -2247,16 +1981,16 @@ function viewSettings(){
     </div>
 
     <div class="card">
-      <h3>Tasks lặp (Daily / Weekly)</h3>
+      <h3>Tasks lặp (Hằng ngày / Theo tuần)</h3>
       <div class="row"><div>Mô tả</div><input id="rText" placeholder="Tập thể dục 15’"></div>
       <div class="row"><div>Zone</div>
         <select id="rZone">
-          ${zones.map(z=>`<option value="${z.id}">${z.name}</option>`).join('')}
+          ${zones.filter(z => !DAILY_ZONE_KINDS.has(z.kind) && z.kind !== 'public').map(z=>`<option value="${z.id}">${z.name}</option>`).join('')}
         </select>
       </div>
       <div class="row"><div>Kiểu</div>
         <select id="rType">
-          <option value="daily">Mỗi ngày</option>
+          <option value="daily">Hằng ngày</option>
           <option value="weekly">Theo thứ</option>
         </select>
       </div>
@@ -2279,7 +2013,7 @@ function viewSettings(){
         <table>
           <thead>
             <tr>
-              <th>Mô tả</th><th>Zone</th><th>Kiểu</th><th>Thứ</th><th></th>
+              <th>Mô tả</th><th>Zone</th><th>Kiểu</th><th>Thứ</th><th>Điểm</th><th></th>
             </tr>
           </thead>
           <tbody id="recT">
@@ -2291,6 +2025,7 @@ function viewSettings(){
                   <td>${zn}</td>
                   <td>${r.type}</td>
                   <td>${r.type==='weekly'?(r.days||[]).join(', '):'-'}</td>
+                  <td>${formatSignedNumber(r.points || 0)}</td>
                   <td><button class="btn-danger rdel" data-id="${r.id}">Xoá</button></td>
                 </tr>`;
             }).join('')}
@@ -2318,58 +2053,6 @@ function viewSettings(){
   /* Ngày & Điểm buttons */
   document.getElementById('btnEnd').onclick = ()=>{ handleEndDay(); };
   document.getElementById('btnReset').onclick = ()=>{ handleResetPoints(); };
-
-  /* Quy tắc điểm */
-  const savePointRulesBtn=document.getElementById('savePointRules');
-  if(savePointRulesBtn){
-    savePointRulesBtn.onclick=()=>{
-      const zoneEEl=document.getElementById('ruleZoneE');
-      const zonePriorityEl=document.getElementById('ruleZonePriority');
-      const zoneDefaultEl=document.getElementById('ruleZoneDefault');
-      const zoneNoiseEl=document.getElementById('ruleZoneNoise');
-      const zoneSharedEl=document.getElementById('ruleZoneShared');
-      const rewardEl=document.getElementById('ruleDailyReward');
-      const penaltyEl=document.getElementById('ruleDailyPenalty');
-      const entries=[
-        {el:zoneEEl, value:Number(zoneEEl.value), label:'Điểm task Zone E'},
-        {el:zonePriorityEl, value:Number(zonePriorityEl.value), label:'Điểm task Zone Quan trọng'},
-        {el:zoneDefaultEl, value:Number(zoneDefaultEl.value), label:'Điểm task Zone Thường'},
-        {el:zoneNoiseEl, value:Number(zoneNoiseEl.value), label:'Điểm task Zone Noise'},
-        {el:zoneSharedEl, value:Number(zoneSharedEl.value), label:'Điểm task Zone Giao việc'},
-        {el:rewardEl, value:Number(rewardEl.value), label:'Thưởng qua ngày cho task daily hoàn thành'},
-        {el:penaltyEl, value:Number(penaltyEl.value), label:'Phạt qua ngày cho task daily chưa hoàn thành'}
-      ];
-      for(const item of entries){
-        if(!Number.isFinite(item.value)){
-          alert(`Giá trị không hợp lệ: ${item.label}`);
-          item.el.focus();
-          return;
-        }
-      }
-
-      const current=getPointRules();
-      setPointRules({
-        zoneCompletion:{
-          ...current.zoneCompletion,
-          default:entries[2].value,
-          regular:entries[2].value,
-          priority:entries[1].value,
-          'zone-e':entries[0].value,
-          noise:entries[3].value,
-          shared:entries[4].value
-        },
-        rollover:{
-          ...current.rollover,
-          rewardPerCompleted:entries[5].value,
-          penaltyPerIncomplete:entries[6].value
-        }
-      });
-
-      alert('Đã cập nhật quy tắc điểm.');
-      renderHero();
-      render('settings');
-    };
-  }
 
   /* Hồ sơ người chơi */
   document.getElementById('saveName').onclick=()=>{
@@ -2446,7 +2129,7 @@ function viewSettings(){
     daysRow.style.display = typeSel.value==='weekly'?'grid':'none';
   };
 
-  document.getElementById('addRec').onclick=()=>{
+  document.getElementById('addRec').onclick=async ()=>{
     const text=document.getElementById('rText').value.trim();
     if(!text){ alert('Nhập mô tả'); return; }
     const zoneId=Number(document.getElementById('rZone').value);
@@ -2456,7 +2139,12 @@ function viewSettings(){
       alert('Chọn thứ');
       return;
     }
-    addRecurring({text, zoneId, type, days});
+    await addRecurring({text, zoneId, type, days});
+    document.getElementById('rText').value = '';
+    document.getElementById('rZone').selectedIndex = 0;
+    typeSel.value = 'daily';
+    daysRow.style.display = 'none';
+    [...daysRow.querySelectorAll('input[type="checkbox"]')].forEach(cb => cb.checked = false);
     viewSettings();
   };
 
