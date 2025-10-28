@@ -207,18 +207,22 @@ h1{
   background:rgba(139,124,255,.18);
   color:#5a4cc1;
 }
-.task-kind.single{
+.task-kind.once{
   background:rgba(34,197,94,.18);
   color:#1f9d55;
 }
-.task-kind.recurring{
+.task-kind.daily{
   background:rgba(59,130,246,.18);
   color:#2563eb;
 }
-.task-kind.recurring.negative{
-  background:rgba(248,113,113,.18);
-  color:#dc2626;
+.task-score{
+  margin-left:8px;
+  font-size:13px;
+  font-weight:600;
 }
+.task-score.positive{color:#16a34a;}
+.task-score.negative{color:#dc2626;}
+.task-score.pending{color:#9ca3af;}
 .task.done .task-kind{opacity:.7}
 .muted{color:var(--muted);font-size:14px}
 .top{
@@ -349,6 +353,23 @@ li.task{
 .done .txt{text-decoration:line-through;color:#9aa}
 .creator{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
 .left input[type="checkbox"]{transform:scale(1.25)}
+.task-actions{display:flex;align-items:center;gap:8px;margin-left:auto;}
+.assign-btn{
+  min-width:32px;
+  height:32px;
+  border-radius:10px;
+  border:1px solid rgba(139,124,255,.2);
+  background:rgba(139,124,255,.12);
+  color:#5a4cc1;
+  font-size:18px;
+  font-weight:600;
+  cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 4px 10px rgba(0,0,0,.08);
+}
+.assign-btn:hover{background:rgba(139,124,255,.22);} 
 
 .del-btn{
   position:absolute;
@@ -487,6 +508,8 @@ th{
 const CONFIG = {
   ENDPOINT:'https://script.google.com/macros/s/AKfycbyQ3imjnhKrzmuz4-KbPNsHzpYGY_Mv45os1bZEPoQrQ-UM8RjJvCznfP5x6RB6QX_Qpw/exec',
   SETTINGS_PASS:'1000',
+  AI_SCORE_ENDPOINT:'',
+  AI_SCORE_PROMPT:'',
   HERO_LEVELS:[
     {
       minLevel:1,
@@ -522,33 +545,42 @@ const LS = {
   LBCACHE:'tq_lb_cache',
   HIST:'tq_hist',
   REALDATE:'tq_real_date',
-  POINT_RULES:'tq_point_rules'
+  POINT_RULES:'tq_point_rules',
+  DAILY_SCORES:'tq_daily_scores'
 };
 
 const ZONE_KIND_LABELS = {
-  'daily-positive':'Tăng E (Daily)',
-  'daily-negative':'Giảm E (Daily)',
-  'priority':'Quan trọng',
-  'regular':'Thông thường'
+  'zone-e':'Zone E',
+  'priority':'Zone Quan trọng',
+  'regular':'Zone Thường',
+  'noise':'Zone Noise',
+  'shared':'Zone Giao việc'
 };
-const ZONE_KIND_ORDER = ['daily-positive','daily-negative','priority','regular'];
-const DEFAULT_ZONES = ZONE_KIND_ORDER.map((kind, idx)=>({
-  name: ['Tăng E','Giảm E','Quan trọng','Thông thường'][idx],
-  kind,
-  bg:''
-}));
+const LEGACY_ZONE_KIND = {
+  'daily-positive':'zone-e',
+  'daily-negative':'noise'
+};
+const ZONE_KIND_ORDER = ['zone-e','priority','regular','noise','shared'];
+const DEFAULT_ZONES = [
+  {name:'Zone E', kind:'zone-e', bg:''},
+  {name:'Zone Quan trọng', kind:'priority', bg:''},
+  {name:'Zone Noise', kind:'noise', bg:''},
+  {name:'Zone Thường', kind:'regular', bg:''},
+  {name:'Zone Giao việc', kind:'shared', bg:''}
+];
 
 const DEFAULT_POINT_RULES = {
   zoneCompletion: {
     default: 1,
     regular: 1,
     priority: 1,
-    'daily-positive': 1,
-    'daily-negative': -1
+    'zone-e': 2,
+    noise: -1,
+    shared: 0
   },
   rollover: {
-    rewardPerCompleted: 2,
-    penaltyPerIncomplete: -3
+    rewardPerCompleted: 0,
+    penaltyPerIncomplete: 0
   }
 };
 
@@ -635,7 +667,9 @@ function setPointRules(next){
 
 function formatSignedNumber(n){
   const val = Number(n)||0;
-  return `${val>=0?'+':''}${val}`;
+  if(val>0) return `+${val}`;
+  if(val<0) return `${val}`;
+  return '0';
 }
 function todayDM(){
   const d=new Date();
@@ -799,6 +833,74 @@ function clearFlagsFor(day){
 }
 
 /* ==============================
+   DAILY SCORE TRACKING
+============================== */
+function createDailyScoreEntry(){
+  return { total:0, noise:0 };
+}
+function pruneDailyScoreStore(store){
+  const keys = Object.keys(store||{}).map(k=>Number(k)).filter(Number.isFinite).sort((a,b)=>a-b);
+  const limit = 60;
+  if(keys.length>limit){
+    const removeCount = keys.length - limit;
+    for(let i=0;i<removeCount;i++){
+      delete store[keys[i]];
+    }
+  }
+}
+function loadDailyScores(){
+  const raw = load(LS.DAILY_SCORES, {});
+  return raw && typeof raw==='object' ? {...raw} : {};
+}
+function saveDailyScores(data){
+  save(LS.DAILY_SCORES, data);
+}
+function getDailyScore(day){
+  const d = Number(day ?? getDay());
+  if(!Number.isFinite(d)) return createDailyScoreEntry();
+  const all = loadDailyScores();
+  const raw = all[d];
+  return {
+    total: Number(raw?.total) || 0,
+    noise: Number(raw?.noise) || 0
+  };
+}
+function resetDailyScore(day){
+  const d = Number(day ?? getDay());
+  if(!Number.isFinite(d)) return;
+  const all = loadDailyScores();
+  all[d] = createDailyScoreEntry();
+  pruneDailyScoreStore(all);
+  saveDailyScores(all);
+}
+function adjustDailyScore(delta, zoneKind, dayOverride){
+  const amount = Number(delta);
+  if(!Number.isFinite(amount) || amount===0) return;
+  const d = Number(dayOverride ?? getDay());
+  if(!Number.isFinite(d)) return;
+  const all = loadDailyScores();
+  const entryRaw = all[d];
+  const entry = entryRaw && typeof entryRaw==='object' ? {...entryRaw} : createDailyScoreEntry();
+  entry.total = Number(entry.total) || 0;
+  entry.noise = Number(entry.noise) || 0;
+  entry.total += amount;
+  if(zoneKind==='noise'){
+    entry.noise += amount;
+  }
+  all[d] = entry;
+  pruneDailyScoreStore(all);
+  saveDailyScores(all);
+}
+
+function applyScoreDelta(delta, meta={}){
+  const amount = Number(delta);
+  if(!Number.isFinite(amount) || amount===0) return 0;
+  addXP(amount);
+  adjustDailyScore(amount, meta.zoneKind || null, meta.dayOverride);
+  return amount;
+}
+
+/* ==============================
    ZONES / TASKS / RECURRING
 ============================== */
 /*
@@ -810,7 +912,7 @@ Zone obj:
   bg
 }
 */
-const DAILY_ZONE_KINDS = new Set(['daily-positive','daily-negative']);
+const DAILY_ZONE_KINDS = new Set(['zone-e']);
 
 function normalizeZoneRecord(raw, idx, idBase){
   if(!raw || typeof raw!=='object') return {changed:true, zone:null};
@@ -832,6 +934,8 @@ function normalizeZoneRecord(raw, idx, idBase){
     zone.bg='';
     changed=true;
   }
+
+  zone.kind = LEGACY_ZONE_KIND[zone.kind] || zone.kind;
 
   if(!ZONE_KIND_LABELS[zone.kind]){
     const fallbackKind = DEFAULT_ZONES.find(d=>d.name===zone.name)?.kind || 'regular';
@@ -875,9 +979,10 @@ function getZones(){
 }
 function setZones(z){ save(LS.ZONES,z) }
 function sanitizeZoneInput(z){
+  const rawKind = LEGACY_ZONE_KIND[z.kind] || z.kind;
   return {
     name: typeof z.name==='string' ? z.name.trim() : '',
-    kind: ZONE_KIND_LABELS[z.kind] ? z.kind : 'regular',
+    kind: ZONE_KIND_LABELS[rawKind] ? rawKind : 'regular',
     bg: typeof z.bg==='string' ? z.bg : ''
   };
 }
@@ -903,6 +1008,7 @@ function updZone(id,patch){
     delete clean.bg;
   }
   if('kind' in clean){
+    clean.kind = LEGACY_ZONE_KIND[clean.kind] || clean.kind;
     clean.kind = ZONE_KIND_LABELS[clean.kind] ? clean.kind : 'regular';
   }
   setZones(getZones().map(z=>z.id===id?{...z,...clean}:z));
@@ -911,16 +1017,56 @@ function delZone(id){
   setZones(getZones().filter(z=>z.id!==id));
 }
 
-function getRecurring(){ return load(LS.RECUR,[]) }
+function getRecurring(){
+  const raw = load(LS.RECUR, []);
+  if(!Array.isArray(raw)) return [];
+  let changed=false;
+  const list = raw.map(item=>{
+    if(!item || typeof item!=='object'){
+      changed=true;
+      return null;
+    }
+    const rec = {...item};
+    if(typeof rec.score!=='number' || !Number.isFinite(rec.score)){
+      if('score' in rec){
+        delete rec.score;
+        changed=true;
+      }
+    }
+    return rec;
+  }).filter(Boolean);
+  if(changed){
+    save(LS.RECUR, list);
+  }
+  return list;
+}
+function setRecurring(list){ save(LS.RECUR, list); }
 function addRecurring(r){
   const rec = {...r};
   rec.id = Date.now() + Math.floor(Math.random()*1000);
   const list = [...getRecurring(), rec];
-  save(LS.RECUR, list);
+  setRecurring(list);
   return rec;
 }
 function delRecurring(id){
-  save(LS.RECUR,getRecurring().filter(r=>r.id!==id));
+  setRecurring(getRecurring().filter(r=>r.id!==id));
+}
+function updateRecurringScore(recId, score){
+  if(typeof recId!=='number' || !Number.isFinite(score)) return;
+  const list = getRecurring();
+  let changed=false;
+  const next = list.map(rec=>{
+    if(rec.id===recId){
+      if(rec.score!==score){
+        rec = {...rec, score};
+        changed=true;
+      }
+    }
+    return rec;
+  });
+  if(changed){
+    setRecurring(next);
+  }
 }
 
 function getTasks(){
@@ -929,7 +1075,11 @@ function getTasks(){
 
   const recs = getRecurring();
   const recIndex = new Map();
+  const recById = new Map();
   for(const r of recs){
+    if(typeof r.id==='number'){
+      recById.set(r.id, r);
+    }
     const key = `${Number(r.zoneId)}|${String(r.text||'')}`;
     if(!recIndex.has(key)) recIndex.set(key, []);
     recIndex.get(key).push(r);
@@ -979,7 +1129,23 @@ function getTasks(){
       delete next.recurringId;
     }
 
-    if(item.zoneId!==next.zoneId || item.done!==next.done || item.kind!==next.kind || (kind==='recurring' && item.recurringId!==next.recurringId) || (kind!=='recurring' && 'recurringId' in item)){
+    let nextScore = Number(item.aiScore);
+    if(!Number.isFinite(nextScore)){
+      nextScore = null;
+    }
+    if(kind==='recurring' && recurringId!=null && nextScore==null){
+      const rec = recById.get(recurringId);
+      if(rec && typeof rec.score==='number' && Number.isFinite(rec.score)){
+        nextScore = rec.score;
+      }
+    }
+    if(nextScore!=null){
+      next.aiScore = nextScore;
+    } else if('aiScore' in next){
+      delete next.aiScore;
+    }
+
+    if(item.zoneId!==next.zoneId || item.done!==next.done || item.kind!==next.kind || (kind==='recurring' && item.recurringId!==next.recurringId) || (kind!=='recurring' && 'recurringId' in item) || item.aiScore!==next.aiScore){
       changed=true;
     }
 
@@ -1015,25 +1181,109 @@ function zoneTaskCompletionDelta(zone){
   return typeof fallback==='number' ? fallback : 1;
 }
 
-function describeTaskKind(task, zone){
+function describeTaskKind(task){
   if(task.kind==='recurring'){
-    return zone && zone.kind==='daily-negative' ? 'Daily (-)' : 'Daily';
+    return 'Hằng ngày';
   }
-  return 'Đơn';
+  return 'Một lần';
 }
 
-function taskKindClass(task, zone){
+function taskKindClass(task){
   if(task.kind==='recurring'){
-    return zone && zone.kind==='daily-negative' ? 'task-kind recurring negative' : 'task-kind recurring';
+    return 'task-kind daily';
   }
-  return 'task-kind single';
+  return 'task-kind once';
 }
 
-function renderTaskKindBadge(task, zone){
-  return `<span class="${taskKindClass(task, zone)}">${describeTaskKind(task, zone)}</span>`;
+function renderTaskKindBadge(task){
+  return `<span class="${taskKindClass(task)}">${describeTaskKind(task)}</span>`;
 }
 
 function setTasks(a){ save(LS.TASKS,a) }
+
+function parseNumericScore(raw){
+  if(typeof raw==='number' && Number.isFinite(raw)) return raw;
+  if(typeof raw==='string'){
+    const match = raw.match(/-?\d+(?:\.\d+)?/);
+    if(match){
+      const num = Number(match[0]);
+      if(Number.isFinite(num)) return num;
+    }
+  }
+  return null;
+}
+
+async function evaluateTaskScoreWithAI({text, zoneKind, taskType}){
+  const zone = zoneKind || 'regular';
+  const endpoint = (CONFIG.AI_SCORE_ENDPOINT||'').trim();
+  const prompt = (CONFIG.AI_SCORE_PROMPT||'').trim();
+  if(endpoint){
+    try{
+      const payload = {
+        prompt,
+        task: text,
+        zoneKind: zone,
+        taskType
+      };
+      const res = await fetch(endpoint, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(payload)
+      });
+      if(res.ok){
+        const contentType = res.headers.get('content-type')||'';
+        let bodyData=null;
+        if(contentType.includes('application/json')){
+          bodyData = await res.json();
+        } else {
+          const textBody = await res.text();
+          bodyData = {score:textBody};
+        }
+        const candidates = [
+          bodyData?.score,
+          bodyData?.points,
+          bodyData?.result,
+          bodyData?.value
+        ];
+        for(const val of candidates){
+          const parsed = parseNumericScore(val);
+          if(parsed!=null) return parsed;
+        }
+      }
+    }catch(err){
+      console.warn('evaluateTaskScoreWithAI failed', err);
+    }
+  }
+  return zoneTaskCompletionDelta({kind:zone});
+}
+
+async function ensureTaskScore(task, zone){
+  if(!task) return null;
+  if(typeof task.aiScore==='number' && Number.isFinite(task.aiScore)){
+    return task.aiScore;
+  }
+  const zoneKind = zone && typeof zone.kind==='string' ? zone.kind : 'regular';
+  if(task.kind==='recurring' && typeof task.recurringId==='number'){
+    const rec = getRecurring().find(r=>r.id===task.recurringId);
+    if(rec && typeof rec.score==='number' && Number.isFinite(rec.score)){
+      task.aiScore = rec.score;
+      return rec.score;
+    }
+  }
+  const score = await evaluateTaskScoreWithAI({
+    text: task.text || '',
+    zoneKind,
+    taskType: task.kind==='recurring' ? 'daily' : 'single'
+  });
+  if(Number.isFinite(score)){
+    task.aiScore = score;
+    if(task.kind==='recurring' && typeof task.recurringId==='number'){
+      updateRecurringScore(task.recurringId, score);
+    }
+    return score;
+  }
+  return null;
+}
 
 /* ==============================
    LB CACHE
@@ -1175,6 +1425,7 @@ function wipeLocalPlayer(){
   localStorage.removeItem(LS.PROFILE);
   localStorage.removeItem(LS.LBCACHE);
   localStorage.removeItem(LS.POINT_RULES);
+  localStorage.removeItem(LS.DAILY_SCORES);
   cachedPointRules=null;
   alert('Đã xoá hồ sơ local. Reload trang để tạo người chơi mới.');
   location.reload();
@@ -1212,18 +1463,38 @@ function performDayRollover(opts={}){
       const completed = totalCount - incomplete;
       const delta = (completed * rewardPerCompleted) + (incomplete * penaltyPerIncomplete);
       if(delta!==0){
-        addXP(delta);
+        applyScoreDelta(delta, {zoneKind: z.kind, dayOverride: todaySim});
       }
+    }
+
+    const todayScore = getDailyScore(todaySim);
+    const totalToday = todayScore.total;
+    const noiseToday = todayScore.noise;
+    let bonus = 0;
+    if(noiseToday >= -1 && totalToday >= 10){
+      if(totalToday >= 20){
+        bonus = 8;
+      } else if(totalToday >= 15){
+        bonus = 5;
+      } else {
+        bonus = 3;
+      }
+    }
+    if(bonus){
+      applyScoreDelta(bonus, {zoneKind:'bonus', dayOverride: todaySim});
     }
 
     pushHistSnapshot();
 
     clearFlagsFor(todaySim);
-    nextDay();
+    const nextSim = nextDay();
     const remaining = tasks.filter(t=>t.kind!=='recurring');
     setTasks(remaining);
     localStorage.removeItem(LS.SPAWN);
     spawnRecurringIfNeeded();
+
+    resetDailyScore(nextSim);
+    applyScoreDelta(-5, {zoneKind:'penalty', dayOverride: nextSim});
 
     setLastRealDate(todayDM());
 
@@ -1526,12 +1797,14 @@ function buildTabsBar(active){
 }
 
 /* TASKS */
+
 function viewTasks(){
   spawnRecurringIfNeeded();
 
   const zones=getZones();
   const tasks=getTasks();
   const dateNowDM = todayDM();
+  const zoneMap = new Map(zones.map(z=>[z.id,z]));
 
   const groups = zones.map(z=>{
     const list = tasks
@@ -1577,18 +1850,28 @@ function viewTasks(){
           <div class="badge">Hoàn thành hôm nay: ${g.progressText}</div>
         </header>
         <ul>
-          ${g.list.length? g.list.map(t=>`
+          ${g.list.length? g.list.map(t=>{
+            const scoreVal = Number(t.aiScore);
+            const hasScore = Number.isFinite(scoreVal);
+            const scoreClass = hasScore ? (scoreVal>=0?'positive':'negative') : 'pending';
+            const scoreText = hasScore ? formatSignedNumber(scoreVal) : '…';
+            const isShared = z.kind==='shared';
+            return `
             <li class="task ${t.done?'done':''}" data-id="${t.id}" data-kind="${t.kind||'single'}">
               <div class="task-inner">
                 <div class="left">
-                  <input type="checkbox" data-id="${t.id}" ${t.done?'checked':''}>
+                  <input type="checkbox" data-id="${t.id}" ${t.done?'checked':''} ${isShared?'disabled':''}>
                   <span class="txt">${t.text}</span>
-                  ${renderTaskKindBadge(t, z)}
+                  ${renderTaskKindBadge(t)}
+                </div>
+                <div class="task-actions">
+                  <span class="task-score ${scoreClass}">${scoreText}</span>
+                  ${isShared?`<button class="assign-btn" data-id="${t.id}" title="Thêm vào Zone Quan trọng">+</button>`:''}
                 </div>
               </div>
               <button class="del-btn" data-id="${t.id}">×</button>
-            </li>
-          `).join('') : `<li class="task"><div class="task-inner"><span class="muted">Chưa có task trong Zone này.</span></div></li>`}
+            </li>`;
+          }).join('') : `<li class="task"><div class="task-inner"><span class="muted">Chưa có task trong Zone này.</span></div></li>`}
         </ul>
       </section>`;
     }).join('')}
@@ -1597,17 +1880,24 @@ function viewTasks(){
   const inp = document.getElementById('taskText');
   const sel = document.getElementById('taskZone');
 
-  function addNow(){
+  async function addNow(){
     const text=(inp.value||'').trim(); if(!text) return;
-    const currentTasks = getTasks();
     const zoneId = Number(sel.value);
-    const z = zones.find(z=>z.id==zoneId);
+    const z = zones.find(zone=>zone.id==zoneId);
     if(!z) return;
 
-    const isDailyZone = DAILY_ZONE_KINDS.has(z.kind);
-    const newTasks = [...currentTasks];
+    const currentTasks = getTasks();
+    if(z.kind==='zone-e'){
+      const activeInZone = getZoneActiveTasks(currentTasks, z.id);
+      if(activeInZone.length>=5){
+        alert('Zone E chỉ cho phép tối đa 5 task trong ngày.');
+        return;
+      }
+    }
 
-    if(isDailyZone){
+    const newTasks = [...currentTasks];
+    let newTask=null;
+    if(DAILY_ZONE_KINDS.has(z.kind)){
       const recs = getRecurring();
       const existingRec = recs.find(r=>r.zoneId==z.id && r.type==='daily' && (r.text||'')===text);
       const rec = existingRec || addRecurring({
@@ -1617,33 +1907,40 @@ function viewTasks(){
         autoKind:z.kind
       });
       const duplicate = newTasks.some(t=>t.zoneId==z.id && t.kind==='recurring' && t.recurringId===rec.id);
-      if(!duplicate){
-        newTasks.push({
-          id:Date.now()+Math.random(),
-          text,
-          zoneId:z.id,
-          done:false,
-          kind:'recurring',
-          recurringId:rec.id
-        });
+      if(duplicate){
+        alert('Task đã tồn tại trong Zone này.');
+        return;
       }
+      newTask={
+        id:Date.now()+Math.random(),
+        text,
+        zoneId:z.id,
+        done:false,
+        kind:'recurring',
+        recurringId:rec.id
+      };
+      newTasks.push(newTask);
     } else {
-      newTasks.push({
-        id:Date.now(),
+      newTask={
+        id:Date.now()+Math.random(),
         text,
         zoneId:z.id,
         done:false,
         kind:'single'
-      });
+      };
+      newTasks.push(newTask);
     }
 
+    await ensureTaskScore(newTask, z);
     setTasks(newTasks);
     inp.value='';
     render('tasks');
   }
 
-  document.getElementById('btnAdd').onclick=addNow;
-  inp.onkeydown=(e)=>{ if(e.key==='Enter') addNow(); };
+  const handleAdd = ()=>{ addNow().catch(err=>console.error(err)); };
+
+  document.getElementById('btnAdd').onclick=handleAdd;
+  inp.onkeydown=(e)=>{ if(e.key==='Enter') handleAdd(); };
 
   window.onkeydown=(e)=>{
     const tag=(document.activeElement?.tagName||'').toLowerCase();
@@ -1653,22 +1950,92 @@ function viewTasks(){
     }
   };
 
-  // tick task
   view.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
-    cb.onchange=()=>{
+    cb.onchange=async()=>{
       const id=Number(cb.dataset.id);
-      const t = getTasks().find(t=>t.id===id);
-      if(!t) return;
-      const z = zones.find(z=>z.id==t.zoneId);
-      t.done = cb.checked;
-      const delta = zoneTaskCompletionDelta(z);
-      addXP(cb.checked ? delta : -delta);
-      setTasks(getTasks().map(x=>x.id===id?t:x));
+      const list = getTasks();
+      const task = list.find(t=>t.id===id);
+      if(!task){
+        render('tasks');
+        return;
+      }
+      const zone = zoneMap.get(task.zoneId) || zones.find(z=>z.id==task.zoneId);
+      await ensureTaskScore(task, zone);
+      const scoreVal = Number(task.aiScore)||0;
+      task.done = cb.checked;
+      if(scoreVal!==0){
+        applyScoreDelta(cb.checked ? scoreVal : -scoreVal, {zoneKind: zone?.kind});
+      }
+      setTasks(list);
       render('tasks');
     };
   });
 
+  const adoptButtons = view.querySelectorAll('.assign-btn');
+  if(adoptButtons.length){
+    adoptButtons.forEach(btn=>{
+      btn.onclick=async(e)=>{
+        e.preventDefault();
+        const id=Number(btn.dataset.id);
+        const importantZone = zones.find(z=>z.kind==='priority');
+        if(!importantZone){
+          alert('Chưa cấu hình Zone Quan trọng.');
+          return;
+        }
+        const allTasks = getTasks();
+        const source = allTasks.find(t=>t.id===id);
+        if(!source){
+          render('tasks');
+          return;
+        }
+        const exists = allTasks.some(t=>t.zoneId===importantZone.id && (t.text||'')===(source.text||''));
+        if(exists){
+          alert('Task đã có trong Zone Quan trọng.');
+          return;
+        }
+        const newTask={
+          id:Date.now()+Math.random(),
+          text:source.text,
+          zoneId:importantZone.id,
+          done:false,
+          kind:'single',
+          aiScore: Number.isFinite(Number(source.aiScore)) ? Number(source.aiScore) : undefined
+        };
+        await ensureTaskScore(newTask, importantZone);
+        allTasks.push(newTask);
+        setTasks(allTasks);
+        render('tasks');
+      };
+    });
+  }
+
   attachSwipeHandlersForTasks();
+
+  const pendingIds = tasks.filter(t=>typeof t.aiScore!=='number').map(t=>t.id);
+  if(pendingIds.length){
+    (async()=>{
+      const latestTasks = getTasks();
+      const latestZones = getZones();
+      const latestZoneMap = new Map(latestZones.map(z=>[z.id,z]));
+      let changed=false;
+      for(const id of pendingIds){
+        const task = latestTasks.find(t=>t.id===id);
+        if(!task) continue;
+        const zone = latestZoneMap.get(task.zoneId);
+        const score = await ensureTaskScore(task, zone);
+        if(Number.isFinite(score) && task.aiScore!==score){
+          task.aiScore = score;
+          changed=true;
+        }
+      }
+      if(changed){
+        setTasks(latestTasks);
+        if(currentTab==='tasks'){
+          viewTasks();
+        }
+      }
+    })();
+  }
 }
 
 /* LEADERBOARD */
@@ -1754,11 +2121,17 @@ function viewSettings(){
   const pointRules=getPointRules();
   const defaultRules=DEFAULT_POINT_RULES;
   const zoneDefault=pointRules.zoneCompletion?.default ?? pointRules.zoneCompletion?.regular ?? defaultRules.zoneCompletion.default;
-  const zoneNegative=pointRules.zoneCompletion?.['daily-negative'] ?? defaultRules.zoneCompletion['daily-negative'];
+  const zonePriority=pointRules.zoneCompletion?.priority ?? zoneDefault;
+  const zoneRegular=pointRules.zoneCompletion?.regular ?? zoneDefault;
+  const zoneE=pointRules.zoneCompletion?.['zone-e'] ?? defaultRules.zoneCompletion['zone-e'];
+  const zoneNoise=pointRules.zoneCompletion?.noise ?? defaultRules.zoneCompletion.noise;
+  const zoneShared=pointRules.zoneCompletion?.shared ?? defaultRules.zoneCompletion.shared;
   const rewardCompleted=pointRules.rollover?.rewardPerCompleted ?? defaultRules.rollover.rewardPerCompleted;
   const penaltyIncomplete=pointRules.rollover?.penaltyPerIncomplete ?? defaultRules.rollover.penaltyPerIncomplete;
   const defaultZoneDefault=defaultRules.zoneCompletion?.default ?? 1;
-  const defaultZoneNegative=defaultRules.zoneCompletion?.['daily-negative'] ?? -1;
+  const defaultZoneE=defaultRules.zoneCompletion?.['zone-e'] ?? defaultZoneDefault;
+  const defaultZoneNoise=defaultRules.zoneCompletion?.noise ?? -1;
+  const defaultZoneShared=defaultRules.zoneCompletion?.shared ?? 0;
   const defaultReward=defaultRules.rollover?.rewardPerCompleted ?? 0;
   const defaultPenalty=defaultRules.rollover?.penaltyPerIncomplete ?? 0;
 
@@ -1789,8 +2162,10 @@ function viewSettings(){
       <div class="muted" style="font-size:13px;margin-bottom:12px">
         <div><b>Mặc định</b></div>
         <ul style="margin:6px 0 0 18px;padding:0;line-height:1.45">
-          <li>Hoàn thành task zone thường: ${formatSignedNumber(defaultZoneDefault)} E</li>
-          <li>Hoàn thành task zone giảm E: ${formatSignedNumber(defaultZoneNegative)} E</li>
+          <li>Zone E: ${formatSignedNumber(defaultZoneE)} E</li>
+          <li>Zone Quan trọng / Zone Thường: ${formatSignedNumber(defaultZoneDefault)} E</li>
+          <li>Zone Noise: ${formatSignedNumber(defaultZoneNoise)} E</li>
+          <li>Zone Giao việc: ${formatSignedNumber(defaultZoneShared)} E</li>
           <li>Qua ngày - mỗi task daily hoàn thành: ${formatSignedNumber(defaultReward)} E</li>
           <li>Qua ngày - mỗi task daily chưa hoàn thành: ${formatSignedNumber(defaultPenalty)} E</li>
         </ul>
@@ -1798,15 +2173,21 @@ function viewSettings(){
       <div class="muted" style="font-size:13px;margin-bottom:12px">
         <div><b>Đang áp dụng</b></div>
         <ul style="margin:6px 0 0 18px;padding:0;line-height:1.45">
-          <li>Zone thường / tăng / quan trọng: ${formatSignedNumber(zoneDefault)} E</li>
-          <li>Zone giảm E: ${formatSignedNumber(zoneNegative)} E</li>
+          <li>Zone E: ${formatSignedNumber(zoneE)} E</li>
+          <li>Zone Quan trọng: ${formatSignedNumber(zonePriority)} E</li>
+          <li>Zone Thường: ${formatSignedNumber(zoneRegular)} E</li>
+          <li>Zone Noise: ${formatSignedNumber(zoneNoise)} E</li>
+          <li>Zone Giao việc: ${formatSignedNumber(zoneShared)} E</li>
           <li>Qua ngày (task daily hoàn thành): ${formatSignedNumber(rewardCompleted)} E</li>
           <li>Qua ngày (task daily chưa hoàn thành): ${formatSignedNumber(penaltyIncomplete)} E</li>
         </ul>
       </div>
       <div class="muted" style="font-size:12px;margin-bottom:12px">Nhập số âm nếu muốn trừ điểm.</div>
-      <div class="row"><div>Task zone thường / tăng / quan trọng</div><input id="ruleZoneDefault" type="number" step="0.1" inputmode="decimal" value="${zoneDefault}"></div>
-      <div class="row"><div>Task zone giảm E</div><input id="ruleZoneNegative" type="number" step="0.1" inputmode="decimal" value="${zoneNegative}"></div>
+      <div class="row"><div>Task Zone E</div><input id="ruleZoneE" type="number" step="0.1" inputmode="decimal" value="${zoneE}"></div>
+      <div class="row"><div>Task Zone Quan trọng</div><input id="ruleZonePriority" type="number" step="0.1" inputmode="decimal" value="${zonePriority}"></div>
+      <div class="row"><div>Task Zone Thường</div><input id="ruleZoneDefault" type="number" step="0.1" inputmode="decimal" value="${zoneRegular}"></div>
+      <div class="row"><div>Task Zone Noise</div><input id="ruleZoneNoise" type="number" step="0.1" inputmode="decimal" value="${zoneNoise}"></div>
+      <div class="row"><div>Task Zone Giao việc</div><input id="ruleZoneShared" type="number" step="0.1" inputmode="decimal" value="${zoneShared}"></div>
       <div class="row"><div>Qua ngày - thưởng mỗi task daily hoàn thành</div><input id="ruleDailyReward" type="number" step="0.1" inputmode="decimal" value="${rewardCompleted}"></div>
       <div class="row"><div>Qua ngày - phạt mỗi task daily chưa hoàn thành</div><input id="ruleDailyPenalty" type="number" step="0.1" inputmode="decimal" value="${penaltyIncomplete}"></div>
       <div class="row"><div></div><button class="btn-primary" id="savePointRules">Lưu quy tắc</button></div>
@@ -1942,13 +2323,19 @@ function viewSettings(){
   const savePointRulesBtn=document.getElementById('savePointRules');
   if(savePointRulesBtn){
     savePointRulesBtn.onclick=()=>{
+      const zoneEEl=document.getElementById('ruleZoneE');
+      const zonePriorityEl=document.getElementById('ruleZonePriority');
       const zoneDefaultEl=document.getElementById('ruleZoneDefault');
-      const zoneNegativeEl=document.getElementById('ruleZoneNegative');
+      const zoneNoiseEl=document.getElementById('ruleZoneNoise');
+      const zoneSharedEl=document.getElementById('ruleZoneShared');
       const rewardEl=document.getElementById('ruleDailyReward');
       const penaltyEl=document.getElementById('ruleDailyPenalty');
       const entries=[
-        {el:zoneDefaultEl, value:Number(zoneDefaultEl.value), label:'Điểm task zone thường / tăng / quan trọng'},
-        {el:zoneNegativeEl, value:Number(zoneNegativeEl.value), label:'Điểm task zone giảm E'},
+        {el:zoneEEl, value:Number(zoneEEl.value), label:'Điểm task Zone E'},
+        {el:zonePriorityEl, value:Number(zonePriorityEl.value), label:'Điểm task Zone Quan trọng'},
+        {el:zoneDefaultEl, value:Number(zoneDefaultEl.value), label:'Điểm task Zone Thường'},
+        {el:zoneNoiseEl, value:Number(zoneNoiseEl.value), label:'Điểm task Zone Noise'},
+        {el:zoneSharedEl, value:Number(zoneSharedEl.value), label:'Điểm task Zone Giao việc'},
         {el:rewardEl, value:Number(rewardEl.value), label:'Thưởng qua ngày cho task daily hoàn thành'},
         {el:penaltyEl, value:Number(penaltyEl.value), label:'Phạt qua ngày cho task daily chưa hoàn thành'}
       ];
@@ -1964,16 +2351,17 @@ function viewSettings(){
       setPointRules({
         zoneCompletion:{
           ...current.zoneCompletion,
-          default:entries[0].value,
-          regular:entries[0].value,
-          priority:entries[0].value,
-          'daily-positive':entries[0].value,
-          'daily-negative':entries[1].value
+          default:entries[2].value,
+          regular:entries[2].value,
+          priority:entries[1].value,
+          'zone-e':entries[0].value,
+          noise:entries[3].value,
+          shared:entries[4].value
         },
         rollover:{
           ...current.rollover,
-          rewardPerCompleted:entries[2].value,
-          penaltyPerIncomplete:entries[3].value
+          rewardPerCompleted:entries[5].value,
+          penaltyPerIncomplete:entries[6].value
         }
       });
 
