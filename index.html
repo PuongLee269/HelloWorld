@@ -1124,14 +1124,16 @@ function spawnRecurringIfNeeded(){
     if(existingRecurring.has(r.id) || fallbackRecurringKeys.has(recKey)) continue;
 
     const newTask = {
-      id:Date.now()+Math.random(),
-      text:r.text,
-      zoneId:r.zoneId,
-      done:false,
-      kind:'recurring',
-      recurringId:r.id,
-      points: Number(r.points) || 0
-    };
+	  id: Date.now() + Math.random(),
+	  text: r.text,
+	  zoneId: r.zoneId,
+	  done: false,
+	  kind: 'recurring',
+	  recurringId: r.id,
+	  points: Number(r.points) || 0,
+	  aiReason: r.reason || ''
+	};
+
 
     tasks.push(newTask);
     existingRecurring.add(r.id);
@@ -1661,19 +1663,23 @@ async function viewTasks(){
                   </div>
                 </li>
               `;
-            } else {
-              return `
-                <li class="task ${t.done?'done':''}" data-id="${t.id}" data-kind="${t.kind||'single'}">
-                  <div class="task-inner">
-                    <div class="left">
-                      <input type="checkbox" data-id="${t.id}" ${t.done?'checked':''}>
-                      <span class="txt">${t.text}</span>
-                      ${renderTaskKindBadge(t, z)}
-                      ${renderTaskPoints(t.points, t.aiReason)}
-                    </div>
-                  </div>
-                  <button class="del-btn" data-id="${t.id}">×</button>
-                </li>
+           } else {
+				  return `
+				    <li class="task ${t.done?'done':''}" data-id="${t.id}" data-kind="${t.kind||'single'}">
+				      <div class="task-inner">
+				        <div class="left">
+				          <input type="checkbox" data-id="${t.id}" ${t.done?'checked':''}>
+				          <span class="txt">${t.text}</span>
+				          ${renderTaskKindBadge(t, z)}
+				          ${renderTaskPoints(t.points, t.aiReason)}
+				        </div>
+				      </div>
+				      ${t.aiReason ? `<div class="ai-reason">${t.aiReason}</div>` : ''}
+				      <button class="del-btn" data-id="${t.id}">×</button>
+				    </li>
+				  `;
+				}
+
               `;
             }
           }).join('') : `<li class="task"><div class="task-inner"><span class="muted">Chưa có task trong Zone này.</span></div></li>`}
