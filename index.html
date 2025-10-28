@@ -558,60 +558,6 @@ const DAILY_ZONE_KINDS = new Set(['e','noise']);
 
 let cachedPublicTasks = null;
 
-const AI_PROMPT_TEMPLATE = `
-Bạn là động cơ chấm điểm nhiệm vụ cho một ứng dụng phát triển bản thân. 
-Mục tiêu: chấm điểm từng task dựa trên ảnh hưởng lên Entropy cá nhân và Zone do người dùng chọn.
-
-ĐẦU VÀO:
-- Mô tả task: "{TASK}"
-- Zone do người dùng chọn: "{ZONE}" 
-  (chỉ một trong: "Zone E" | "Zone Quan trọng" | "Zone Noise" | "Zone Thường")
-
-ĐẦU RA:
-Trả về DUY NHẤT một JSON với đúng các trường và giá trị hợp lệ sau:
-{
-  "zone": "Zone E" | "Zone Quan trọng" | "Zone Noise" | "Zone Thường",
-  "category": "E3" | "E2" | "E1" | "Neutral" | "NoiseLight" | "NoiseMid" | "NoiseHigh",
-  "points": số nguyên từ -3 đến 3,
-  "reason": "giải thích ngắn gọn tối đa 12 từ"
-}
-
-QUY TẮC CHUNG:
-- E3 = +3: tăng năng lượng mạnh, tác động dài hạn.
-- E2 = +2: cải thiện rõ rệt năng lượng/học hỏi/năng suất.
-- E1 = +1: duy trì nhỏ nhưng có ích.
-- Neutral = 0: trung tính, không tăng cũng không giảm.
-- NoiseLight = -1: tiêu hao nhẹ, xao lạc ngắn.
-- NoiseMid = -2: tiêu hao vừa, kéo dài, ít giá trị.
-- NoiseHigh = -3: tiêu hao mạnh, dễ gây nghiện/hại sức khỏe.
-
-RÀNG BUỘC THEO ZONE (bắt buộc):
-- "Zone E": chỉ chọn 1 trong {E3, E2, E1}. Điểm tương ứng {+3, +2, +1}.
-- "Zone Quan trọng": chọn {E2, E1, Neutral}. Không được +3. Điểm tối đa +2.
-- "Zone Noise": chỉ chọn {NoiseHigh, NoiseMid, NoiseLight}. Điểm {−3, −2, −1}.
-- "Zone Thường": chọn {E1, Neutral}. Điểm tối đa +1.
-
-LƯU Ý ĐÁNH GIÁ:
-- Ưu tiên dùng thông tin thời lượng/mục đích trong mô tả nếu có 
-  (ví dụ >60 phút, mốc hoàn thành, tính lặp lại).
-- Nếu mô tả mơ hồ: hạ một bậc thang điểm trong phạm vi Zone.
-- Luôn tôn trọng Zone người dùng chọn để giữ công bằng khi xếp hạng.
-
-ĐỊNH DẠNG XUẤT:
-- Chỉ xuất JSON thuần, không kèm văn bản khác, không kèm backticks.
-
-Ví dụ:
-Input: "Đọc sách 30 phút", Zone: "Zone E"
-Output:
-{
-  "zone": "Zone E",
-  "category": "E2",
-  "points": 2,
-  "reason": "Học tập tăng năng lượng tinh thần"
-}
-
-Bây giờ hãy chấm task ở trên.
-`;
 
 /* ==============================
    HERO ELEMENTS
@@ -669,51 +615,45 @@ function setLastRealDate(val){
 function lastLevelCfg(){ return LEVELS[LEVELS.length-1]; }
 
 /* ==============================
-   AI TASK SCORING (PLACEHOLDER)
+   AI TASK SCORING (FINAL)
 ============================== */
-/* ==============================
-   AI TASK SCORING (PLACEHOLDER)
-============================== */
+const AI_ENDPOINT = "https://todo-quest-proxyp260992.vercel.app/api/score"; // sửa đúng URL proxy đang chạy
+
+
+/**
+ * Chấm điểm 1 task và trả về object đầy đủ từ proxy.
+ * @param {string} taskText
+ * @param {string} zoneKind: 'e' | 'priority' | 'noise' | 'regular' | 'public'
+ * @returns {{zone:string, category:string, points:number, reason:string}}
+ */
 async function getTaskPoints(taskText, zoneKind) {
-  const endpoint = "https://todo-quest-proxy2609.vercel.app/api/score";
-
-  // Map zoneKind (e.g. 'e') sang label (e.g. "Zone E")
-  const zoneLabel = ZONE_KIND_LABELS[zoneKind] || "Zone Thường";  // Fallback
-
-  // Ghép prompt động
-  const fullPrompt = AI_PROMPT_TEMPLATE
-    .replace('{TASK}', taskText)
-    .replace('{ZONE}', zoneLabel);
+  const zoneLabel = ZONE_KIND_LABELS[zoneKind] || "Zone Thường";
 
   try {
-    const response = await fetch(endpoint, {
+    const response = await fetch(AI_ENDPOINT, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ 
-        text: taskText, 
-        zone: zoneKind,  // Giữ nguyên cho proxy nếu cần
-        prompt: fullPrompt  // Gửi prompt đầy đủ cho proxy dùng
-      })
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: taskText, zone: zoneLabel })
     });
 
-    const data = await response.json();
+    if (!response.ok) {
+      console.warn("AI proxy error:", response.status);
+      return { zone: zoneLabel, category: "Neutral", points: 0, reason: "Lỗi proxy" };
+    }
 
-    // Parse JSON từ AI (mong đợi {points: ..., category: ..., reason: ...})
-    // Fallback nếu không có points
-    const points = Number(data.points) || 0;
-    const category = data.category || 'Neutral';
-    const reason = data.reason || 'Không xác định';
-
-    console.log("AI Score:", taskText, "=>", { points, category, reason });  // Log đầy đủ để debug
-    return points;  // Chỉ return points như cũ
-  } catch (error) {
-    console.error("Proxy API failed:", error);
-    return 0;
+    const data = await response.json(); // { zone, category, points, reason }
+    const points = Number(data.points);
+    return {
+      zone: data.zone || zoneLabel,
+      category: data.category || "Neutral",
+      points: Number.isFinite(points) ? Math.max(-3, Math.min(3, points)) : 0,
+      reason: data.reason || ""
+    };
+  } catch (err) {
+    console.error("AI proxy failed:", err);
+    return { zone: zoneLabel, category: "Neutral", points: 0, reason: "Lỗi mạng" };
   }
 }
-
 
 /* ==============================
    PROFILE / LEVEL / XP ("E")
@@ -965,11 +905,20 @@ function delZone(id){
 async function addRecurring(r){
   const rec = {...r};
   rec.id = Date.now() + Math.floor(Math.random()*1000);
-  rec.points = await getTaskPoints(rec.text);
+
+  // Lấy zone để biết kind
+  const zones = getZones();
+  const z = zones.find(z => z.id == rec.zoneId);
+  const zoneKind = z ? z.kind : 'regular';
+
+  const ai = await getTaskPoints(rec.text, zoneKind);
+  rec.points = ai.points; // lưu điểm base cho recurring
+
   const list = [...getRecurring(), rec];
   save(LS.RECUR, list);
   return rec;
 }
+
 function delRecurring(id){
   save(LS.RECUR,getRecurring().filter(r=>r.id!==id));
 }
@@ -1081,13 +1030,13 @@ function renderTaskKindBadge(task, zone){
   return `<span class="${taskKindClass(task, zone)}">${describeTaskKind(task, zone)}</span>`;
 }
 
-function renderTaskPoints(points) {
+function renderTaskPoints(points, reasonText) {
   const sign = points >= 0 ? '+' : '';
   const className = points >= 0 ? 'positive' : 'negative';
-  // Giả sử bạn lưu reason tạm (cần chỉnh thêm ở getTaskPoints nếu muốn)
-  const reason = ''; // Hoặc lấy từ đâu đó nếu cần
-  return `<span class="task-points ${className}" title="${reason}">${sign}${points}</span>`;
+  const safe = String(reasonText || '').replace(/"/g, '&quot;');
+  return `<span class="task-points ${className}" title="${safe}">${sign}${points}</span>`;
 }
+
 
 function setTasks(a){ save(LS.TASKS,a) }
 
@@ -1682,7 +1631,7 @@ async function viewTasks(){
                   <div class="task-inner">
                     <div class="left">
                       <span class="txt">${t.text}</span>
-                      ${renderTaskPoints(t.points)}
+                      ${renderTaskPoints(t.points, t.aiReason)}
                       <button class="btn-primary add-to-priority" data-text="${t.text}" data-points="${t.points}">+</button>
                     </div>
                   </div>
@@ -1696,7 +1645,7 @@ async function viewTasks(){
                       <input type="checkbox" data-id="${t.id}" ${t.done?'checked':''}>
                       <span class="txt">${t.text}</span>
                       ${renderTaskKindBadge(t, z)}
-                      ${renderTaskPoints(t.points)}
+                      ${renderTaskPoints(t.points, t.aiReason)}
                     </div>
                   </div>
                   <button class="del-btn" data-id="${t.id}">×</button>
@@ -1733,7 +1682,7 @@ async function viewTasks(){
       return;
     }
 
-    const points = await getTaskPoints(text);
+	const ai = await getTaskPoints(text, z.kind);
     const currentTasks = getTasks();
     const newTasks = [...currentTasks];
 
@@ -1749,24 +1698,31 @@ async function viewTasks(){
       const duplicate = newTasks.some(t=>t.zoneId==z.id && t.kind==='recurring' && t.recurringId===rec.id);
       if(!duplicate){
         newTasks.push({
-          id:Date.now()+Math.random(),
-          text,
-          zoneId:z.id,
-          done:false,
-          kind:'recurring',
-          recurringId:rec.id,
-          points: Number(rec.points) || points
-        });
+		  id: Date.now() + Math.random(),
+		  text,
+		  zoneId: z.id,
+		  done: false,
+		  kind: 'recurring',
+		  recurringId: rec.id,
+		  points: Number(rec.points) || ai.points,
+		  aiCategory: ai.category,
+		  aiReason: ai.reason,
+		  zoneLabel: ai.zone
+		});
+
       }
     } else {
       newTasks.push({
-        id:Date.now(),
-        text,
-        zoneId:z.id,
-        done:false,
-        kind:'single',
-        points
-      });
+		  id: Date.now(),
+		  text,
+		  zoneId: z.id,
+		  done: false,
+		  kind: 'single',
+		  points: ai.points,
+		  aiCategory: ai.category,
+		  aiReason: ai.reason,
+		  zoneLabel: ai.zone
+		});
     }
 
     setTasks(newTasks);
@@ -1801,25 +1757,32 @@ async function viewTasks(){
   });
 
   // add to priority from public
-  view.querySelectorAll('.add-to-priority').forEach(btn => {
-    btn.onclick = async (e) => {
-      e.stopPropagation();
-      const text = btn.dataset.text;
-      const points = Number(btn.dataset.points) || 0;
-      const currentTasks = getTasks();
-      const newTask = {
-        id: Date.now(),
-        text,
-        zoneId: priorityZone.id,
-        done: false,
-        kind: 'single',
-        points
-      };
-      setTasks([...currentTasks, newTask]);
-      alert('Đã thêm vào Zone Quan trọng!');
-      render('tasks');
-    };
-  });
+	 view.querySelectorAll('.add-to-priority').forEach(btn => {
+	  btn.onclick = async (e) => {
+		e.stopPropagation();
+		const text = btn.dataset.text;
+
+		// Chấm lại theo Zone Priority
+		const ai = await getTaskPoints(text, 'priority');
+
+		const currentTasks = getTasks();
+		const newTask = {
+		  id: Date.now(),
+		  text,
+		  zoneId: priorityZone.id,
+		  done: false,
+		  kind: 'single',
+		  points: ai.points,
+		  aiCategory: ai.category,
+		  aiReason: ai.reason,
+		  zoneLabel: ai.zone
+		};
+		setTasks([...currentTasks, newTask]);
+		alert('Đã thêm vào Zone Quan trọng!');
+		render('tasks');
+	  };
+	});
+
 
   attachSwipeHandlersForTasks();
 }
