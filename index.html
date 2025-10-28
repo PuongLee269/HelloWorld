@@ -44,6 +44,78 @@ h1{
   gap:8px
 }
 
+/* Hero */
+.hero{
+  position:relative;
+  border-radius:24px;
+  background:var(--gradient-main);
+  background-size:cover;
+  background-position:center;
+  color:#fff;
+  overflow:hidden;
+  margin-bottom:20px;
+  box-shadow:0 24px 48px rgba(139,124,255,.35);
+}
+.hero::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(135deg,rgba(10,14,39,.55),rgba(10,14,39,.25));
+}
+.hero-inner{
+  position:relative;
+  z-index:1;
+  display:flex;
+  align-items:center;
+  gap:24px;
+  padding:28px;
+}
+.hero-character{
+  width:140px;
+  height:140px;
+  flex-shrink:0;
+  background-size:contain;
+  background-repeat:no-repeat;
+  background-position:center bottom;
+  filter:drop-shadow(0 12px 24px rgba(0,0,0,.45));
+}
+.hero-info{flex:1;min-width:0}
+.hero-name{
+  margin:0;
+  font-size:26px;
+  font-weight:700;
+  letter-spacing:.4px;
+}
+.hero-meta{
+  margin-top:8px;
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  font-size:16px;
+  font-weight:500;
+}
+.hero-meta span{display:inline-flex;align-items:center;gap:6px}
+.hero-progress{margin-top:18px;width:100%}
+.hero-progress-bar{
+  height:10px;
+  background:rgba(255,255,255,.35);
+  border-radius:999px;
+  overflow:hidden;
+}
+.hero-progress-fill{
+  height:100%;
+  width:0;
+  background:rgba(255,255,255,.95);
+  box-shadow:0 6px 18px rgba(255,255,255,.35);
+  border-radius:999px;
+}
+.hero-progress-label{
+  margin-top:8px;
+  font-size:14px;
+  letter-spacing:.2px;
+  opacity:.9;
+}
+
 /* Tabs bar */
 .tabs{
   display:flex;
@@ -359,6 +431,10 @@ th{
   .row{grid-template-columns:1fr}
   .creator{flex-direction:column}
   h1{font-size:20px}
+  .hero-inner{flex-direction:column;align-items:flex-start;text-align:left;gap:18px;padding:22px}
+  .hero-character{width:100px;height:100px}
+  .hero-name{font-size:22px}
+  .hero-meta{font-size:15px}
 }
 @media (max-width:480px){
   body{font-size:15px}
@@ -372,6 +448,25 @@ th{
 <div class="wrap">
   <h1>Todo Quest</h1>
 
+  <section id="hero" class="hero">
+    <div class="hero-inner">
+      <div class="hero-character" data-hero="character" aria-hidden="true"></div>
+      <div class="hero-info">
+        <div class="hero-name" data-hero="name">Player</div>
+        <div class="hero-meta">
+          <span class="hero-level" data-hero="level">Level 1</span>
+          <span class="hero-xp" data-hero="xp">0 E</span>
+        </div>
+        <div class="hero-progress">
+          <div class="hero-progress-bar">
+            <div class="hero-progress-fill" data-hero="xp-fill"></div>
+          </div>
+          <div class="hero-progress-label" data-hero="xp-label">0 / 100 E</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <div class="tabs" id="tabsBar"></div>
 
   <div id="view">Đang nạp…</div>
@@ -383,7 +478,26 @@ th{
 ============================== */
 const CONFIG = {
   ENDPOINT:'https://script.google.com/macros/s/AKfycbyQ3imjnhKrzmuz4-KbPNsHzpYGY_Mv45os1bZEPoQrQ-UM8RjJvCznfP5x6RB6QX_Qpw/exec',
-  SETTINGS_PASS:'1000'
+  SETTINGS_PASS:'1000',
+  HERO_LEVELS:[
+    {
+      minLevel:1,
+      maxLevel:3,
+      characterImg:"url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 120\"><circle cx=\"50\" cy=\"38\" r=\"26\" fill=\"%23f97316\"/><rect x=\"22\" y=\"64\" width=\"56\" height=\"44\" rx=\"18\" fill=\"%23fb923c\"/></svg>')",
+      backgroundImg:'linear-gradient(135deg,#fde68a 0%,#f97316 100%)'
+    },
+    {
+      minLevel:4,
+      maxLevel:6,
+      characterImg:"url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 120\"><circle cx=\"50\" cy=\"38\" r=\"26\" fill=\"%232563eb\"/><rect x=\"22\" y=\"64\" width=\"56\" height=\"44\" rx=\"18\" fill=\"%2393c5fd\"/></svg>')",
+      backgroundImg:'linear-gradient(135deg,#bae6fd 0%,#2563eb 100%)'
+    },
+    {
+      minLevel:7,
+      characterImg:"url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 120\"><circle cx=\"50\" cy=\"38\" r=\"26\" fill=\"%237c3aed\"/><rect x=\"22\" y=\"64\" width=\"56\" height=\"44\" rx=\"18\" fill=\"%23c4b5fd\"/></svg>')",
+      backgroundImg:'linear-gradient(135deg,#e9d5ff 0%,#7c3aed 100%)'
+    }
+  ]
 };
 
 /* ==============================
@@ -401,6 +515,20 @@ const LS = {
   HIST:'tq_hist',
   REALDATE:'tq_real_date'
 };
+
+/* ==============================
+   HERO ELEMENTS
+============================== */
+const heroEl = document.getElementById('hero');
+const heroDefaultCharacter = "url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 120\"><circle cx=\"50\" cy=\"38\" r=\"26\" fill=\"%239ca3af\"/><rect x=\"22\" y=\"64\" width=\"56\" height=\"44\" rx=\"18\" fill=\"%23d1d5db\"/></svg>')";
+const heroRefs = heroEl ? {
+  character: heroEl.querySelector('[data-hero="character"]'),
+  name: heroEl.querySelector('[data-hero="name"]'),
+  level: heroEl.querySelector('[data-hero="level"]'),
+  xp: heroEl.querySelector('[data-hero="xp"]'),
+  xpFill: heroEl.querySelector('[data-hero="xp-fill"]'),
+  xpLabel: heroEl.querySelector('[data-hero="xp-label"]')
+} : {};
 
 /* ==============================
    LEVEL CONFIG
@@ -448,6 +576,7 @@ function getProfile(){
 }
 function setName(name){
   const p=getProfile(); p.name=(name||'').trim(); save(LS.PROFILE,p);
+  renderHero();
 }
 function addXP(delta){
   const p=getProfile();
@@ -464,6 +593,7 @@ function addXP(delta){
     }
   }
   save(LS.PROFILE,p);
+  renderHero();
 }
 function getLevelInfo(){
   const p=getProfile();
@@ -472,12 +602,60 @@ function getLevelInfo(){
 }
 function resetPoints(){
   const p=getProfile(); p.level=1; p.xp=0; save(LS.PROFILE,p);
+  renderHero();
 }
 function ensureName(){
   const p=getProfile();
   if(!p.name){
     const n=prompt('Nhập tên người chơi:');
     if(n) setName(n);
+  }
+}
+
+/* ==============================
+   HERO RENDERING
+============================== */
+function pickHeroConfigFor(level){
+  const list = Array.isArray(CONFIG.HERO_LEVELS) ? CONFIG.HERO_LEVELS : [];
+  const fallback = list[list.length-1] || null;
+  for(const item of list){
+    if(typeof item.level === 'number' && item.level === level) return item;
+    if(Array.isArray(item.levels) && item.levels.includes(level)) return item;
+    const min = typeof item.minLevel === 'number' ? item.minLevel : (typeof item.min === 'number' ? item.min : -Infinity);
+    const max = typeof item.maxLevel === 'number' ? item.maxLevel : (typeof item.max === 'number' ? item.max : Infinity);
+    if(level>=min && level<=max) return item;
+  }
+  return fallback;
+}
+
+function renderHero(){
+  if(!heroEl) return;
+
+  const profile = getProfile();
+  const {level,xp,need} = getLevelInfo();
+  const preset = pickHeroConfigFor(level) || {};
+  const name = (profile.name || '').trim() || 'Player';
+  const pct = need ? Math.min(100, Math.round(xp/need*100)) : 100;
+
+  heroEl.style.backgroundImage = preset.backgroundImg || 'linear-gradient(135deg,#8b7cff 0%,#b09bff 100%)';
+
+  if(heroRefs.character){
+    heroRefs.character.style.backgroundImage = preset.characterImg || heroDefaultCharacter;
+  }
+  if(heroRefs.name){
+    heroRefs.name.textContent = name;
+  }
+  if(heroRefs.level){
+    heroRefs.level.textContent = `Level ${level}`;
+  }
+  if(heroRefs.xp){
+    heroRefs.xp.textContent = `${xp} E`;
+  }
+  if(heroRefs.xpLabel){
+    heroRefs.xpLabel.textContent = need ? `${xp} / ${need} E tới level tiếp theo` : `${xp} E (tối đa)`;
+  }
+  if(heroRefs.xpFill){
+    heroRefs.xpFill.style.width = `${pct}%`;
   }
 }
 
@@ -858,6 +1036,7 @@ function performDayRollover(opts={}){
       .then(()=>fetchLeaderboardAndCache())
       .catch(()=>{});
 
+    renderHero();
     return true;
   } finally {
     isRolloverRunning=false;
@@ -1153,7 +1332,7 @@ function viewTasks(){
 
   const zones=getZones();
   const tasks=getTasks();
-  const {level,xp,need,cap}=getLevelInfo();
+  const {cap}=getLevelInfo();
   const dateNowDM = todayDM();
 
   const groups = zones.map(z=>{
@@ -1171,12 +1350,7 @@ function viewTasks(){
   view.innerHTML = `
     <div class="top">
       <span class="pill">Ngày: <b>${dateNowDM}</b></span>
-      <span class="pill">Level: <b>${level}</b></span>
-      <span class="pill">E: <b>${xp}</b>${need?` / ${need}`:''}</span>
-      <span class="pill">Giới hạn/ngày: <b>${cap}</b></span>
     </div>
-
-    <div class="bar"><div class="fill" style="width:${need?Math.min(100,Math.round(xp/need*100)):100}%;"></div></div>
 
     <div class="creator">
       <input id="taskText" placeholder="Thêm nhiệm vụ… (Enter)">
@@ -1615,6 +1789,7 @@ let currentTab='tasks';
 
 function render(tab){
   currentTab = tab;
+  renderHero();
   buildTabsBar(tab);
 
   if(tab==='tasks'){
