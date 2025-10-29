@@ -1255,11 +1255,23 @@ async function fetchLeaderboardAndCache(){
     if (!r.ok) throw new Error('HTTP ' + r.status);
 
     const data = await r.json();
-    if (Array.isArray(data.lb)) {
-      setLBCache({ ts: Date.now(), list: data.lb });
+
+    const leaderboardList = Array.isArray(data)
+      ? data
+      : Array.isArray(data.lb)
+        ? data.lb
+        : [];
+    if (leaderboardList.length > 0) {
+      setLBCache({ ts: Date.now(), list: leaderboardList });
     }
-    if (Array.isArray(data.public_tasks)) {
-      setPublicTasks(data.public_tasks);
+
+    const publicTasks = Array.isArray(data)
+      ? []
+      : Array.isArray(data.public_tasks)
+        ? data.public_tasks
+        : [];
+    if (publicTasks.length > 0) {
+      setPublicTasks(publicTasks);
     }
   } catch (e) {
     clearTimeout(t);
