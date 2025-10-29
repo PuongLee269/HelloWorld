@@ -1472,6 +1472,8 @@ function attachSwipeHandlersForTasks(){
     let currentX = 0;
     let isDown = false;
     let opened = li.classList.contains('show-del');
+    let justSwiped = false;
+    let swipeResetTimer = null;
 
     function openRow(){
       li.classList.add('show-del');
@@ -1487,6 +1489,11 @@ function attachSwipeHandlersForTasks(){
       inner.style.transform = '';
       delBtn.style.transform = 'translateX(60px)';
       opened = false;
+      justSwiped = false;
+      if(swipeResetTimer){
+        clearTimeout(swipeResetTimer);
+        swipeResetTimer = null;
+      }
     }
 
     function applyDrag(dx){
@@ -1530,18 +1537,33 @@ function attachSwipeHandlersForTasks(){
 
       const dx = currentX - startX;
 
+      let openedViaSwipe = false;
+
       if(opened){
         if(dx > 30){
           closeRow();
         }else{
           openRow();
+          openedViaSwipe = true;
         }
       }else{
         if(dx < -30){
           openRow();
+          openedViaSwipe = true;
         }else{
           closeRow();
         }
+      }
+
+      if(openedViaSwipe){
+        justSwiped = true;
+        if(swipeResetTimer){
+          clearTimeout(swipeResetTimer);
+        }
+        swipeResetTimer = setTimeout(()=>{
+          justSwiped = false;
+          swipeResetTimer = null;
+        }, 250);
       }
     }
 
@@ -1582,6 +1604,11 @@ function attachSwipeHandlersForTasks(){
 
     inner.addEventListener('click', e=>{
       if(li.classList.contains('show-del')){
+        if(justSwiped){
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
         e.preventDefault();
         e.stopPropagation();
         closeRow();
