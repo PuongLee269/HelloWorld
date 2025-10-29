@@ -649,26 +649,29 @@ async function getTaskPoints(taskText, zoneKind) {
     if (!response.ok) return { points: 0, reason: "" };
 
     const data = await response.json(); // { zone, category, points, reason }
-    const points = Number(data.points) || 0;
-
-    // Bảo đảm ≤ 10 từ, 1 dòng
+    // Chuẩn hóa lý do (≤ 10 từ, 1 dòng)
     const raw = String(data.reason || "").trim();
-    const reason = raw.split(/\s+/).slice(0, 10).join(" ");
+    let reason = raw.split(/\s+/).slice(0, 10).join(" ");
 
-    let normalizedPoints = points;
-    let normalizedReason = reason;
+    // Chuẩn hóa điểm theo Zone
+    let points = Number(data.points) || 0;
 
+    /* QUY TẮC:
+       - Zone Noise: không cho điểm dương; nếu AI > 0 đặt = 0.
+                     Nếu < 0 kẹp trong [-3, -1] để không trừ quá nặng.
+       - Các Zone khác: giữ nguyên điểm AI.
+    */
     if (zoneKind === "noise") {
-      if (normalizedPoints > 0) {
-        normalizedPoints = 0;
-        normalizedReason = "Sai Zone Noise, không trừ";
-      } else if (normalizedPoints < 0) {
-        normalizedPoints = Math.max(-3, Math.min(-1, normalizedPoints));
+      if (points > 0) {
+        points = 0;
+        reason = "Sai Zone Noise, không trừ";
+      } else if (points < 0) {
+        points = Math.max(-3, Math.min(-1, points));
       }
     }
 
-    console.log("AI Score:", taskText, "=>", { points: normalizedPoints, reason: normalizedReason, category: data.category });
-    return { points: normalizedPoints, reason: normalizedReason };
+    console.log("AI Score:", taskText, "=>", { points, reason, category: data.category });
+    return { points, reason };
   } catch (err) {
     console.error("AI proxy failed:", err);
     return { points: 0, reason: "" };
@@ -961,46 +964,27 @@ function delRecurring(id){
 function getRecurring(){ return load(LS.RECUR,[]) }
 
 function fixNoiseRecurringScores(){
+  const recs  = getRecurring();
   const zones = getZones();
-  const recs = getRecurring();
+  let changed = false;
 
-  if(!Array.isArray(zones) || !Array.isArray(recs) || recs.length===0) return;
-
-  const zoneKinds = new Map(zones.map(z=>[Number(z?.id), z?.kind]));
-  let changed=false;
-
-  const updated = recs.map(rec=>{
-    if(!rec || typeof rec!=='object') return rec;
-
-    const zoneKind = zoneKinds.get(Number(rec.zoneId));
-    if(zoneKind !== 'noise') return rec;
-
-    const originalPoints = Number(rec.points) || 0;
-    let nextPoints = originalPoints;
-    let nextReason = rec.reason;
-
-    if(originalPoints > 0){
-      nextPoints = 0;
-      nextReason = 'Sai Zone Noise, không trừ';
-    }else if(originalPoints < -3){
-      nextPoints = -3;
-    }
-
-    if(nextPoints !== originalPoints || nextReason !== rec.reason){
-      changed = true;
-      const result = { ...rec, points: nextPoints };
-      if(nextReason !== rec.reason){
-        result.reason = nextReason;
+  for (const r of recs) {
+    const z = zones.find(z => z.id == r.zoneId);
+    if (z?.kind === 'noise') {
+      // Không cho điểm dương ở Noise
+      if (r.points > 0) {
+        r.points = 0;
+        r.reason = r.reason || 'Sai Zone Noise, không trừ';
+        changed = true;
       }
-      return result;
+      // Kẹp mức trừ trong [-3, -1]
+      if (typeof r.points === 'number' && r.points < -3) {
+        r.points = -3;
+        changed = true;
+      }
     }
-
-    return rec;
-  });
-
-  if(changed){
-    save(LS.RECUR, updated);
   }
+  if (changed) save(LS.RECUR, recs);
 }
 
 function getTasks(){
@@ -2277,7 +2261,7 @@ function render(tab){
    BOOT
 ============================== */
 ensureName();
-fixNoiseRecurringScores();
+fixNoiseRecurringScores();  // vá dữ liệu cũ ở Zone Noise
 render('tasks');
 backgroundBoardRefresh();
 </script>
