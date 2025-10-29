@@ -183,6 +183,17 @@ h1 .app-version{
   box-shadow:0 6px 16px rgba(0,0,0,.08);
   cursor:pointer;
 }
+.btn-ghost:active{
+  transform:translateY(1px);
+  box-shadow:0 4px 12px rgba(0,0,0,.12);
+}
+.btn-ghost[disabled],
+.btn-ghost[data-loading]{
+  cursor:progress;
+  opacity:.6;
+  box-shadow:none;
+  transform:none;
+}
 .btn-danger{
   min-height:var(--tap);
   background:linear-gradient(135deg,#ff5f48 0%,#ff3425 100%);
@@ -1909,6 +1920,7 @@ function viewLeaderboard(){
       </div>
       <div style="margin:10px 0;display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn-ghost" id="reload">Tải lại</button>
+        <p id="lbStatus" class="muted" style="margin:0"></p>
       </div>
       <div class="table-wrap">
         <table id="tbl">
@@ -1937,10 +1949,36 @@ function viewLeaderboard(){
 
   renderLBRows(rows, cache.list.length ? cache.list : fallbackLocalProfileList());
 
-  document.getElementById('reload').onclick = async ()=>{
-    await fetchLeaderboardAndCache();
-    const fresh = getLBCache();
-    renderLBRows(rows, fresh.list.length ? fresh.list : fallbackLocalProfileList());
+  const reloadBtn = document.getElementById('reload');
+  const statusEl = document.getElementById('lbStatus');
+  reloadBtn.dataset.defaultLabel = reloadBtn.textContent;
+
+  function setLoadingState(isLoading){
+    if(isLoading){
+      reloadBtn.disabled = true;
+      reloadBtn.dataset.loading = 'true';
+      reloadBtn.textContent = 'Đang tải...';
+    }else{
+      reloadBtn.disabled = false;
+      reloadBtn.removeAttribute('data-loading');
+      reloadBtn.textContent = reloadBtn.dataset.defaultLabel;
+    }
+  }
+
+  reloadBtn.onclick = async ()=>{
+    setLoadingState(true);
+    statusEl.textContent = 'Đang tải bảng xếp hạng...';
+    try{
+      await fetchLeaderboardAndCache();
+      const fresh = getLBCache();
+      renderLBRows(rows, fresh.list.length ? fresh.list : fallbackLocalProfileList());
+      statusEl.textContent = `Đã cập nhật lúc ${new Date().toLocaleTimeString('vi-VN')}`;
+    }catch(err){
+      console.error(err);
+      statusEl.textContent = 'Không thể tải leaderboard. Vui lòng thử lại sau.';
+    }finally{
+      setLoadingState(false);
+    }
   };
 }
 
