@@ -708,6 +708,7 @@ function addXP(delta){
     }
   }
   save(LS.PROFILE,p);
+  scheduleAutoSync();
   renderHero();
 }
 function getLevelInfo(){
@@ -1209,6 +1210,20 @@ async function autoSync(){
     console.warn('autoSync failed', e);
   }
 }
+
+const scheduleAutoSync = (() => {
+  let timer = null;
+  const DELAY = 2000;
+  return function scheduleAutoSync(){
+    if(timer){
+      clearTimeout(timer);
+    }
+    timer = setTimeout(()=>{
+      timer = null;
+      autoSync();
+    }, DELAY);
+  };
+})();
 
 async function fetchLeaderboardAndCache(){
   const cfg = getSyncCfg();
