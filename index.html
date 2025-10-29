@@ -878,6 +878,21 @@ function getZones(){
     changed=true;
   }
 
+  const existingKinds = new Set(zones.map(z=>z.kind));
+  const missingDefaults = DEFAULT_ZONES.filter(def=>!existingKinds.has(def.kind));
+  if(missingDefaults.length){
+    const base = Date.now();
+    missingDefaults.forEach((def, idx)=>{
+      zones.push({
+        id: base + idx,
+        name: def.name,
+        kind: def.kind,
+        bg: def.bg
+      });
+    });
+    changed=true;
+  }
+
   if(changed){
     setZones(zones);
   }
@@ -1637,15 +1652,27 @@ function buildTabsBar(active){
 async function viewTasks(){
   spawnRecurringIfNeeded();
 
-  const zones=getZones();
+  let zones=getZones();
   const tasks=getTasks();
   const publicTasks = getPublicTasks();
   const dateNowDM = todayDM();
-  const priorityZone = zones.find(z => z.kind === 'priority');
+  let priorityZone = zones.find(z => z.kind === 'priority');
+
   if (!priorityZone) {
-    alert('Zone Quan trọng không tồn tại!');
-    return;
+    const fallback = DEFAULT_ZONES.find(z=>z.kind==='priority') || {name: 'Zone Quan trọng', kind: 'priority', bg: ''};
+    const restored = {
+      id: Date.now(),
+      name: fallback.name,
+      kind: fallback.kind,
+      bg: fallback.bg
+    };
+    zones = [...zones, restored];
+    setZones(zones);
+    priorityZone = restored;
+    alert('Không tìm thấy Zone Quan trọng, hệ thống đã tạo mới để bạn tiếp tục.');
   }
+
+  const priorityZoneAvailable = Boolean(priorityZone);
 
   const groups = zones.map(z=>{
     const zoneTasks = tasks
@@ -1703,13 +1730,16 @@ async function viewTasks(){
       const listHtml = g.list.length
         ? g.list.map(t=>{
             if (t.isPublic) {
+              const priorityAction = priorityZoneAvailable
+                ? `<button class="btn-primary add-to-priority" data-text="${t.text}" data-points="${t.points}">+</button>`
+                : `<span class="muted" style="font-size:13px;">Không thể thêm do thiếu Zone Quan trọng</span>`;
               return `
                 <li class="task" data-public="true" data-text="${t.text}" data-points="${t.points}">
                   <div class="task-inner">
                     <div class="left">
                       <span class="txt">${t.text}</span>
                       ${renderTaskPoints(t.points, t.aiReason)}
-                      <button class="btn-primary add-to-priority" data-text="${t.text}" data-points="${t.points}">+</button>
+                      ${priorityAction}
                     </div>
                   </div>
                 </li>
@@ -1839,31 +1869,33 @@ async function viewTasks(){
   });
 
   // add to priority from public
-	 view.querySelectorAll('.add-to-priority').forEach(btn => {
-	  btn.onclick = async (e) => {
-		e.stopPropagation();
-		const text = btn.dataset.text;
+  if(priorityZoneAvailable){
+    view.querySelectorAll('.add-to-priority').forEach(btn => {
+      btn.onclick = async (e) => {
+        e.stopPropagation();
+        const text = btn.dataset.text;
 
-		// Chấm lại theo Zone Priority
-		const ai = await getTaskPoints(text, 'priority');
+        // Chấm lại theo Zone Priority
+        const ai = await getTaskPoints(text, 'priority');
 
-		const currentTasks = getTasks();
-		const newTask = {
-		  id: Date.now(),
-		  text,
-		  zoneId: priorityZone.id,
-		  done: false,
-		  kind: 'single',
-		  points: ai.points,
-		  aiCategory: ai.category,
-		  aiReason: ai.reason,
-		  zoneLabel: ai.zone
-		};
-		setTasks([...currentTasks, newTask]);
-		alert('Đã thêm vào Zone Quan trọng!');
-		render('tasks');
-	  };
-	});
+        const currentTasks = getTasks();
+        const newTask = {
+          id: Date.now(),
+          text,
+          zoneId: priorityZone.id,
+          done: false,
+          kind: 'single',
+          points: ai.points,
+          aiCategory: ai.category,
+          aiReason: ai.reason,
+          zoneLabel: ai.zone
+        };
+        setTasks([...currentTasks, newTask]);
+        alert('Đã thêm vào Zone Quan trọng!');
+        render('tasks');
+      };
+    });
+  }
 
 
   attachSwipeHandlersForTasks();
