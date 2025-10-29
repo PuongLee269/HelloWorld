@@ -1604,8 +1604,6 @@ async function viewTasks(){
     alert('Không tìm thấy Zone Quan trọng, hệ thống đã tạo mới để bạn tiếp tục.');
   }
 
-  const priorityZoneAvailable = Boolean(priorityZone);
-
   const groups = zones.map(z=>{
     const zoneTasks = tasks
       .filter(t=>t.zoneId==z.id)
@@ -1662,9 +1660,7 @@ async function viewTasks(){
       const listHtml = g.list.length
         ? g.list.map(t=>{
             if (t.isPublic) {
-              const priorityAction = priorityZoneAvailable
-                ? `<button class="btn-primary add-to-priority" data-text="${t.text}" data-points="${t.points}">+</button>`
-                : `<span class="muted" style="font-size:13px;">Không thể thêm do thiếu Zone Quan trọng</span>`;
+              const priorityAction = `<button class="btn-primary add-to-priority" data-text="${t.text}" data-points="${t.points}">+</button>`;
               return `
                 <li class="task" data-public="true" data-text="${t.text}" data-points="${t.points}">
                   <div class="task-inner">
@@ -1801,33 +1797,45 @@ async function viewTasks(){
   });
 
   // add to priority from public
-  if(priorityZoneAvailable){
-    view.querySelectorAll('.add-to-priority').forEach(btn => {
-      btn.onclick = async (e) => {
-        e.stopPropagation();
-        const text = btn.dataset.text;
+  view.querySelectorAll('.add-to-priority').forEach(btn => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
+      const text = btn.dataset.text;
 
-        // Chấm lại theo Zone Priority
-        const ai = await getTaskPoints(text, 'priority');
+      let zones = getZones();
+      let priorityZone = zones.find(z => z.kind === 'priority');
 
-        const currentTasks = getTasks();
-        const newTask = {
-          id: Date.now(),
-          text,
-          zoneId: priorityZone.id,
-          done: false,
-          kind: 'single',
-          points: ai.points,
-          aiCategory: ai.category,
-          aiReason: ai.reason,
-          zoneLabel: ai.zone
-        };
-        setTasks([...currentTasks, newTask]);
-        alert('Đã thêm vào Zone Quan trọng!');
-        render('tasks');
+      if (!priorityZone) {
+        addZone({ name: 'Zone Quan trọng', kind: 'priority', bg: '' });
+        zones = getZones();
+        priorityZone = zones.find(z => z.kind === 'priority');
+      }
+
+      if (!priorityZone) {
+        alert('Không thể tạo Zone Quan trọng.');
+        return;
+      }
+
+      // Chấm lại theo Zone Priority
+      const ai = await getTaskPoints(text, 'priority');
+
+      const currentTasks = getTasks();
+      const newTask = {
+        id: Date.now(),
+        text,
+        zoneId: priorityZone.id,
+        done: false,
+        kind: 'single',
+        points: ai.points,
+        aiCategory: ai.category,
+        aiReason: ai.reason,
+        zoneLabel: ai.zone
       };
-    });
-  }
+      setTasks([...currentTasks, newTask]);
+      alert('Đã thêm vào Zone Quan trọng!');
+      render('tasks');
+    };
+  });
 
 
   attachSwipeHandlersForTasks();
