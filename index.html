@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Todo Quest</title>
+<title data-app="document-title">Todo Quest</title>
 <style>
 :root{
   --ink:#1b1e2e;
@@ -36,12 +36,22 @@ body{
 
 h1{
   margin:0 0 12px;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:4px
+}
+
+h1 .app-title{
   font-size:24px;
   font-weight:600;
   color:#1b1e2e;
-  display:flex;
-  align-items:center;
-  gap:8px
+}
+
+h1 .app-version{
+  font-size:14px;
+  font-weight:500;
+  color:var(--muted);
 }
 
 /* Hero */
@@ -451,10 +461,10 @@ th{
   box-shadow:0 6px 16px rgba(0,0,0,.08);
 }
 
-@media (max-width:768px){
-  .row{grid-template-columns:1fr}
-  .creator{flex-direction:column}
-  h1{font-size:20px}
+  @media (max-width:768px){
+    .row{grid-template-columns:1fr}
+    .creator{flex-direction:column}
+    h1 .app-title{font-size:20px}
   .hero-inner{flex-direction:column;align-items:flex-start;text-align:left;gap:18px;padding:22px}
   .hero-character{width:100px;height:100px}
   .hero-name{font-size:22px}
@@ -477,7 +487,10 @@ th{
 <body>
 
 <div class="wrap">
-  <h1>Todo Quest</h1>
+  <h1>
+    <span class="app-title" data-app="title">Todo Quest</span>
+    <span class="app-version" data-app="version"></span>
+  </h1>
 
   <section id="hero" class="hero">
     <div class="hero-inner">
@@ -507,7 +520,10 @@ th{
 /* ==============================
    CONFIG
 ============================== */
+const APP_NAME = 'Todo Quest';
+
 const CONFIG = {
+  VERSION:'1.0',
   ENDPOINT:'https://script.google.com/macros/s/AKfycbyQ3imjnhKrzmuz4-KbPNsHzpYGY_Mv45os1bZEPoQrQ-UM8RjJvCznfP5x6RB6QX_Qpw/exec',
   SETTINGS_PASS:'1000',
   HERO_LEVELS:[
@@ -530,6 +546,23 @@ const CONFIG = {
     }
   ]
 };
+
+const APP_VERSION = CONFIG.VERSION;
+
+(function syncAppMeta(){
+  const versionLabel = `v${APP_VERSION}`;
+  document.title = `${APP_NAME} – ${versionLabel}`;
+
+  const nameEl = document.querySelector('[data-app="title"]');
+  if(nameEl){
+    nameEl.textContent = APP_NAME;
+  }
+
+  const versionEl = document.querySelector('[data-app="version"]');
+  if(versionEl){
+    versionEl.textContent = versionLabel;
+  }
+})();
 
 /* ==============================
    LOCAL STORAGE KEYS
