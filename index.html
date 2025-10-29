@@ -945,6 +945,49 @@ function delRecurring(id){
 
 function getRecurring(){ return load(LS.RECUR,[]) }
 
+function fixNoiseRecurringScores(){
+  const zones = getZones();
+  const recs = getRecurring();
+
+  if(!Array.isArray(zones) || !Array.isArray(recs) || recs.length===0) return;
+
+  const zoneKinds = new Map(zones.map(z=>[Number(z?.id), z?.kind]));
+  let changed=false;
+
+  const updated = recs.map(rec=>{
+    if(!rec || typeof rec!=='object') return rec;
+
+    const zoneKind = zoneKinds.get(Number(rec.zoneId));
+    if(zoneKind !== 'noise') return rec;
+
+    const originalPoints = Number(rec.points) || 0;
+    let nextPoints = originalPoints;
+    let nextReason = rec.reason;
+
+    if(originalPoints > 0){
+      nextPoints = 0;
+      nextReason = 'Sai Zone Noise, không trừ';
+    }else if(originalPoints < -3){
+      nextPoints = -3;
+    }
+
+    if(nextPoints !== originalPoints || nextReason !== rec.reason){
+      changed = true;
+      const result = { ...rec, points: nextPoints };
+      if(nextReason !== rec.reason){
+        result.reason = nextReason;
+      }
+      return result;
+    }
+
+    return rec;
+  });
+
+  if(changed){
+    save(LS.RECUR, updated);
+  }
+}
+
 function getTasks(){
   const raw = load(LS.TASKS, []);
   if(!Array.isArray(raw)) return [];
@@ -2202,6 +2245,7 @@ function render(tab){
    BOOT
 ============================== */
 ensureName();
+fixNoiseRecurringScores();
 render('tasks');
 backgroundBoardRefresh();
 </script>
