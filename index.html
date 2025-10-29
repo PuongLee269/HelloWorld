@@ -194,13 +194,14 @@ h1{
   color:#1b1e2e;
   box-shadow:0 6px 16px rgba(0,0,0,.08);
 }
-.task-points {
-  font-weight: bold;
-  margin-left: 8px;
-  font-size: 14px;
+.task-points { 
+  font-weight: bold; 
+  margin-left: 8px; 
+  font-size: 14px; 
 }
 .task-points.positive { color: #16a34a; }
 .task-points.negative { color: #dc2626; }
+.task-points.neutral { color: #4b5563; }
 .task-kind{
   display:inline-flex;
   align-items:center;
@@ -635,47 +636,15 @@ const AI_ENDPOINT = "https://todo-quest-proxyp260992.vercel.app/api/score"; // s
  */
 async function getTaskPoints(taskText, zoneKind) {
   const zoneLabel = ZONE_KIND_LABELS[zoneKind] || "Zone Thường";
-
-  try {
-    const response = await fetch(AI_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        text: taskText,
-        zone: zoneLabel
-      })
-    });
-
-    if (!response.ok) return { points: 0, reason: "" };
-
-    const data = await response.json(); // { zone, category, points, reason }
-    // Chuẩn hóa lý do (≤ 10 từ, 1 dòng)
-    const raw = String(data.reason || "").trim();
-    let reason = raw.split(/\s+/).slice(0, 10).join(" ");
-
-    // Chuẩn hóa điểm theo Zone
-    let points = Number(data.points) || 0;
-
-    /* QUY TẮC:
-       - Zone Noise: không cho điểm dương; nếu AI > 0 đặt = 0.
-                     Nếu < 0 kẹp trong [-3, -1] để không trừ quá nặng.
-       - Các Zone khác: giữ nguyên điểm AI.
-    */
-    if (zoneKind === "noise") {
-      if (points > 0) {
-        points = 0;
-        reason = "Sai Zone Noise, không trừ";
-      } else if (points < 0) {
-        points = Math.max(-3, Math.min(-1, points));
-      }
-    }
-
-    console.log("AI Score:", taskText, "=>", { points, reason, category: data.category });
-    return { points, reason };
-  } catch (err) {
-    console.error("AI proxy failed:", err);
-    return { points: 0, reason: "" };
-  }
+  const r = await fetch(AI_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Scoring-Version": "v2" },
+    body: JSON.stringify({ text: taskText, zone: zoneLabel })
+  });
+  if (!r.ok) return { points: 0, reason: "" };
+  const data = await r.json();
+  const reason = String(data.reason || "").trim().split(/\s+/).slice(0,10).join(" ");
+  return { points: Number(data.points)||0, reason, category: data.category, zone: data.zone };
 }
 
 /* ==============================
@@ -963,30 +932,6 @@ function delRecurring(id){
 
 function getRecurring(){ return load(LS.RECUR,[]) }
 
-function fixNoiseRecurringScores(){
-  const recs  = getRecurring();
-  const zones = getZones();
-  let changed = false;
-
-  for (const r of recs) {
-    const z = zones.find(z => z.id == r.zoneId);
-    if (z?.kind === 'noise') {
-      // Không cho điểm dương ở Noise
-      if (r.points > 0) {
-        r.points = 0;
-        r.reason = r.reason || 'Sai Zone Noise, không trừ';
-        changed = true;
-      }
-      // Kẹp mức trừ trong [-3, -1]
-      if (typeof r.points === 'number' && r.points < -3) {
-        r.points = -3;
-        changed = true;
-      }
-    }
-  }
-  if (changed) save(LS.RECUR, recs);
-}
-
 function getTasks(){
   const raw = load(LS.TASKS, []);
   if(!Array.isArray(raw)) return [];
@@ -1092,7 +1037,10 @@ function renderTaskKindBadge(task, zone){
   return `<span class="${taskKindClass(task, zone)}">${describeTaskKind(task, zone)}</span>`;
 }
 
-function renderTaskPoints(points, reasonText) {
+function renderTaskPoints(points, reasonText, zoneKind) {
+  if (zoneKind === 'public') {
+    return `<span class="task-points neutral" title="Gợi ý/Test — không tính điểm">0</span>`;
+  }
   const sign = points >= 0 ? '+' : '';
   const className = points >= 0 ? 'positive' : 'negative';
   const safe = String(reasonText || '').replace(/"/g, '&quot;');
@@ -1722,7 +1670,7 @@ async function viewTasks(){
                   <div class="task-inner">
                     <div class="left">
                       <span class="txt">${t.text}</span>
-                      ${renderTaskPoints(t.points, t.aiReason)}
+                      ${renderTaskPoints(t.points, t.aiReason, z.kind)}
                       ${priorityAction}
                     </div>
                   </div>
@@ -1734,10 +1682,10 @@ async function viewTasks(){
               <li class="task ${t.done?'done':''}" data-id="${t.id}" data-kind="${t.kind||'single'}">
                 <div class="task-inner">
                   <div class="left">
-                    <input type="checkbox" data-id="${t.id}" ${t.done?'checked':''}>
+                    <input type="checkbox" data-id="${t.id}" ${t.done?'checked':''} ${z.kind==='public'?'disabled':''}>
                     <span class="txt">${t.text}</span>
                     ${renderTaskKindBadge(t, z)}
-                    ${renderTaskPoints(t.points, t.aiReason)}
+                    ${renderTaskPoints(t.points, t.aiReason, z.kind)}
                   </div>
                 </div>
                 ${t.aiReason ? `<div class="ai-reason">${t.aiReason}</div>` : ''}
@@ -1800,7 +1748,7 @@ async function viewTasks(){
 		  done: false,
 		  kind: 'recurring',
 		  recurringId: rec.id,
-		  points: Number(rec.points) || ai.points,
+                  points: ai.points,
 		  aiCategory: ai.category,
 		  aiReason: ai.reason,
 		  zoneLabel: ai.zone
@@ -1814,7 +1762,7 @@ async function viewTasks(){
 		  zoneId: z.id,
 		  done: false,
 		  kind: 'single',
-		  points: ai.points,
+                  points: ai.points,
 		  aiCategory: ai.category,
 		  aiReason: ai.reason,
 		  zoneLabel: ai.zone
@@ -2261,7 +2209,6 @@ function render(tab){
    BOOT
 ============================== */
 ensureName();
-fixNoiseRecurringScores();  // vá dữ liệu cũ ở Zone Noise
 render('tasks');
 backgroundBoardRefresh();
 </script>
