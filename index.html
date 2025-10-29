@@ -647,6 +647,26 @@ const LEVELS = [
 function load(key, def){ try{ return JSON.parse(localStorage.getItem(key)) ?? def }catch{ return def } }
 function save(key, val){ localStorage.setItem(key, JSON.stringify(val)) }
 
+function generateProfileId(){
+  try {
+    if(typeof crypto !== 'undefined'){
+      if(typeof crypto.randomUUID === 'function'){
+        return crypto.randomUUID();
+      }
+      if(typeof crypto.getRandomValues === 'function'){
+        const arr = new Uint32Array(4);
+        crypto.getRandomValues(arr);
+        return Array.from(arr).map(n=>n.toString(16).padStart(8,'0')).join('');
+      }
+    }
+  } catch(_err) {
+    // ignore and fallback below
+  }
+  const time = Date.now().toString(36);
+  const rand = Math.random().toString(36).slice(2,10);
+  return `p-${time}-${rand}`;
+}
+
 function formatSignedNumber(n){
   const val = Number(n)||0;
   return `${val>=0?'+':''}${val}`;
@@ -697,7 +717,41 @@ async function getTaskPoints(taskText, zoneKind) {
 ============================== */
 function getProfile(){
   let p = load(LS.PROFILE);
-  if(!p){ p={name:'', level:1, xp:0}; save(LS.PROFILE,p); }
+  let changed = false;
+
+  if(!p || typeof p !== 'object' || Array.isArray(p)){
+    p = { id: generateProfileId(), name:'', level:1, xp:0 };
+    changed = true;
+  } else {
+    if(!p.id){
+      p.id = generateProfileId();
+      changed = true;
+    }
+    if(typeof p.name !== 'string'){
+      p.name = '';
+      changed = true;
+    }
+    const lvl = Number(p.level);
+    if(!Number.isFinite(lvl) || lvl < 1){
+      p.level = 1;
+      changed = true;
+    } else if(typeof p.level !== 'number'){
+      p.level = lvl;
+      changed = true;
+    }
+    const xpVal = Number(p.xp);
+    if(!Number.isFinite(xpVal) || xpVal < 0){
+      p.xp = 0;
+      changed = true;
+    } else if(typeof p.xp !== 'number'){
+      p.xp = xpVal;
+      changed = true;
+    }
+  }
+
+  if(changed){
+    save(LS.PROFILE, p);
+  }
   return p;
 }
 function setName(name){
@@ -1203,6 +1257,7 @@ async function autoSync(){
   const p = getProfile();
 
   const form = new URLSearchParams({
+    id:    String(p.id || ''),
     name:  (p.name || 'Player'),
     level: String(p.level || 1),
     xp:    String(p.xp   || 0)
