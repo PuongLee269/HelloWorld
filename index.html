@@ -1657,6 +1657,13 @@ async function viewTasks(){
       const headerStyle = z.bg
         ? `background-image:linear-gradient(0deg,rgba(0,0,0,.5),rgba(0,0,0,.15)),url('${z.bg}');`
         : '';
+      const emptyStateHtml = `
+        <li class="task">
+          <div class="task-inner">
+            <span class="muted">${z.kind==='public' ? 'Chưa có gợi ý.' : 'Chưa có task trong Zone này.'}</span>
+          </div>
+        </li>`;
+
       const listHtml = g.list.length
         ? g.list.map(t=>{
             if (t.isPublic) {
@@ -1689,7 +1696,7 @@ async function viewTasks(){
               </li>
             `;
           }).join('')
-        : '<li class="task"><div class="task-inner"><span class="muted">Chưa có task trong Zone này.</span></div></li>';
+        : emptyStateHtml;
 
       return `
       <section class="zone">
