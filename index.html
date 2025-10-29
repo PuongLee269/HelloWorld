@@ -565,6 +565,7 @@ const DEFAULT_ZONES = ZONE_KIND_ORDER.map((kind)=>({
 const DAILY_ZONE_KINDS = new Set(['e','noise']);
 
 let cachedPublicTasks = null;
+let lbTimer = null;
 
 
 /* ==============================
@@ -2225,7 +2226,14 @@ function render(tab){
 ============================== */
 ensureName();
 render('tasks');
+fetchLeaderboardAndCache().catch(()=>{});
 backgroundBoardRefresh();
+if(lbTimer===null){
+  // Runs for the duration of the session to keep leaderboard data fresh.
+  lbTimer = setInterval(()=>{
+    fetchLeaderboardAndCache().catch(()=>{});
+  }, 60000);
+}
 </script>
 </body>
 </html>
