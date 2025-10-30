@@ -1555,50 +1555,183 @@ function drawChart(canvasId, values){
   const cvs = document.getElementById(canvasId);
   if(!cvs) return;
   const ctx = cvs.getContext('2d');
-  const W = cvs.width  = cvs.offsetWidth  || 300;
-  const H = cvs.height = cvs.offsetHeight || 160;
 
-  ctx.clearRect(0,0,W,H);
+  const ratio = window.devicePixelRatio || 1;
+  const displayWidth = Math.floor(cvs.clientWidth || cvs.offsetWidth || 300);
+  const displayHeight = Math.floor(cvs.clientHeight || cvs.offsetHeight || 160);
+  if(displayWidth === 0 || displayHeight === 0){
+    return;
+  }
+
+  cvs.width = Math.round(displayWidth * ratio);
+  cvs.height = Math.round(displayHeight * ratio);
+
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.scale(ratio, ratio);
+  ctx.clearRect(0,0,displayWidth,displayHeight);
+  ctx.lineJoin = ctx.lineCap = 'round';
+
   ctx.fillStyle = "rgba(255,255,255,0.6)";
-  ctx.fillRect(0,0,W,H);
+  ctx.fillRect(0,0,displayWidth,displayHeight);
 
   if(!values || !values.length){
     ctx.fillStyle="#555";
     ctx.font="14px system-ui";
+    ctx.textBaseline = 'top';
     ctx.fillText("Chưa có dữ liệu", 10, 24);
     return;
   }
 
   const minV = Math.min(...values);
   const maxV = Math.max(...values);
-  const padX=20, padY=20;
+  const padX = 24;
+  const padY = 24;
   const span = (maxV-minV)||1;
+  const usableW = (displayWidth-2*padX);
+  const usableH = (displayHeight-2*padY);
 
-  ctx.lineWidth=3;
-  const grad = ctx.createLinearGradient(0,0,W,0);
-  grad.addColorStop(0,"#8b7cff");
-  grad.addColorStop(1,"#b09bff");
-  ctx.strokeStyle = grad;
-  ctx.beginPath();
-  values.forEach((v,i)=>{
-    const x = padX + ( (W-2*padX) * (i/(values.length-1||1)) );
-    const y = H-padY - ( (H-2*padY) * ((v-minV)/span) );
-    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  const points = values.map((v,i)=>{
+    const ratioX = (values.length===1)?0:(i/(values.length-1));
+    const x = padX + (usableW * ratioX);
+    const y = displayHeight - padY - (usableH * ((v-minV)/span));
+    return {x,y,value:v};
   });
-  ctx.stroke();
 
-  const lastIdx = values.length-1;
-  const lastVal = values[lastIdx];
-  const lastX = padX + ((W-2*padX)*(lastIdx/(values.length-1||1)));
-  const lastY = H-padY - ((H-2*padY)*((lastVal-minV)/span));
-  ctx.fillStyle="#ff3425";
+  ctx.save();
+  ctx.strokeStyle = 'rgba(27,30,46,0.08)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4,6]);
+  const gridLines = 4;
+  for(let i=0;i<=gridLines;i++){
+    const gy = padY + (usableH * (i/gridLines));
+    ctx.beginPath();
+    ctx.moveTo(padX, gy);
+    ctx.lineTo(displayWidth-padX, gy);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(27,30,46,0.14)';
+  ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.arc(lastX,lastY,5,0,Math.PI*2);
+  ctx.moveTo(padX, padY-4);
+  ctx.lineTo(padX, displayHeight-padY);
+  ctx.lineTo(displayWidth-padX+4, displayHeight-padY);
+  ctx.stroke();
+  ctx.restore();
+
+  const gradLine = ctx.createLinearGradient(padX,0,displayWidth-padX,0);
+  gradLine.addColorStop(0,"#8b7cff");
+  gradLine.addColorStop(1,"#b09bff");
+
+  ctx.beginPath();
+  points.forEach((pt,i)=>{
+    if(i===0){
+      ctx.moveTo(pt.x, pt.y);
+    }else{
+      ctx.lineTo(pt.x, pt.y);
+    }
+  });
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = gradLine;
+  ctx.shadowColor = 'rgba(139,124,255,0.35)';
+  ctx.shadowBlur = 12;
+  ctx.stroke();
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+
+  ctx.beginPath();
+  points.forEach((pt,i)=>{
+    if(i===0){
+      ctx.moveTo(pt.x, pt.y);
+    }else{
+      ctx.lineTo(pt.x, pt.y);
+    }
+  });
+  ctx.lineTo(points[points.length-1].x, displayHeight-padY);
+  ctx.lineTo(points[0].x, displayHeight-padY);
+  ctx.closePath();
+  const gradFill = ctx.createLinearGradient(0,padY,0,displayHeight-padY);
+  gradFill.addColorStop(0,'rgba(139,124,255,0.18)');
+  gradFill.addColorStop(1,'rgba(139,124,255,0)');
+  ctx.fillStyle = gradFill;
   ctx.fill();
 
-  ctx.font="12px system-ui";
-  ctx.fillStyle="#1b1e2e";
-  ctx.fillText(String(lastVal), lastX+8, lastY-8);
+  ctx.beginPath();
+  points.forEach((pt,i)=>{
+    if(i===0){
+      ctx.moveTo(pt.x, pt.y);
+    }else{
+      ctx.lineTo(pt.x, pt.y);
+    }
+  });
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = gradLine;
+  ctx.stroke();
+
+  points.forEach((pt,i)=>{
+    ctx.beginPath();
+    const isLast = i === points.length-1;
+    const radius = isLast ? 5 : 3;
+    ctx.arc(pt.x, pt.y, radius, 0, Math.PI*2);
+    if(isLast){
+      ctx.fillStyle = '#ff3425';
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.lineWidth = 3;
+    }else{
+      ctx.fillStyle = '#fff';
+      ctx.strokeStyle = 'rgba(139,124,255,0.6)';
+      ctx.lineWidth = 2;
+    }
+    ctx.fill();
+    ctx.stroke();
+  });
+
+  const lastPoint = points[points.length-1];
+  const lastVal = lastPoint.value;
+  const label = String(lastVal);
+  ctx.font = '600 13px system-ui';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  const metrics = ctx.measureText(label);
+  const labelPadX = 8;
+  const labelHeight = 24;
+  const labelWidth = metrics.width + labelPadX*2;
+  let labelX = lastPoint.x + 12;
+  let labelY = lastPoint.y - labelHeight/2 - 6;
+  if(labelX + labelWidth > displayWidth - padX){
+    labelX = displayWidth - padX - labelWidth;
+  }
+  if(labelY < padY){
+    labelY = padY;
+  }
+  if(labelY + labelHeight > displayHeight - padY){
+    labelY = displayHeight - padY - labelHeight;
+  }
+
+  const radiusRect = 10;
+  ctx.beginPath();
+  const r = Math.min(radiusRect, labelHeight/2, labelWidth/2);
+  ctx.moveTo(labelX + r, labelY);
+  ctx.lineTo(labelX + labelWidth - r, labelY);
+  ctx.quadraticCurveTo(labelX + labelWidth, labelY, labelX + labelWidth, labelY + r);
+  ctx.lineTo(labelX + labelWidth, labelY + labelHeight - r);
+  ctx.quadraticCurveTo(labelX + labelWidth, labelY + labelHeight, labelX + labelWidth - r, labelY + labelHeight);
+  ctx.lineTo(labelX + r, labelY + labelHeight);
+  ctx.quadraticCurveTo(labelX, labelY + labelHeight, labelX, labelY + labelHeight - r);
+  ctx.lineTo(labelX, labelY + r);
+  ctx.quadraticCurveTo(labelX, labelY, labelX + r, labelY);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(27,30,46,0.9)';
+  ctx.shadowColor = 'rgba(0,0,0,0.12)';
+  ctx.shadowBlur = 6;
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+
+  ctx.fillStyle = '#fff';
+  ctx.fillText(label, labelX + labelPadX, labelY + labelHeight/2);
 }
 
 /* ==============================
