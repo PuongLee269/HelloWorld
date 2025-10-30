@@ -699,6 +699,48 @@ async function getTaskPoints(taskText, zoneKind) {
   return { points: Number(data.points)||0, reason, category: data.category, zone: data.zone };
 }
 
+function normalizeAiScoreForZone(ai, zoneKind){
+  const basePoints = Number(ai.points);
+  const normalized = {
+    points: Number.isFinite(basePoints) ? basePoints : 0,
+    reason: String(ai.reason || '').trim(),
+    category: ai.category,
+    zone: ai.zone
+  };
+
+  if(zoneKind === 'noise'){
+    const initialPoints = Number.isFinite(basePoints) ? basePoints : 0;
+    let nextPoints = initialPoints;
+    if(nextPoints > -1){
+      nextPoints = -1;
+    }
+    if(nextPoints === 0){
+      nextPoints = -1;
+    }
+
+    const segments = [];
+    const addSegment = (part) => {
+      const trimmed = String(part || '').trim();
+      if(!trimmed) return;
+      const lower = trimmed.toLowerCase();
+      if(!segments.some(seg => seg.toLowerCase() === lower)){
+        segments.push(trimmed);
+      }
+    };
+
+    if(initialPoints >= 0){
+      addSegment('Nhầm Zone');
+    }
+
+    normalized.reason.split(/—| - /).forEach(addSegment);
+
+    normalized.points = nextPoints;
+    normalized.reason = segments.join(' — ');
+  }
+
+  return normalized;
+}
+
 /* ==============================
    PROFILE / LEVEL / XP ("E")
 ============================== */
@@ -1014,7 +1056,9 @@ async function addRecurring(r){
   const zoneKind = z ? z.kind : 'regular';
 
   const ai = await getTaskPoints(rec.text, zoneKind);
-  rec.points = ai.points; // lưu điểm base cho recurring
+  const normalizedAi = normalizeAiScoreForZone(ai, zoneKind);
+  rec.points = normalizedAi.points; // lưu điểm base cho recurring
+  rec.reason = normalizedAi.reason;
 
   const list = [...getRecurring(), rec];
   save(LS.RECUR, list);
@@ -1031,7 +1075,36 @@ function getTasks(){
   const raw = load(LS.TASKS, []);
   if(!Array.isArray(raw)) return [];
 
-  const recs = getRecurring();
+  const zones = getZones();
+  const zoneKindMap = new Map(zones.map(z=>[Number(z.id), z.kind]));
+
+  let recs = getRecurring();
+  let recChanged=false;
+  const adjustedRecs = recs.map((r)=>{
+    if(!r || typeof r!=='object') return r;
+    const zoneKind = zoneKindMap.get(Number(r.zoneId));
+    if(zoneKind!=='noise') return r;
+
+    const normalized = normalizeAiScoreForZone({ points: r.points, reason: r.reason }, 'noise');
+    const next = { ...r };
+    let changedRow = false;
+    if(Number(next.points) !== normalized.points){
+      next.points = normalized.points;
+      changedRow = true;
+    }
+    const nextReason = normalized.reason;
+    if(String(next.reason || '') !== nextReason){
+      next.reason = nextReason;
+      changedRow = true;
+    }
+    if(changedRow) recChanged = true;
+    return changedRow ? next : r;
+  });
+  if(recChanged){
+    save(LS.RECUR, adjustedRecs);
+  }
+  recs = adjustedRecs;
+
   const recIndex = new Map();
   for(const r of recs){
     const key = `${Number(r.zoneId)}|${String(r.text||'')}`;
@@ -1047,6 +1120,7 @@ function getTasks(){
     }
 
     const zoneId = Number(item.zoneId);
+    const zoneKind = zoneKindMap.get(zoneId);
     let kind = item.kind==='recurring' ? 'recurring' : (item.kind==='single' ? 'single' : null);
     let recurringId = typeof item.recurringId==='number' ? item.recurringId : null;
     let done = !!item.done;
@@ -1089,7 +1163,20 @@ function getTasks(){
       delete next.recurringId;
     }
 
-    if(item.zoneId!==next.zoneId || item.done!==next.done || item.kind!==next.kind || (kind==='recurring' && item.recurringId!==next.recurringId) || (kind!=='recurring' && 'recurringId' in item) || item.points !== next.points){
+    if(zoneKind==='noise'){
+      const normalizedNoise = normalizeAiScoreForZone({ points: next.points, reason: next.aiReason }, 'noise');
+      if(next.points !== normalizedNoise.points){
+        next.points = normalizedNoise.points;
+        changed=true;
+      }
+      const nextReason = normalizedNoise.reason;
+      if(String(next.aiReason || '') !== nextReason){
+        next.aiReason = nextReason;
+        changed=true;
+      }
+    }
+
+    if(item.zoneId!==next.zoneId || item.done!==next.done || item.kind!==next.kind || (kind==='recurring' && item.recurringId!==next.recurringId) || (kind!=='recurring' && 'recurringId' in item) || item.points !== next.points || (zoneKind==='noise' && String(item.aiReason || '') !== String(next.aiReason || ''))){
       changed=true;
     }
 
@@ -1135,7 +1222,28 @@ function renderTaskKindBadge(task, zone){
 function renderTaskPoints(points, reasonText) {
   const sign = points >= 0 ? '+' : '';
   const className = points >= 0 ? 'positive' : 'negative';
-  const safe = String(reasonText || '').replace(/"/g, '&quot;');
+  const rawReason = String(reasonText || '').trim();
+  let prioritizedReason = rawReason;
+  if(rawReason){
+    const segments = rawReason.split(/—| - /).map(part=>part.trim()).filter(Boolean);
+    if(segments.length){
+      const seen = new Set();
+      const noiseSegments = [];
+      const otherSegments = [];
+      segments.forEach(seg=>{
+        const key = seg.toLowerCase();
+        if(seen.has(key)) return;
+        seen.add(key);
+        if(key.startsWith('nhầm zone')){
+          noiseSegments.push(seg);
+        }else{
+          otherSegments.push(seg);
+        }
+      });
+      prioritizedReason = [...noiseSegments, ...otherSegments].join(' — ');
+    }
+  }
+  const safe = prioritizedReason.replace(/"/g, '&quot;');
   return `<span class="task-points ${className}" title="${safe}">${sign}${points}</span>`;
 }
 function setTasks(a){ save(LS.TASKS,a) }
@@ -1347,15 +1455,16 @@ function performDayRollover(opts={}){
     // Calculate productivity bonus
     const todayTasks = tasks.filter(t => isTaskActiveToday(t) && t.done);
     let totalDayPoints = 0;
-    let noisePoints = 0;
+    let noisePenalty = 0;
     const noiseZone = zones.find(z => z.kind === 'noise');
     todayTasks.forEach(t => {
-      totalDayPoints += t.points || 0;
-      if (t.zoneId === noiseZone?.id) {
-        noisePoints += t.points || 0;
+      const pts = Number(t.points) || 0;
+      totalDayPoints += pts;
+      if (noiseZone && t.zoneId === noiseZone.id) {
+        noisePenalty += Math.min(0, pts);
       }
     });
-    if (totalDayPoints >= 10 && noisePoints >= -1) {
+    if (totalDayPoints >= 10 && noisePenalty >= -1) {
       let bonus = 3;
       if (totalDayPoints >= 15) bonus = 5;
       if (totalDayPoints >= 20) bonus = 8;
@@ -1821,46 +1930,63 @@ async function viewTasks(){
     }
 
     const ai = await getTaskPoints(text, z.kind);
+    const normalizedAi = normalizeAiScoreForZone(ai, z.kind);
     const currentTasks = getTasks();
     const newTasks = [...currentTasks];
 
     if(DAILY_ZONE_KINDS.has(z.kind)){
       const recs = getRecurring();
       const existingRec = recs.find(r=>r.zoneId==z.id && r.type==='daily' && (r.text||'')===text);
-      const rec = existingRec || await addRecurring({
-        text,
-        zoneId:z.id,
-        type:'daily',
-        autoKind:z.kind
-      });
+      let rec = existingRec;
+      if(!rec){
+        rec = await addRecurring({
+          text,
+          zoneId:z.id,
+          type:'daily',
+          autoKind:z.kind
+        });
+      }else{
+        let recChanged = false;
+        if(Number(rec.points) !== normalizedAi.points){
+          recChanged = true;
+        }
+        if(String(rec.reason || '') !== normalizedAi.reason){
+          recChanged = true;
+        }
+        if(recChanged){
+          const updatedRecs = recs.map(r=>r.id===rec.id?{...r, points: normalizedAi.points, reason: normalizedAi.reason}:r);
+          save(LS.RECUR, updatedRecs);
+          rec = { ...rec, points: normalizedAi.points, reason: normalizedAi.reason };
+        }
+      }
       const duplicate = newTasks.some(t=>t.zoneId==z.id && t.kind==='recurring' && t.recurringId===rec.id);
       if(!duplicate){
         newTasks.push({
-		  id: Date.now() + Math.random(),
-		  text,
-		  zoneId: z.id,
-		  done: false,
-		  kind: 'recurring',
-		  recurringId: rec.id,
-                  points: ai.points,
-		  aiCategory: ai.category,
-		  aiReason: ai.reason,
-		  zoneLabel: ai.zone
-		});
+                  id: Date.now() + Math.random(),
+                  text,
+                  zoneId: z.id,
+                  done: false,
+                  kind: 'recurring',
+                  recurringId: rec.id,
+                  points: normalizedAi.points,
+                  aiCategory: normalizedAi.category,
+                  aiReason: normalizedAi.reason,
+                  zoneLabel: normalizedAi.zone
+                });
 
       }
     } else {
       newTasks.push({
-		  id: Date.now(),
-		  text,
-		  zoneId: z.id,
-		  done: false,
-		  kind: 'single',
-                  points: ai.points,
-		  aiCategory: ai.category,
-		  aiReason: ai.reason,
-		  zoneLabel: ai.zone
-		});
+                  id: Date.now(),
+                  text,
+                  zoneId: z.id,
+                  done: false,
+                  kind: 'single',
+                  points: normalizedAi.points,
+                  aiCategory: normalizedAi.category,
+                  aiReason: normalizedAi.reason,
+                  zoneLabel: normalizedAi.zone
+                });
     }
 
     setTasks(newTasks);
