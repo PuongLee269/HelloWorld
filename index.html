@@ -1662,6 +1662,19 @@ function attachSwipeHandlersForTasks(){
       }
     }
 
+    function canStartDrag(target, clientX){
+      if(target.closest('.del-btn')){
+        return true;
+      }
+
+      if(target.closest('.task-inner') || target.closest('.txt')){
+        return false;
+      }
+
+      const liRect = li.getBoundingClientRect();
+      return clientX >= (liRect.right - 60);
+    }
+
     function moveDrag(clientX){
       if(!isDown) return;
       currentX = clientX;
@@ -1712,8 +1725,11 @@ function attachSwipeHandlersForTasks(){
 
     // Touch
     li.addEventListener('touchstart', e=>{
-      startDrag(e.touches[0].clientX);
-    }, {passive:true});
+      const clientX = e.touches[0].clientX;
+      if(!canStartDrag(e.target, clientX)) return;
+      startDrag(clientX);
+      e.preventDefault();
+    }, {passive:false});
 
     li.addEventListener('touchmove', e=>{
       if(!isDown) return;
@@ -1727,7 +1743,9 @@ function attachSwipeHandlersForTasks(){
 
     // Mouse
     li.addEventListener('mousedown', e=>{
+      if(!canStartDrag(e.target, e.clientX)) return;
       startDrag(e.clientX);
+      e.preventDefault();
     });
 
     li.addEventListener('mousemove', e=>{
