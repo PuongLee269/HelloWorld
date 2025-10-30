@@ -417,15 +417,6 @@ li.task.dragging .del-btn{
   transition:none;
 }
 
-/* public task add button */
-.add-to-priority {
-  padding: 4px 8px;
-  font-size: 12px;
-  min-height: auto;
-  min-width: auto;
-  height: auto;
-}
-
 /* Leaderboard table */
 .table-wrap{
   overflow:auto;
@@ -587,7 +578,6 @@ const LS = {
   BONUS:'tq_bonus_flags',
   SPAWN:'tq_spawned_day',
   LBCACHE:'tq_lb_cache',
-  PUBLIC_TASKS:'tq_public_tasks',
   HIST:'tq_hist',
   REALDATE:'tq_real_date'
 };
@@ -596,10 +586,9 @@ const ZONE_KIND_LABELS = {
   'e':'Zone E',
   'priority':'Zone Quan trọng',
   'noise':'Zone Noise',
-  'regular':'Zone Thường',
-  'public':'Zone Giao việc'
+  'regular':'Zone Thường'
 };
-const ZONE_KIND_ORDER = ['e','priority','noise','regular','public'];
+const ZONE_KIND_ORDER = ['e','priority','noise','regular'];
 const DEFAULT_ZONES = ZONE_KIND_ORDER.map((kind)=>({
   name: ZONE_KIND_LABELS[kind],
   kind,
@@ -607,8 +596,6 @@ const DEFAULT_ZONES = ZONE_KIND_ORDER.map((kind)=>({
 }));
 
 const DAILY_ZONE_KINDS = new Set(['e','noise']);
-
-let cachedPublicTasks = null;
 let lbTimer = null;
 
 
@@ -696,7 +683,7 @@ const AI_ENDPOINT = "https://todo-quest-proxyp260992.vercel.app/api/score"; // s
 /**
  * Chấm điểm 1 task và trả về object đầy đủ từ proxy.
  * @param {string} taskText
- * @param {string} zoneKind: 'e' | 'priority' | 'noise' | 'regular' | 'public'
+ * @param {string} zoneKind: 'e' | 'priority' | 'noise' | 'regular'
  * @returns {{zone:string, category:string, points:number, reason:string}}
  */
 async function getTaskPoints(taskText, zoneKind) {
@@ -909,6 +896,14 @@ function normalizeZoneRecord(raw, idx, idBase){
   if(!zone.name){
     zone.name = `Zone ${idx+1}`;
     changed=true;
+  }
+
+  if(zone.kind === 'public'){
+    zone.kind = 'regular';
+    if(zone.name === 'Zone Giao việc'){
+      zone.name = ZONE_KIND_LABELS['regular'];
+    }
+    changed = true;
   }
 
   if(typeof zone.bg!=='string'){
@@ -1137,32 +1132,13 @@ function renderTaskKindBadge(task, zone){
   return `<span class="${taskKindClass(task, zone)}">${describeTaskKind(task, zone)}</span>`;
 }
 
-function renderTaskPoints(points, reasonText, zoneKind) {
-  if (zoneKind === 'public') {
-    return `<span class="task-points neutral" title="Gợi ý/Test — không tính điểm">0</span>`;
-  }
+function renderTaskPoints(points, reasonText) {
   const sign = points >= 0 ? '+' : '';
   const className = points >= 0 ? 'positive' : 'negative';
   const safe = String(reasonText || '').replace(/"/g, '&quot;');
   return `<span class="task-points ${className}" title="${safe}">${sign}${points}</span>`;
 }
-
-
 function setTasks(a){ save(LS.TASKS,a) }
-
-/* ==============================
-   PUBLIC TASKS
-============================== */
-function getPublicTasks() {
-  if (cachedPublicTasks === null) {
-    cachedPublicTasks = load(LS.PUBLIC_TASKS, []);
-  }
-  return cachedPublicTasks;
-}
-function setPublicTasks(tasks) {
-  cachedPublicTasks = tasks;
-  save(LS.PUBLIC_TASKS, tasks);
-}
 
 /* ==============================
    LB CACHE
@@ -1320,14 +1296,6 @@ async function fetchLeaderboardAndCache(){
       setLBCache({ ts: Date.now(), list: leaderboardList });
     }
 
-    const publicTasks = Array.isArray(data)
-      ? []
-      : Array.isArray(data.public_tasks)
-        ? data.public_tasks
-        : [];
-    if (publicTasks.length > 0) {
-      setPublicTasks(publicTasks);
-    }
   } catch (e) {
     clearTimeout(t);
     // CHỈ SỬA LẠI 3 DÒNG NÀY: AbortError thì im lặng, không log cảnh báo
@@ -1352,7 +1320,6 @@ function backgroundBoardRefresh(){
 function wipeLocalPlayer(){
   localStorage.removeItem(LS.PROFILE);
   localStorage.removeItem(LS.LBCACHE);
-  localStorage.removeItem(LS.PUBLIC_TASKS);
   alert('Đã xoá hồ sơ local. Reload trang để tạo người chơi mới.');
   location.reload();
 }
@@ -1529,7 +1496,7 @@ function drawChart(canvasId, values){
    SWIPE TASK HANDLERS
 ============================== */
 function attachSwipeHandlersForTasks(){
-  const rows = [...document.querySelectorAll('li.task:not([data-public="true"])')];
+  const rows = [...document.querySelectorAll('li.task')];
 
   rows.forEach(li=>{
     const inner  = li.querySelector('.task-inner');
@@ -1740,7 +1707,6 @@ async function viewTasks(){
 
   let zones=getZones();
   const tasks=getTasks();
-  const publicTasks = getPublicTasks();
   const dateNowDM = todayDM();
   let priorityZone = zones.find(z => z.kind === 'priority');
 
@@ -1766,21 +1732,7 @@ async function viewTasks(){
         return a.kind==='recurring' ? -1 : 1;
       });
 
-    let list;
-    if (z.kind === 'public') {
-      const suggestionTasks = publicTasks.map(pt => ({
-        id: `public_${pt.id}`,
-        text: pt.text,
-        points: Number(pt.points) || 0,
-        kind: 'single',
-        zoneId: z.id,
-        isPublic: true,
-        done: false // Public tasks are suggestions, not done
-      }));
-      list = [...zoneTasks, ...suggestionTasks];
-    } else {
-      list = zoneTasks;
-    }
+    const list = zoneTasks;
     const activeList = list.filter(isTaskActiveToday);
     const activeDone = activeList.filter(t=>t.done).length;
     return {
@@ -1790,7 +1742,7 @@ async function viewTasks(){
       activeDone,
       activeTotal: activeList.length,
       kindLabel: ZONE_KIND_LABELS[z.kind] || 'Zone',
-      progressText: z.kind === 'public' ? 'Gợi ý' : (activeList.length ? `${activeDone}/${activeList.length}` : '0')
+      progressText: activeList.length ? `${activeDone}/${activeList.length}` : '0'
     };
   });
 
@@ -1814,35 +1766,20 @@ async function viewTasks(){
       const emptyStateHtml = `
         <li class="task">
           <div class="task-inner">
-            <span class="muted">${z.kind==='public' ? 'Chưa có gợi ý.' : 'Chưa có task trong Zone này.'}</span>
+            <span class="muted">Chưa có task trong Zone này.</span>
           </div>
         </li>`;
 
       const listHtml = g.list.length
         ? g.list.map(t=>{
-            if (t.isPublic) {
-              const priorityAction = `<button class="btn-primary add-to-priority" data-text="${t.text}" data-points="${t.points}">+</button>`;
-              return `
-                <li class="task" data-public="true" data-text="${t.text}" data-points="${t.points}">
-                  <div class="task-inner">
-                    <div class="left">
-                      <span class="txt">${t.text}</span>
-                      ${renderTaskPoints(t.points, t.aiReason, z.kind)}
-                      ${priorityAction}
-                    </div>
-                  </div>
-                </li>
-              `;
-            }
-
             return `
               <li class="task ${t.done?'done':''}" data-id="${t.id}" data-kind="${t.kind||'single'}">
                 <div class="task-inner">
                   <div class="left">
-                    <input type="checkbox" data-id="${t.id}" ${t.done?'checked':''} ${z.kind==='public'?'disabled':''}>
+                    <input type="checkbox" data-id="${t.id}" ${t.done?'checked':''}>
                     <span class="txt">${t.text}</span>
                     ${renderTaskKindBadge(t, z)}
-                    ${renderTaskPoints(t.points, t.aiReason, z.kind)}
+                    ${renderTaskPoints(t.points, t.aiReason)}
                   </div>
                 </div>
                 ${t.aiReason ? `<div class="ai-reason">${t.aiReason}</div>` : ''}
@@ -1956,48 +1893,6 @@ async function viewTasks(){
       render('tasks');
     };
   });
-
-  // add to priority from public
-  view.querySelectorAll('.add-to-priority').forEach(btn => {
-    btn.onclick = async (e) => {
-      e.stopPropagation();
-      const text = btn.dataset.text;
-
-      let zones = getZones();
-      let priorityZone = zones.find(z => z.kind === 'priority');
-
-      if (!priorityZone) {
-        addZone({ name: 'Zone Quan trọng', kind: 'priority', bg: '' });
-        zones = getZones();
-        priorityZone = zones.find(z => z.kind === 'priority');
-      }
-
-      if (!priorityZone) {
-        alert('Không thể tạo Zone Quan trọng.');
-        return;
-      }
-
-      // Chấm lại theo Zone Priority
-      const ai = await getTaskPoints(text, 'priority');
-
-      const currentTasks = getTasks();
-      const newTask = {
-        id: Date.now(),
-        text,
-        zoneId: priorityZone.id,
-        done: false,
-        kind: 'single',
-        points: ai.points,
-        aiCategory: ai.category,
-        aiReason: ai.reason,
-        zoneLabel: ai.zone
-      };
-      setTasks([...currentTasks, newTask]);
-      alert('Đã thêm vào Zone Quan trọng!');
-      render('tasks');
-    };
-  });
-
 
   attachSwipeHandlersForTasks();
 }
@@ -2190,7 +2085,7 @@ function viewSettings(){
       <div class="row"><div>Mô tả</div><input id="rText" placeholder="Tập thể dục 15’"></div>
       <div class="row"><div>Zone</div>
         <select id="rZone">
-          ${zones.filter(z => !DAILY_ZONE_KINDS.has(z.kind) && z.kind !== 'public').map(z=>`<option value="${z.id}">${z.name}</option>`).join('')}
+          ${zones.filter(z => !DAILY_ZONE_KINDS.has(z.kind)).map(z=>`<option value="${z.id}">${z.name}</option>`).join('')}
         </select>
       </div>
       <div class="row"><div>Kiểu</div>
