@@ -1800,8 +1800,12 @@ function attachSwipeHandlersForTasks(){
         return true;
       }
 
-      if(target.closest('.task-inner') || target.closest('.txt')){
+      if(target.closest('input, button, select, textarea, a, label')){
         return false;
+      }
+
+      if(target.closest('.task-inner') || target.closest('.txt')){
+        return true;
       }
 
       const liRect = li.getBoundingClientRect();
