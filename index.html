@@ -76,18 +76,11 @@ h1 .app-version{
   position:relative;
   z-index:1;
   display:flex;
-  align-items:center;
-  gap:24px;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:20px;
   padding:28px;
-}
-.hero-character{
-  width:140px;
-  height:140px;
-  flex-shrink:0;
-  background-size:contain;
-  background-repeat:no-repeat;
-  background-position:center bottom;
-  filter:drop-shadow(0 12px 24px rgba(0,0,0,.45));
+  text-align:left;
 }
 .hero-info{flex:1;min-width:0}
 .hero-name{
@@ -467,8 +460,7 @@ th{
     .row{grid-template-columns:1fr}
     .creator{flex-direction:column}
     h1 .app-title{font-size:20px}
-  .hero-inner{flex-direction:column;align-items:flex-start;text-align:left;gap:18px;padding:22px}
-  .hero-character{width:100px;height:100px}
+  .hero-inner{gap:18px;padding:22px}
   .hero-name{font-size:22px}
   .hero-meta{font-size:15px}
 }
@@ -496,7 +488,6 @@ th{
 
   <section id="hero" class="hero">
     <div class="hero-inner">
-      <div class="hero-character" data-hero="character" aria-hidden="true"></div>
       <div class="hero-info">
         <div class="hero-name" data-hero="name">Player</div>
         <div class="hero-meta">
@@ -603,9 +594,7 @@ let lbTimer = null;
    HERO ELEMENTS
 ============================== */
 const heroEl = document.getElementById('hero');
-const heroDefaultCharacter = "url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 120\"><circle cx=\"50\" cy=\"38\" r=\"26\" fill=\"%239ca3af\"/><rect x=\"22\" y=\"64\" width=\"56\" height=\"44\" rx=\"18\" fill=\"%23d1d5db\"/></svg>')";
 const heroRefs = heroEl ? {
-  character: heroEl.querySelector('[data-hero="character"]'),
   name: heroEl.querySelector('[data-hero="name"]'),
   level: heroEl.querySelector('[data-hero="level"]'),
   xp: heroEl.querySelector('[data-hero="xp"]'),
@@ -849,9 +838,6 @@ function renderHero(){
 
   heroEl.style.backgroundImage = preset.backgroundImg || 'linear-gradient(135deg,#8b7cff 0%,#b09bff 100%)';
 
-  if(heroRefs.character){
-    heroRefs.character.style.backgroundImage = preset.characterImg || heroDefaultCharacter;
-  }
   if(heroRefs.name){
     heroRefs.name.textContent = name;
   }
