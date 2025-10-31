@@ -591,29 +591,40 @@ const CONFIG = {
       backgroundImg:'linear-gradient(135deg,#e9d5ff 0%,#7c3aed 100%)'
     }
   ],
-  BACKGROUND_THEME:{
-    appDefaultBgUrl:'linear-gradient(160deg,#dfe8ff 0%,#f6f0ff 45%,#ffffff 100%)',
-    heroByLevel:[
-      {
-        minLevel:1,
-        maxLevel:3,
-        heroBgUrl:'linear-gradient(135deg,#fde68a 0%,#f97316 100%)',
-        appBgUrl:'linear-gradient(160deg,#fff6eb 0%,#ffe7d4 45%,#ffd8c2 100%)'
-      },
-      {
-        minLevel:4,
-        maxLevel:6,
-        heroBgUrl:'linear-gradient(135deg,#bae6fd 0%,#2563eb 100%)',
-        appBgUrl:'linear-gradient(160deg,#e1f2ff 0%,#d5e7ff 50%,#f1f6ff 100%)'
-      },
-      {
-        minLevel:7,
-        heroBgUrl:'linear-gradient(135deg,#e9d5ff 0%,#7c3aed 100%)',
-        appBgUrl:'linear-gradient(160deg,#f0e7ff 0%,#dcd1ff 40%,#f8f4ff 100%)'
-      }
-    ]
-  }
+  // Dùng link RAW để ảnh hiển thị trong CSS
+const RAW_APP_BG =
+  "https://raw.githubusercontent.com/PuongLee269/HelloWorld/cc1ea4b1d90dab277ff5138dc9eb9e928986d9ef/image/ChatGPT%20Image%2022_24_20%2031%20thg%2010%2C%202025.png";
+
+const RAW_LEVEL_BG =
+  "https://raw.githubusercontent.com/PuongLee269/HelloWorld/747e7bfebad622025035376e42939a217dde236b/image/ChatGPT%20Image%2016_04_12%2028%20thg%2010%2C%202025.png";
+
+// Ghi đè phần BACKGROUND_THEME
+CONFIG.BACKGROUND_THEME = {
+  // App dùng ảnh 1
+  appDefaultBgUrl: `url('${RAW_APP_BG}')`,
+  // Áp dụng cùng 1 nền cho mọi khoảng level
+  heroByLevel: [
+    {
+      minLevel: 1,
+      maxLevel: 3,
+      // Hero/Level area dùng ảnh 2
+      heroBgUrl: `url('${RAW_LEVEL_BG}')`,
+      appBgUrl: `url('${RAW_APP_BG}')`
+    },
+    {
+      minLevel: 4,
+      maxLevel: 6,
+      heroBgUrl: `url('${RAW_LEVEL_BG}')`,
+      appBgUrl: `url('${RAW_APP_BG}')`
+    },
+    {
+      minLevel: 7,
+      heroBgUrl: `url('${RAW_LEVEL_BG}')`,
+      appBgUrl: `url('${RAW_APP_BG}')`
+    }
+  ]
 };
+
 
 window.APP_CONFIG = CONFIG;
 
