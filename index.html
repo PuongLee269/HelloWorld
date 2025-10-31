@@ -1751,6 +1751,9 @@ function attachSwipeHandlersForTasks(){
     let opened = li.classList.contains('show-del');
     let justSwiped = false;
     let swipeResetTimer = null;
+    let hasDragged = false;
+    let pendingDragFromDel = false;
+    let pendingStartX = 0;
 
     function openRow(){
       li.classList.add('show-del');
@@ -1786,6 +1789,8 @@ function attachSwipeHandlersForTasks(){
 
     function startDrag(clientX){
       isDown = true;
+      hasDragged = false;
+      pendingDragFromDel = false;
       startX = clientX;
       currentX = clientX;
       li.classList.add('dragging');
@@ -1859,23 +1864,59 @@ function attachSwipeHandlersForTasks(){
           swipeResetTimer = null;
         }, 250);
       }
+
+      hasDragged = false;
     }
 
     // Touch
     li.addEventListener('touchstart', e=>{
       const clientX = e.touches[0].clientX;
+      if(e.target.closest('.del-btn')){
+        pendingDragFromDel = true;
+        pendingStartX = clientX;
+        return;
+      }
+
+      pendingDragFromDel = false;
+      pendingStartX = 0;
+
       if(!canStartDrag(e.target, clientX)) return;
       startDrag(clientX);
-      e.preventDefault();
     }, {passive:false});
 
     li.addEventListener('touchmove', e=>{
+      const clientX = e.touches[0].clientX;
+
+      if(pendingDragFromDel){
+        const dx = clientX - pendingStartX;
+        if(Math.abs(dx) > 3){
+          startDrag(pendingStartX);
+          hasDragged = true;
+          moveDrag(clientX);
+          e.preventDefault();
+        }
+        return;
+      }
+
       if(!isDown) return;
-      moveDrag(e.touches[0].clientX);
-      e.preventDefault();
+
+      const dx = clientX - startX;
+      if(!hasDragged && Math.abs(dx) > 3){
+        hasDragged = true;
+      }
+
+      if(hasDragged){
+        moveDrag(clientX);
+        e.preventDefault();
+      }
     }, {passive:false});
 
     li.addEventListener('touchend', ()=>{
+      if(pendingDragFromDel){
+        pendingDragFromDel = false;
+        pendingStartX = 0;
+        return;
+      }
       endDrag();
     });
 
