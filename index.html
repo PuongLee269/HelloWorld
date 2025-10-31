@@ -617,6 +617,17 @@ const LEVELS = [
   {lvl:9, need:3800},
 ];
 
+function calcTotalE(level, xp){
+  const lvl = Number(level) || 0;
+  const currentXP = Number(xp) || 0;
+  let total = currentXP;
+  for(const cfg of LEVELS){
+    if(cfg.lvl >= lvl) break;
+    total += Number(cfg.need) || 0;
+  }
+  return total;
+}
+
 /* ==============================
    GENERIC HELPERS
 ============================== */
@@ -1248,15 +1259,19 @@ function renderLBRows(rowsEl, list){
     rowsEl.innerHTML = '<tr><td colspan="5" class="muted">Chưa có dữ liệu</td></tr>';
     return;
   }
-  list.sort((a,b)=>
-    (b.level-a.level) || (b.xp-a.xp) || (a.name||'').localeCompare(b.name||'')
+  const enriched = list.map(item=>({
+    ...item,
+    totalE: calcTotalE(item.level, item.xp)
+  }));
+  enriched.sort((a,b)=>
+    (b.totalE-a.totalE) || (b.level-a.level) || (b.xp-a.xp) || (a.name||'').localeCompare(b.name||'')
   );
-  rowsEl.innerHTML = list.map((u,i)=>`
+  rowsEl.innerHTML = enriched.map((u,i)=>`
     <tr>
       <td>${i+1}</td>
       <td>${u.name||'-'}</td>
       <td>${u.level??'-'}</td>
-      <td>${u.xp??'-'}</td>
+      <td>${u.totalE??'-'}</td>
       <td>${u.updatedAt?new Date(u.updatedAt).toLocaleString():'-'}</td>
     </tr>
   `).join('');
@@ -2195,10 +2210,12 @@ function viewLeaderboard(){
 
   function fallbackLocalProfileList(){
     const p=getProfile();
+    const totalE = calcTotalE(p.level, p.xp);
     return [{
       name:p.name||'Player',
       level:p.level||1,
       xp:p.xp||0,
+      totalE,
       updatedAt:new Date().toISOString()
     }];
   }
