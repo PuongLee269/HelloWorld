@@ -590,8 +590,32 @@ const CONFIG = {
       characterImg:"url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 120\"><circle cx=\"50\" cy=\"38\" r=\"26\" fill=\"%237c3aed\"/><rect x=\"22\" y=\"64\" width=\"56\" height=\"44\" rx=\"18\" fill=\"%23c4b5fd\"/></svg>')",
       backgroundImg:'linear-gradient(135deg,#e9d5ff 0%,#7c3aed 100%)'
     }
-  ]
+  ],
+  BACKGROUND_THEME:{
+    appDefaultBgUrl:'linear-gradient(160deg,#dfe8ff 0%,#f6f0ff 45%,#ffffff 100%)',
+    heroByLevel:[
+      {
+        minLevel:1,
+        maxLevel:3,
+        heroBgUrl:'linear-gradient(135deg,#fde68a 0%,#f97316 100%)',
+        appBgUrl:'linear-gradient(160deg,#fff6eb 0%,#ffe7d4 45%,#ffd8c2 100%)'
+      },
+      {
+        minLevel:4,
+        maxLevel:6,
+        heroBgUrl:'linear-gradient(135deg,#bae6fd 0%,#2563eb 100%)',
+        appBgUrl:'linear-gradient(160deg,#e1f2ff 0%,#d5e7ff 50%,#f1f6ff 100%)'
+      },
+      {
+        minLevel:7,
+        heroBgUrl:'linear-gradient(135deg,#e9d5ff 0%,#7c3aed 100%)',
+        appBgUrl:'linear-gradient(160deg,#f0e7ff 0%,#dcd1ff 40%,#f8f4ff 100%)'
+      }
+    ]
+  }
 };
+
+window.APP_CONFIG = CONFIG;
 
 const APP_VERSION = CONFIG.VERSION;
 
@@ -922,16 +946,84 @@ function pickHeroConfigFor(level){
   return fallback;
 }
 
+function getBackgroundTheme(){
+  return CONFIG && typeof CONFIG === 'object' ? (CONFIG.BACKGROUND_THEME || {}) : {};
+}
+
+function pickHeroBackgroundThemeFor(level){
+  const theme = getBackgroundTheme();
+  const list = Array.isArray(theme.heroByLevel) ? theme.heroByLevel : [];
+  const fallback = list[list.length-1] || null;
+  for(const item of list){
+    if(typeof item.level === 'number' && item.level === level) return item;
+    if(Array.isArray(item.levels) && item.levels.includes(level)) return item;
+    const min = typeof item.minLevel === 'number' ? item.minLevel : (typeof item.min === 'number' ? item.min : -Infinity);
+    const max = typeof item.maxLevel === 'number' ? item.maxLevel : (typeof item.max === 'number' ? item.max : Infinity);
+    if(level>=min && level<=max) return item;
+  }
+  return fallback;
+}
+
+function normalizeBackgroundValue(raw){
+  const result = { image:'', color:'' };
+  if(!raw) return result;
+  const trimmed = `${raw}`.trim();
+  if(!trimmed) return result;
+  const lower = trimmed.toLowerCase();
+  if(/^(#[0-9a-f]{3,8}|rgba?\(|hsla?\()/i.test(trimmed)){
+    result.color = trimmed;
+    return result;
+  }
+  const shouldWrap = !(lower.startsWith('url(') || lower.includes('gradient('));
+  result.image = shouldWrap ? `url('${trimmed.replace(/'/g,"\\'")}')` : trimmed;
+  return result;
+}
+
+function applyBackgroundToElement(el, value, fallbackValue, options){
+  if(!el) return;
+  const opts = Object.assign({ size:null, position:null, attachment:null, repeat:null }, options);
+  const normalized = normalizeBackgroundValue(value);
+  const fallbackNormalized = normalizeBackgroundValue(fallbackValue);
+  const final = (normalized.image || normalized.color) ? normalized : fallbackNormalized;
+
+  el.style.backgroundImage = final.image || '';
+  el.style.backgroundColor = final.color || '';
+
+  if(opts.size !== null){
+    el.style.backgroundSize = opts.size;
+  }
+  if(opts.position !== null){
+    el.style.backgroundPosition = opts.position;
+  }
+  if(opts.attachment !== null){
+    el.style.backgroundAttachment = opts.attachment;
+  }
+  if(opts.repeat !== null){
+    el.style.backgroundRepeat = opts.repeat;
+  }
+}
+
 function renderHero(){
   if(!heroEl) return;
 
   const profile = getProfile();
   const {level,xp,need} = getLevelInfo();
   const preset = pickHeroConfigFor(level) || {};
+  const backgroundTheme = getBackgroundTheme();
+  const heroThemePreset = pickHeroBackgroundThemeFor(level) || {};
   const name = (profile.name || '').trim() || 'Player';
   const pct = need ? Math.min(100, Math.round(xp/need*100)) : 100;
 
-  heroEl.style.backgroundImage = preset.backgroundImg || 'linear-gradient(135deg,#8b7cff 0%,#b09bff 100%)';
+  const defaultHeroBg = preset.backgroundImg || 'linear-gradient(135deg,#8b7cff 0%,#b09bff 100%)';
+  applyBackgroundToElement(heroEl, heroThemePreset.heroBgUrl, defaultHeroBg, { size:'cover', position:'center' });
+
+  const appBgFallback = backgroundTheme.appDefaultBgUrl || '';
+  const appBgValue = heroThemePreset.appBgUrl || '';
+  if(appBgValue || appBgFallback){
+    applyBackgroundToElement(document.body, appBgValue, appBgFallback, { size:'cover', attachment:'fixed' });
+  } else {
+    applyBackgroundToElement(document.body, '', '', { size:'', attachment:'fixed' });
+  }
 
   if(heroRefs.name){
     heroRefs.name.textContent = name;

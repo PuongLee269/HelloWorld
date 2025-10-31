@@ -35,9 +35,33 @@ window.UI_THEME = {
 
 // đổi nền body theo tab
 window.applyTabBackground = function(tabKey){
-  const bg = (window.UI_THEME && window.UI_THEME.backgrounds[tabKey]) || "#f6f7ff";
-  document.body.style.background = bg;
+  const uiTheme = window.UI_THEME || {};
+  const configTheme = window.APP_CONFIG && window.APP_CONFIG.BACKGROUND_THEME ? window.APP_CONFIG.BACKGROUND_THEME : {};
+  const tabOverrides = configTheme.tabBackgrounds || configTheme.tabs || {};
+  const uiFallback = uiTheme.backgrounds && uiTheme.backgrounds[tabKey];
+  const rawBg = (tabOverrides && tabOverrides[tabKey]) || configTheme.appDefaultBgUrl || uiFallback || "#f6f7ff";
+  const trimmed = (rawBg || "").toString().trim();
+  const lower = trimmed.toLowerCase();
+  const isColor = /^(#[0-9a-f]{3,8}|rgba?\(|hsla?\()/i.test(trimmed);
+  const isImageValue = lower.startsWith("url(") || lower.includes("gradient(");
+
+  document.body.style.background = "";
+
+  if(isColor){
+    document.body.style.backgroundColor = trimmed;
+    document.body.style.backgroundImage = "";
+  } else if(trimmed){
+    const imageValue = isImageValue ? trimmed : `url('${trimmed.replace(/'/g,"\\'")}')`;
+    document.body.style.backgroundColor = "";
+    document.body.style.backgroundImage = imageValue;
+  } else {
+    document.body.style.backgroundColor = "";
+    document.body.style.backgroundImage = "";
+  }
+
+  document.body.style.backgroundSize = "cover";
   document.body.style.backgroundAttachment = "fixed";
+  document.body.style.backgroundRepeat = "no-repeat";
 };
 
 // apply style kính mờ cho .wrap
