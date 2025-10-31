@@ -196,6 +196,13 @@ h1 .app-version{
   box-shadow:0 10px 20px rgba(255,60,48,.4);
   font-size:14px;
 }
+.btn-primary.btn-sm,
+.btn-ghost.btn-sm,
+.btn-danger.btn-sm{
+  min-height:36px;
+  padding:6px 12px;
+  font-size:13px;
+}
 
 /* pills */
 .pill{
@@ -308,6 +315,52 @@ input[type="checkbox"]{
 
 /* task lists */
 ul{list-style:none;margin:0;padding:0}
+.archive-toolbar{
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:12px;
+}
+.archive-list{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  margin:16px 0 0;
+}
+.archive-item{
+  display:flex;
+  gap:12px;
+  padding:12px;
+  border:1px solid var(--panel-border);
+  border-radius:12px;
+  background:rgba(255,255,255,.8);
+  box-shadow:0 6px 16px rgba(0,0,0,.06);
+}
+.archive-info{flex:1;min-width:0;}
+.archive-title{font-weight:600;word-break:break-word;}
+.archive-meta{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-top:6px;
+  font-size:12px;
+  color:var(--muted);
+  align-items:center;
+}
+.archive-meta .sep{color:rgba(0,0,0,.25);}
+.archive-reason{
+  margin-top:8px;
+  font-size:13px;
+  color:var(--muted);
+  word-break:break-word;
+}
+.archive-actions{display:flex;align-items:center;gap:8px;}
+.archive-empty{
+  margin-top:12px;
+  color:var(--muted);
+}
+
 .zone{
   border:1px solid rgba(0,0,0,.05);
   border-radius:16px;
@@ -570,8 +623,38 @@ const LS = {
   SPAWN:'tq_spawned_day',
   LBCACHE:'tq_lb_cache',
   HIST:'tq_hist',
-  REALDATE:'tq_real_date'
+  REALDATE:'tq_real_date',
+  ARCHIVE:'tq_archive'
 };
+
+function normalizeArchiveEntry(raw){
+  if(!raw || typeof raw !== 'object') return null;
+  const taskId = raw.taskId != null ? String(raw.taskId) : '';
+  if(!taskId) return null;
+  const zoneId = raw.zoneId != null ? String(raw.zoneId) : '';
+  const completedAt = typeof raw.completedAt === 'string' ? raw.completedAt : '';
+  return {
+    taskId,
+    text: String(raw.text || ''),
+    zoneId,
+    zoneName: String(raw.zoneName || ''),
+    zoneKind: String(raw.zoneKind || ''),
+    completedAt,
+    points: Number(raw.points) || 0,
+    reason: String(raw.reason || '').trim()
+  };
+}
+
+function getArchive(){
+  const raw = load(LS.ARCHIVE, []);
+  if(!Array.isArray(raw)) return [];
+  return raw.map(normalizeArchiveEntry).filter(Boolean);
+}
+function setArchive(list){
+  if(!Array.isArray(list)) list = [];
+  const normalized = list.map(normalizeArchiveEntry).filter(Boolean);
+  save(LS.ARCHIVE, normalized);
+}
 
 const ZONE_KIND_LABELS = {
   'e':'Zone E',
@@ -587,6 +670,7 @@ const DEFAULT_ZONES = ZONE_KIND_ORDER.map((kind)=>({
 }));
 
 const DAILY_ZONE_KINDS = new Set(['e','noise']);
+const ARCHIVE_ZONE_KINDS = new Set(['priority','regular']);
 let lbTimer = null;
 
 
@@ -1244,6 +1328,53 @@ function renderTaskPoints(points, reasonText) {
   return `<span class="task-points ${className}" title="${safe}">${sign}${points}</span>`;
 }
 function setTasks(a){ save(LS.TASKS,a) }
+
+/* ==============================
+   ARCHIVE STORAGE HELPERS
+============================== */
+function isArchiveEligibleKind(kind){
+  return ARCHIVE_ZONE_KINDS.has(kind);
+}
+
+function archiveTaskCompletion(task, zone){
+  if(!task) return;
+  const taskKey = task.id != null ? String(task.id) : '';
+  if(!taskKey) return;
+
+  const zoneKind = zone ? zone.kind : '';
+  if(!isArchiveEligibleKind(zoneKind)) return;
+
+  const entry = {
+    taskId: taskKey,
+    text: String(task.text || ''),
+    zoneId: zone ? String(zone.id) : '',
+    zoneName: zone ? String(zone.name || '') : String(task.zoneName || ''),
+    zoneKind,
+    completedAt: new Date().toISOString(),
+    points: Number(task.points) || 0,
+    reason: String(task.aiReason || '').trim()
+  };
+
+  const current = getArchive();
+  const index = current.findIndex(item => item.taskId === taskKey);
+  const next = [...current];
+  if(index>-1){
+    next[index] = { ...next[index], ...entry };
+  }else{
+    next.push(entry);
+  }
+  setArchive(next);
+}
+
+function removeTaskFromArchive(taskId){
+  const key = taskId != null ? String(taskId) : '';
+  if(!key) return;
+  const list = getArchive();
+  const next = list.filter(item => item.taskId !== key);
+  if(next.length !== list.length){
+    setArchive(next);
+  }
+}
 
 /* ==============================
    LB CACHE
@@ -1991,6 +2122,7 @@ function ensureSettingsAuth(){
 function buildTabsBar(active){
   tabsBar.innerHTML = [
     {id:'tasks', label:'Nhiệm vụ', icon:'✅'},
+    {id:'archive', label:'Lưu trữ', icon:'🗂️'},
     {id:'leaderboard', label:'Leaderboard', icon:'🏆'},
     {id:'stats', label:'Biểu đồ', icon:'📈'},
     {id:'settings', label:'Settings', icon:'⚙️'}
@@ -2205,19 +2337,168 @@ async function viewTasks(){
   // tick task
   view.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
     cb.onchange=()=>{
-      const id=Number(cb.dataset.id);
-      const t = getTasks().find(t=>t.id===id);
-      if(!t) return;
-      const z = zones.find(z=>z.id==t.zoneId);
-      t.done = cb.checked;
-      const delta = cb.checked ? (t.points || 0) : -(t.points || 0);
+      const id = Number(cb.dataset.id);
+      const list = getTasks();
+      const index = list.findIndex(task=>task.id===id);
+      if(index<0) return;
+
+      const original = list[index];
+      const updated = { ...original, done: cb.checked };
+      const delta = cb.checked ? (Number(original.points) || 0) : -(Number(original.points) || 0);
+      const zone = zones.find(z=>z.id==updated.zoneId);
+      const zoneKind = zone ? zone.kind : '';
+
+      const nextTasks = list.map(task=>task.id===id?updated:task);
       addXP(delta);
-      setTasks(getTasks().map(x=>x.id===id?t:x));
+      setTasks(nextTasks);
+
+      if(cb.checked){
+        if(isArchiveEligibleKind(zoneKind)){
+          archiveTaskCompletion(updated, zone);
+        }
+      }else{
+        removeTaskFromArchive(updated.id);
+      }
+
       render('tasks');
     };
   });
 
   attachSwipeHandlersForTasks();
+}
+
+function formatArchiveDisplayTime(iso){
+  if(!iso) return '';
+  const date = new Date(iso);
+  if(Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString('vi-VN');
+}
+
+function renderArchiveItem(item){
+  const kindLabel = item.zoneKind ? (ZONE_KIND_LABELS[item.zoneKind] || item.zoneKind) : '';
+  const zoneName = item.zoneName || '';
+  let zoneDisplay = '';
+  if(zoneName && kindLabel){
+    zoneDisplay = `${zoneName} (${kindLabel})`;
+  }else if(zoneName){
+    zoneDisplay = zoneName;
+  }else if(kindLabel){
+    zoneDisplay = kindLabel;
+  }
+
+  const metaParts = [];
+  if(zoneDisplay) metaParts.push(zoneDisplay);
+  const timeText = formatArchiveDisplayTime(item.completedAt);
+  if(timeText) metaParts.push(timeText);
+  if(item.points){
+    metaParts.push(`${formatSignedNumber(item.points)} E`);
+  }
+
+  const reasonText = (item.reason || '').trim();
+  const metaHtml = metaParts.length ? `
+    <div class="archive-meta">
+      ${metaParts.map((part, idx)=> idx?`<span class="sep">•</span><span>${part}</span>`:`<span>${part}</span>`).join('')}
+    </div>
+  ` : '';
+  const reasonHtml = reasonText ? `<div class="archive-reason">Lý do: ${reasonText}</div>` : '';
+
+  return `
+    <li class="archive-item" data-task-id="${item.taskId}">
+      <div class="archive-info">
+        <div class="archive-title">${item.text}</div>
+        ${metaHtml}
+        ${reasonHtml}
+      </div>
+      <div class="archive-actions">
+        <button class="btn-ghost btn-sm" type="button" data-copy="${item.taskId}">Copy</button>
+      </div>
+    </li>
+  `;
+}
+
+function formatArchiveCopyText(item){
+  const kindLabel = item.zoneKind ? (ZONE_KIND_LABELS[item.zoneKind] || item.zoneKind) : '';
+  const zoneName = item.zoneName || '';
+  let zoneDisplay = '';
+  if(zoneName && kindLabel){
+    zoneDisplay = `${zoneName} (${kindLabel})`;
+  }else if(zoneName){
+    zoneDisplay = zoneName;
+  }else if(kindLabel){
+    zoneDisplay = kindLabel;
+  }
+
+  const segments = [String(item.text || '').trim()];
+  if(zoneDisplay) segments.push(zoneDisplay);
+  const timeText = formatArchiveDisplayTime(item.completedAt);
+  if(timeText) segments.push(timeText);
+  if(item.points){
+    segments.push(`${formatSignedNumber(item.points)} E`);
+  }
+  const reasonText = (item.reason || '').trim();
+  if(reasonText){
+    segments.push(`Lý do: ${reasonText}`);
+  }
+  return segments.filter(Boolean).join(' — ');
+}
+
+function viewArchive(){
+  const archived = getArchive();
+  const sorted = [...archived].sort((a,b)=>{
+    const timeA = Date.parse(a.completedAt || '');
+    const timeB = Date.parse(b.completedAt || '');
+    const safeA = Number.isNaN(timeA) ? 0 : timeA;
+    const safeB = Number.isNaN(timeB) ? 0 : timeB;
+    return safeB - safeA;
+  });
+
+  const listHtml = sorted.length
+    ? `<ul class="archive-list">${sorted.map(renderArchiveItem).join('')}</ul>`
+    : `<p class="archive-empty">Chưa có nhiệm vụ nào được lưu trữ.</p>`;
+
+  view.innerHTML = `
+    <div class="card" style="margin-top:0">
+      <h3>Lưu trữ nhiệm vụ</h3>
+      <div class="muted">Các nhiệm vụ đã hoàn thành từ Zone Quan trọng và Zone Thường.</div>
+      <div class="archive-toolbar">
+        <button class="btn-danger btn-sm" type="button" id="btnClearArchive" ${sorted.length?'':'disabled'}>Xóa tất cả</button>
+      </div>
+      ${listHtml}
+    </div>
+  `;
+
+  const archiveMap = new Map(sorted.map(item=>[item.taskId, item]));
+  view.querySelectorAll('[data-copy]').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const key = String(btn.dataset.copy || '');
+      const entry = archiveMap.get(key);
+      if(!entry) return;
+      if(!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function'){
+        alert('Trình duyệt không hỗ trợ copy vào clipboard.');
+        return;
+      }
+      try{
+        await navigator.clipboard.writeText(formatArchiveCopyText(entry));
+        btn.textContent = 'Đã copy!';
+        btn.disabled = true;
+        setTimeout(()=>{ render('archive'); }, 800);
+      }catch(err){
+        console.error(err);
+        alert('Không thể copy vào clipboard. Vui lòng thử lại.');
+      }
+    };
+  });
+
+  const clearBtn = document.getElementById('btnClearArchive');
+  if(clearBtn){
+    clearBtn.onclick = ()=>{
+      if(!sorted.length) return;
+      if(confirm('Bạn có chắc muốn xóa tất cả nhiệm vụ đã lưu?')){
+        setArchive([]);
+        render('archive');
+      }
+    };
+  }
 }
 
 /* LEADERBOARD */
@@ -2606,7 +2887,9 @@ function render(tab){
 
   stopDaySyncMonitoring();
 
-  if(tab==='leaderboard'){
+  if(tab==='archive'){
+    viewArchive();
+  } else if(tab==='leaderboard'){
     viewLeaderboard();
   } else if(tab==='stats'){
     viewStats();
