@@ -1731,7 +1731,15 @@ function performDayRollover(opts={}){
 
     clearFlagsFor(todaySim);
     nextDay();
-    const remaining = tasks.filter(t=>t.kind!=='recurring');
+    const zoneKindById = new Map(zones.map(z => [z.id, z.kind]));
+    const remaining = tasks.filter(t => {
+      if (t.kind === 'recurring') return false;
+      const zoneKind = zoneKindById.get(t.zoneId);
+      if (t.done && zoneKind && ARCHIVE_ZONE_KINDS.has(zoneKind)) {
+        return false;
+      }
+      return true;
+    });
     setTasks(remaining);
     localStorage.removeItem(LS.SPAWN);
     spawnRecurringIfNeeded();
