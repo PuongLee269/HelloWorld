@@ -2531,36 +2531,14 @@ function renderArchiveItem(item){
         ${reasonHtml}
       </div>
       <div class="archive-actions">
-        <button class="btn-ghost btn-sm" type="button" data-copy="${item.taskId}">Copy</button>
+        <button class="btn-ghost btn-sm" type="button" data-copy="${item.taskId}" title="Copy tiêu đề nhiệm vụ">Copy</button>
       </div>
     </li>
   `;
 }
 
 function formatArchiveCopyText(item){
-  const kindLabel = item.zoneKind ? (ZONE_KIND_LABELS[item.zoneKind] || item.zoneKind) : '';
-  const zoneName = item.zoneName || '';
-  let zoneDisplay = '';
-  if(zoneName && kindLabel){
-    zoneDisplay = `${zoneName} (${kindLabel})`;
-  }else if(zoneName){
-    zoneDisplay = zoneName;
-  }else if(kindLabel){
-    zoneDisplay = kindLabel;
-  }
-
-  const segments = [String(item.text || '').trim()];
-  if(zoneDisplay) segments.push(zoneDisplay);
-  const timeText = formatArchiveDisplayTime(item.completedAt);
-  if(timeText) segments.push(timeText);
-  if(item.points){
-    segments.push(`${formatSignedNumber(item.points)} E`);
-  }
-  const reasonText = (item.reason || '').trim();
-  if(reasonText){
-    segments.push(`Lý do: ${reasonText}`);
-  }
-  return segments.filter(Boolean).join(' — ');
+  return String(item?.text || '').trim();
 }
 
 function viewArchive(){
