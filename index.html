@@ -116,9 +116,17 @@ h1 .app-version{
 .hero-progress-fill{
   height:100%;
   width:0;
-  background:rgba(255,255,255,.95);
+  background:linear-gradient(90deg,#ff5f6d,#ffc371,#f9f871,#a8ff78,#78ffd6,#57c7ff,#9d50bb);
+  background-size:300% 100%;
   box-shadow:0 6px 18px rgba(255,255,255,.35);
   border-radius:999px;
+  transition:width .6s ease;
+  animation:hero-progress-rainbow 6s linear infinite;
+}
+@keyframes hero-progress-rainbow{
+  0%{background-position:0% 50%}
+  50%{background-position:100% 50%}
+  100%{background-position:0% 50%}
 }
 .hero-progress-label{
   margin-top:8px;
