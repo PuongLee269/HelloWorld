@@ -680,32 +680,57 @@ const LS = {
   ARCHIVE:'tq_archive'
 };
 
+function normalizeArchiveText(raw){
+  const text = String(raw || '').trim();
+  if(!text) return '';
+  const normalized = typeof text.normalize === 'function'
+    ? text.normalize('NFKC')
+    : text;
+  return normalized
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
 function normalizeArchiveEntry(raw){
-  if(!raw || typeof raw !== 'object') return null;
-  const taskId = raw.taskId != null ? String(raw.taskId) : '';
-  if(!taskId) return null;
-  const zoneId = raw.zoneId != null ? String(raw.zoneId) : '';
-  const completedAt = typeof raw.completedAt === 'string' ? raw.completedAt : '';
-  return {
-    taskId,
-    text: String(raw.text || ''),
-    zoneId,
-    zoneName: String(raw.zoneName || ''),
-    zoneKind: String(raw.zoneKind || ''),
-    completedAt,
-    points: Number(raw.points) || 0,
-    reason: String(raw.reason || '').trim()
-  };
+  let text = '';
+  if(typeof raw === 'string'){
+    text = raw;
+  }else if(raw && typeof raw === 'object'){
+    text = raw.text != null ? raw.text : '';
+  }
+  const clean = String(text || '').trim();
+  const key = normalizeArchiveText(clean);
+  if(!key) return null;
+  return { text: clean };
 }
 
 function getArchive(){
   const raw = load(LS.ARCHIVE, []);
   if(!Array.isArray(raw)) return [];
-  return raw.map(normalizeArchiveEntry).filter(Boolean);
+  const seen = new Set();
+  const result = [];
+  for(const item of raw){
+    const entry = normalizeArchiveEntry(item);
+    if(!entry) continue;
+    const key = normalizeArchiveText(entry.text);
+    if(seen.has(key)) continue;
+    seen.add(key);
+    result.push(entry);
+  }
+  return result;
 }
 function setArchive(list){
   if(!Array.isArray(list)) list = [];
-  const normalized = list.map(normalizeArchiveEntry).filter(Boolean);
+  const seen = new Set();
+  const normalized = [];
+  for(const item of list){
+    const entry = normalizeArchiveEntry(item);
+    if(!entry) continue;
+    const key = normalizeArchiveText(entry.text);
+    if(seen.has(key)) continue;
+    seen.add(key);
+    normalized.push(entry);
+  }
   save(LS.ARCHIVE, normalized);
 }
 
@@ -1459,39 +1484,30 @@ function isArchiveEligibleKind(kind){
 
 function archiveTaskCompletion(task, zone){
   if(!task) return;
-  const taskKey = task.id != null ? String(task.id) : '';
-  if(!taskKey) return;
 
   const zoneKind = zone ? zone.kind : '';
   if(!isArchiveEligibleKind(zoneKind)) return;
 
-  const entry = {
-    taskId: taskKey,
-    text: String(task.text || ''),
-    zoneId: zone ? String(zone.id) : '',
-    zoneName: zone ? String(zone.name || '') : String(task.zoneName || ''),
-    zoneKind,
-    completedAt: new Date().toISOString(),
-    points: Number(task.points) || 0,
-    reason: String(task.aiReason || '').trim()
-  };
+  const text = String(task.text || '').trim();
+  const key = normalizeArchiveText(text);
+  if(!key) return;
 
   const current = getArchive();
-  const index = current.findIndex(item => item.taskId === taskKey);
+  const index = current.findIndex(item => normalizeArchiveText(item.text) === key);
   const next = [...current];
   if(index>-1){
-    next[index] = { ...next[index], ...entry };
+    next[index] = { text };
   }else{
-    next.push(entry);
+    next.push({ text });
   }
   setArchive(next);
 }
 
-function removeTaskFromArchive(taskId){
-  const key = taskId != null ? String(taskId) : '';
+function removeTaskFromArchive(taskText){
+  const key = normalizeArchiveText(taskText);
   if(!key) return;
   const list = getArchive();
-  const next = list.filter(item => item.taskId !== key);
+  const next = list.filter(item => normalizeArchiveText(item.text) !== key);
   if(next.length !== list.length){
     setArchive(next);
   }
@@ -2483,7 +2499,7 @@ async function viewTasks(){
           archiveTaskCompletion(updated, zone);
         }
       }else{
-        removeTaskFromArchive(updated.id);
+        removeTaskFromArchive(updated.text);
       }
 
       render('tasks');
@@ -2501,42 +2517,19 @@ function formatArchiveDisplayTime(iso){
 }
 
 function renderArchiveItem(item){
-  const kindLabel = item.zoneKind ? (ZONE_KIND_LABELS[item.zoneKind] || item.zoneKind) : '';
-  const zoneName = item.zoneName || '';
-  let zoneDisplay = '';
-  if(zoneName && kindLabel){
-    zoneDisplay = `${zoneName} (${kindLabel})`;
-  }else if(zoneName){
-    zoneDisplay = zoneName;
-  }else if(kindLabel){
-    zoneDisplay = kindLabel;
-  }
-
-  const metaParts = [];
-  if(zoneDisplay) metaParts.push(zoneDisplay);
-  const timeText = formatArchiveDisplayTime(item.completedAt);
-  if(timeText) metaParts.push(timeText);
-  if(item.points){
-    metaParts.push(`${formatSignedNumber(item.points)} E`);
-  }
-
-  const reasonText = (item.reason || '').trim();
-  const metaHtml = metaParts.length ? `
-    <div class="archive-meta">
-      ${metaParts.map((part, idx)=> idx?`<span class="sep">•</span><span>${part}</span>`:`<span>${part}</span>`).join('')}
-    </div>
-  ` : '';
-  const reasonHtml = reasonText ? `<div class="archive-reason">Lý do: ${reasonText}</div>` : '';
-
+  const key = normalizeArchiveText(item.text);
+  const safeKey = key
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
   return `
-    <li class="archive-item" data-task-id="${item.taskId}">
+    <li class="archive-item" data-archive-key="${safeKey}">
       <div class="archive-info">
         <div class="archive-title">${item.text}</div>
-        ${metaHtml}
-        ${reasonHtml}
       </div>
       <div class="archive-actions">
-        <button class="btn-ghost btn-sm" type="button" data-copy="${item.taskId}" title="Copy tiêu đề nhiệm vụ">Copy</button>
+        <button class="btn-ghost btn-sm" type="button" data-copy="${safeKey}" title="Copy tiêu đề nhiệm vụ">Copy</button>
       </div>
     </li>
   `;
@@ -2548,13 +2541,9 @@ function formatArchiveCopyText(item){
 
 function viewArchive(){
   const archived = getArchive();
-  const sorted = [...archived].sort((a,b)=>{
-    const timeA = Date.parse(a.completedAt || '');
-    const timeB = Date.parse(b.completedAt || '');
-    const safeA = Number.isNaN(timeA) ? 0 : timeA;
-    const safeB = Number.isNaN(timeB) ? 0 : timeB;
-    return safeB - safeA;
-  });
+  const sorted = [...archived].sort((a,b)=>
+    a.text.localeCompare(b.text, 'vi', { sensitivity: 'base' })
+  );
 
   const listHtml = sorted.length
     ? `<ul class="archive-list">${sorted.map(renderArchiveItem).join('')}</ul>`
@@ -2571,10 +2560,10 @@ function viewArchive(){
     </div>
   `;
 
-  const archiveMap = new Map(sorted.map(item=>[item.taskId, item]));
+  const archiveMap = new Map(sorted.map(item=>[normalizeArchiveText(item.text), item]));
   view.querySelectorAll('[data-copy]').forEach(btn=>{
     btn.onclick = async ()=>{
-      const key = String(btn.dataset.copy || '');
+      const key = normalizeArchiveText(btn.dataset.copy || '');
       const entry = archiveMap.get(key);
       if(!entry) return;
       if(!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function'){
