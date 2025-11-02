@@ -1731,7 +1731,12 @@ function performDayRollover(opts={}){
 
     clearFlagsFor(todaySim);
     nextDay();
-    const remaining = tasks.filter(t=>t.kind!=='recurring');
+    const remaining = tasks
+      .filter(t => {
+        if (t && t.kind === 'recurring') return true;
+        return t && !t.done;
+      })
+      .map(t => t.kind === 'recurring' ? { ...t, done: false } : t);
     setTasks(remaining);
     localStorage.removeItem(LS.SPAWN);
     spawnRecurringIfNeeded();
