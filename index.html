@@ -670,7 +670,8 @@ const LS = {
   LBCACHE:'tq_lb_cache',
   HIST:'tq_hist',
   REALDATE:'tq_real_date',
-  ARCHIVE:'tq_archive'
+  ARCHIVE:'tq_archive',
+  ZONE_E_BONUS_DAY:'tq_zone_e_bonus_day'
 };
 
 function normalizeArchiveText(raw){
@@ -1714,23 +1715,24 @@ function performDayRollover(opts={}){
     const tasks=getTasks();
     const todaySim=getDay();
 
-    // Calculate productivity bonus
+    const zoneKindMap = new Map(zones.map(z => [Number(z.id), z.kind]));
     const todayTasks = tasks.filter(t => isTaskActiveToday(t) && t.done);
-    let totalDayPoints = 0;
-    let noisePenalty = 0;
-    const noiseZone = zones.find(z => z.kind === 'noise');
-    todayTasks.forEach(t => {
-      const pts = Number(t.points) || 0;
-      totalDayPoints += pts;
-      if (noiseZone && t.zoneId === noiseZone.id) {
-        noisePenalty += Math.min(0, pts);
-      }
-    });
-    if (totalDayPoints >= 10 && noisePenalty >= -1) {
-      let bonus = 3;
-      if (totalDayPoints >= 15) bonus = 5;
-      if (totalDayPoints >= 20) bonus = 8;
-      addXP(bonus);
+    const completedZoneECount = todayTasks.reduce((count, task) => {
+      const zoneKind = zoneKindMap.get(Number(task.zoneId));
+      return zoneKind === 'e' ? count + 1 : count;
+    }, 0);
+
+    const lastZoneEBonusDay = Number(localStorage.getItem(LS.ZONE_E_BONUS_DAY) || 0);
+    const isZoneEBonusEligible = completedZoneECount > 3;
+    const isZoneEBonusApplied = lastZoneEBonusDay === todaySim;
+    const shouldApplyZoneEBonus = isZoneEBonusEligible && !isZoneEBonusApplied;
+    const zoneEBonus = shouldApplyZoneEBonus
+      ? Math.min(5, Math.max(3, completedZoneECount))
+      : 0;
+
+    if (zoneEBonus > 0) {
+      localStorage.setItem(LS.ZONE_E_BONUS_DAY, String(todaySim));
+      addXP(zoneEBonus);
     }
 
     // Daily penalty
