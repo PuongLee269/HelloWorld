@@ -671,7 +671,8 @@ const LS = {
   HIST:'tq_hist',
   REALDATE:'tq_real_date',
   ARCHIVE:'tq_archive',
-  ZONE_E_BONUS_DAY:'tq_zone_e_bonus_day'
+  ZONE_E_BONUS_DAY:'tq_zone_e_bonus_day',
+  NOISE_STREAKS:'tq_noise_streaks'
 };
 
 function normalizeArchiveText(raw){
@@ -789,6 +790,73 @@ function calcTotalE(level, xp){
 ============================== */
 function load(key, def){ try{ return JSON.parse(localStorage.getItem(key)) ?? def }catch{ return def } }
 function save(key, val){ localStorage.setItem(key, JSON.stringify(val)) }
+
+const NOISE_STREAK_MIN_POINTS = -5;
+
+function clampNoiseBasePoints(value){
+  const n = Number(value);
+  if(!Number.isFinite(n)) return -1;
+  if(n > -1) return -1;
+  if(n < NOISE_STREAK_MIN_POINTS) return NOISE_STREAK_MIN_POINTS;
+  return Math.round(n);
+}
+
+function tryParseNoiseBase(value){
+  const n = Number(value);
+  if(!Number.isFinite(n)) return null;
+  return clampNoiseBasePoints(n);
+}
+
+function pickNoiseBase(...candidates){
+  for(const value of candidates){
+    const parsed = tryParseNoiseBase(value);
+    if(parsed !== null) return parsed;
+  }
+  return clampNoiseBasePoints(-1);
+}
+
+function parseNoiseStreak(value){
+  const n = Number(value);
+  if(!Number.isFinite(n) || n <= 0) return 0;
+  return Math.floor(n);
+}
+
+function getNoiseStreakStore(){
+  const raw = load(LS.NOISE_STREAKS, {});
+  if(!raw || typeof raw !== 'object') return {};
+  const result = {};
+  Object.keys(raw).forEach((key)=>{
+    const entry = raw[key];
+    if(!entry || typeof entry !== 'object') return;
+    const base = clampNoiseBasePoints(entry.basePoints);
+    const rawStreak = Number(entry.streak);
+    const streak = Number.isFinite(rawStreak) && rawStreak > 0 ? Math.floor(rawStreak) : 0;
+    result[key] = { basePoints: base, streak };
+  });
+  return result;
+}
+
+function setNoiseStreakStore(store){
+  const normalized = {};
+  if(store && typeof store === 'object'){
+    Object.keys(store).forEach((key)=>{
+      const entry = store[key];
+      if(!entry || typeof entry !== 'object') return;
+      const base = clampNoiseBasePoints(entry.basePoints);
+      const rawStreak = Number(entry.streak);
+      const streak = Number.isFinite(rawStreak) && rawStreak > 0 ? Math.floor(rawStreak) : 0;
+      normalized[key] = { basePoints: base, streak };
+    });
+  }
+  save(LS.NOISE_STREAKS, normalized);
+}
+
+function getNoiseTaskKey(task){
+  if(!task || typeof task !== 'object') return null;
+  if(typeof task.recurringId === 'number') return `rec:${task.recurringId}`;
+  if(task.id != null) return `task:${task.id}`;
+  return null;
+}
 
 function generateProfileId(){
   try {
@@ -1280,6 +1348,11 @@ async function addRecurring(r){
   const normalizedAi = normalizeAiScoreForZone(ai, zoneKind);
   rec.points = normalizedAi.points; // lưu điểm base cho recurring
   rec.reason = normalizedAi.reason;
+  if(zoneKind === 'noise'){
+    rec.noiseBasePoints = clampNoiseBasePoints(rec.points);
+  }else if('noiseBasePoints' in rec){
+    delete rec.noiseBasePoints;
+  }
 
   const list = [...getRecurring(), rec];
   save(LS.RECUR, list);
@@ -1737,6 +1810,136 @@ function performDayRollover(opts={}){
 
     // Daily penalty
     addXP(-5);
+
+    const recsRaw = getRecurring();
+    const recs = Array.isArray(recsRaw) ? recsRaw : [];
+    const recMap = new Map();
+    const recZoneKind = new Map();
+    const validNoiseKeys = new Set();
+    let recsChanged = false;
+
+    recs.forEach((rec) => {
+      if(!rec || typeof rec !== 'object') return;
+      recMap.set(rec.id, rec);
+      const zoneKind = zoneKindMap.get(Number(rec.zoneId));
+      recZoneKind.set(rec.id, zoneKind);
+      if(zoneKind === 'noise'){
+        const key = `rec:${rec.id}`;
+        validNoiseKeys.add(key);
+        const normalizedBase = pickNoiseBase(rec.noiseBasePoints, rec.points);
+        if(rec.noiseBasePoints !== normalizedBase){
+          rec.noiseBasePoints = normalizedBase;
+          recsChanged = true;
+        }
+      }else if('noiseBasePoints' in rec){
+        delete rec.noiseBasePoints;
+        recsChanged = true;
+      }
+    });
+
+    const noiseStreakStore = getNoiseStreakStore();
+    const nextNoiseStreakStore = { ...noiseStreakStore };
+    let noiseStoreChanged = false;
+    const processedNoiseKeys = new Set();
+
+    recZoneKind.forEach((zoneKind, recId) => {
+      if(zoneKind !== 'noise'){
+        const key = `rec:${recId}`;
+        if(Object.prototype.hasOwnProperty.call(nextNoiseStreakStore, key)){
+          delete nextNoiseStreakStore[key];
+          noiseStoreChanged = true;
+        }
+      }
+    });
+
+    for(const task of tasks){
+      const zoneKind = zoneKindMap.get(Number(task.zoneId));
+      if(zoneKind !== 'noise' || task.kind !== 'recurring') continue;
+      const key = getNoiseTaskKey(task);
+      if(!key) continue;
+      processedNoiseKeys.add(key);
+      validNoiseKeys.add(key);
+
+      const rec = recMap.get(task.recurringId);
+      const storedEntry = nextNoiseStreakStore[key];
+      const basePoints = pickNoiseBase(
+        storedEntry && storedEntry.basePoints,
+        rec && rec.noiseBasePoints,
+        rec && rec.points,
+        task.points
+      );
+      if(rec && rec.noiseBasePoints !== basePoints){
+        rec.noiseBasePoints = basePoints;
+        recsChanged = true;
+      }
+
+      let streak = parseNoiseStreak(storedEntry && storedEntry.streak);
+      const wasDoneToday = !!task.done;
+      if(wasDoneToday){
+        streak = streak + 1;
+      }else{
+        streak = 0;
+      }
+      const extraPenalty = wasDoneToday ? Math.min(4, Math.max(0, streak - 1)) : 0;
+      const updatedPoints = wasDoneToday
+        ? Math.max(NOISE_STREAK_MIN_POINTS, basePoints - extraPenalty)
+        : basePoints;
+
+      if(task.points !== updatedPoints){
+        task.points = updatedPoints;
+      }
+      if(rec && rec.points !== updatedPoints){
+        rec.points = updatedPoints;
+        recsChanged = true;
+      }
+
+      const currentEntry = nextNoiseStreakStore[key];
+      if(!currentEntry || currentEntry.basePoints !== basePoints || currentEntry.streak !== streak){
+        nextNoiseStreakStore[key] = { basePoints, streak };
+        noiseStoreChanged = true;
+      }
+    }
+
+    recs.forEach((rec) => {
+      if(!rec || typeof rec !== 'object') return;
+      const zoneKind = recZoneKind.get(rec.id);
+      if(zoneKind !== 'noise') return;
+      const key = `rec:${rec.id}`;
+      if(processedNoiseKeys.has(key)) return;
+      validNoiseKeys.add(key);
+      const basePoints = pickNoiseBase(
+        nextNoiseStreakStore[key] && nextNoiseStreakStore[key].basePoints,
+        rec.noiseBasePoints,
+        rec.points
+      );
+      if(rec.noiseBasePoints !== basePoints){
+        rec.noiseBasePoints = basePoints;
+        recsChanged = true;
+      }
+      if(rec.points !== basePoints){
+        rec.points = basePoints;
+        recsChanged = true;
+      }
+      const currentEntry = nextNoiseStreakStore[key];
+      if(!currentEntry || currentEntry.basePoints !== basePoints || currentEntry.streak !== 0){
+        nextNoiseStreakStore[key] = { basePoints, streak: 0 };
+        noiseStoreChanged = true;
+      }
+    });
+
+    Object.keys(nextNoiseStreakStore).forEach((key) => {
+      if(!validNoiseKeys.has(key)){
+        delete nextNoiseStreakStore[key];
+        noiseStoreChanged = true;
+      }
+    });
+
+    if(noiseStoreChanged){
+      setNoiseStreakStore(nextNoiseStreakStore);
+    }
+    if(recsChanged){
+      save(LS.RECUR, recs);
+    }
 
     pushHistSnapshot();
 
