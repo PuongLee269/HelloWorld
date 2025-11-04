@@ -231,14 +231,22 @@ h1 .app-version{
   color:#1b1e2e;
   box-shadow:0 6px 16px rgba(0,0,0,.08);
 }
-.task-points { 
-  font-weight: bold; 
-  margin-left: 8px; 
-  font-size: 14px; 
+.task-points {
+  font-weight: bold;
+  margin-left: 8px;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 .task-points.positive { color: #16a34a; }
 .task-points.negative { color: #dc2626; }
 .task-points.neutral { color: #4b5563; }
+.task-point-icon {
+  display: inline-flex;
+  align-items: center;
+  font-size: 14px;
+}
 .task-kind{
   display:inline-flex;
   align-items:center;
@@ -504,6 +512,10 @@ th{
   color:#1b1e2e;
   background:rgba(255,255,255,.6)
 }
+.lb-medal{
+  margin-left:6px;
+  font-size:16px;
+}
 
 /* Charts */
 .chart-card canvas{
@@ -672,7 +684,8 @@ const LS = {
   REALDATE:'tq_real_date',
   ARCHIVE:'tq_archive',
   ZONE_E_BONUS_DAY:'tq_zone_e_bonus_day',
-  NOISE_STREAKS:'tq_noise_streaks'
+  NOISE_STREAKS:'tq_noise_streaks',
+  ZONE_E_STREAKS:'tq_zone_e_streaks'
 };
 
 function normalizeArchiveText(raw){
@@ -792,6 +805,9 @@ function load(key, def){ try{ return JSON.parse(localStorage.getItem(key)) ?? de
 function save(key, val){ localStorage.setItem(key, JSON.stringify(val)) }
 
 const NOISE_STREAK_MIN_POINTS = -5;
+const NOISE_SKULL_THRESHOLD = 5;
+const NOISE_EXTRA_PENALTY_THRESHOLD = 10;
+const ZONE_E_CROWN_THRESHOLD = 10;
 
 function clampNoiseBasePoints(value){
   const n = Number(value);
@@ -849,6 +865,37 @@ function setNoiseStreakStore(store){
     });
   }
   save(LS.NOISE_STREAKS, normalized);
+}
+
+function normalizeZoneEEntry(raw){
+  if(!raw || typeof raw !== 'object') return null;
+  const baseVal = Number(raw.basePoints);
+  const basePoints = Number.isFinite(baseVal) ? baseVal : 0;
+  const streak = parseNoiseStreak(raw.streak);
+  const crownActive = !!raw.crownActive;
+  return { basePoints, streak, crownActive };
+}
+
+function getZoneEStreakStore(){
+  const raw = load(LS.ZONE_E_STREAKS, {});
+  if(!raw || typeof raw !== 'object') return {};
+  const result = {};
+  Object.keys(raw).forEach((key)=>{
+    const entry = normalizeZoneEEntry(raw[key]);
+    if(entry) result[key] = entry;
+  });
+  return result;
+}
+
+function setZoneEStreakStore(store){
+  const normalized = {};
+  if(store && typeof store === 'object'){
+    Object.keys(store).forEach((key)=>{
+      const entry = normalizeZoneEEntry(store[key]);
+      if(entry) normalized[key] = entry;
+    });
+  }
+  save(LS.ZONE_E_STREAKS, normalized);
 }
 
 function getNoiseTaskKey(task){
@@ -1513,7 +1560,8 @@ function renderTaskKindBadge(task, zone){
   return `<span class="${taskKindClass(task, zone)}">${describeTaskKind(task, zone)}</span>`;
 }
 
-function renderTaskPoints(points, reasonText) {
+function renderTaskPoints(points, reasonText, options) {
+  const opts = options && typeof options === 'object' ? options : {};
   const sign = points >= 0 ? '+' : '';
   const className = points >= 0 ? 'positive' : 'negative';
   const rawReason = String(reasonText || '').trim();
@@ -1537,8 +1585,49 @@ function renderTaskPoints(points, reasonText) {
       prioritizedReason = [...noiseSegments, ...otherSegments].join(' — ');
     }
   }
-  const safe = prioritizedReason.replace(/"/g, '&quot;');
-  return `<span class="task-points ${className}" title="${safe}">${sign}${points}</span>`;
+  const extraTooltip = opts.tooltip != null ? String(opts.tooltip).trim() : '';
+  const tooltipParts = [];
+  if(prioritizedReason){
+    tooltipParts.push(prioritizedReason);
+  }
+  if(extraTooltip){
+    tooltipParts.push(extraTooltip);
+  }
+  const tooltipText = tooltipParts.join(' — ');
+  const safeTitle = tooltipText.replace(/"/g, '&quot;');
+  const titleAttr = tooltipText ? ` title="${safeTitle}"` : '';
+  const icon = opts.icon ? `<span class="task-point-icon" aria-hidden="true">${opts.icon}</span>` : '';
+  return `<span class="task-points ${className}"${titleAttr}>${icon}${sign}${points}</span>`;
+}
+
+function getTaskPointExtras(task, zoneKind, stores){
+  if(!task || !stores) return {};
+  const noiseStore = stores.noise || {};
+  const zoneEStore = stores.zoneE || {};
+  if(zoneKind === 'noise' && task.kind === 'recurring'){
+    const key = getNoiseTaskKey(task);
+    if(key && noiseStore[key]){
+      const streak = parseNoiseStreak(noiseStore[key].streak);
+      if(streak >= NOISE_SKULL_THRESHOLD){
+        const penaltyNote = streak >= NOISE_EXTRA_PENALTY_THRESHOLD ? ' — -1 E bổ sung' : '';
+        return {
+          icon:'💀',
+          tooltip:`Streak Noise: ${streak}${penaltyNote}`
+        };
+      }
+    }
+  }
+  if(zoneKind === 'e' && task.kind === 'recurring'){
+    const key = getNoiseTaskKey(task);
+    if(key && zoneEStore[key] && zoneEStore[key].crownActive){
+      const streak = parseNoiseStreak(zoneEStore[key].streak);
+      return {
+        icon:'👑',
+        tooltip:`Streak Zone E: ${streak}`
+      };
+    }
+  }
+  return {};
 }
 function setTasks(a){ save(LS.TASKS,a) }
 
@@ -1601,15 +1690,19 @@ function renderLBRows(rowsEl, list){
   enriched.sort((a,b)=>
     (b.totalE-a.totalE) || (b.level-a.level) || (b.xp-a.xp) || (a.name||'').localeCompare(b.name||'')
   );
-  rowsEl.innerHTML = enriched.map((u,i)=>`
+  rowsEl.innerHTML = enriched.map((u,i)=>{
+    const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+    const rankCell = medal ? `${i+1}<span class="lb-medal">${medal}</span>` : `${i+1}`;
+    return `
     <tr>
-      <td>${i+1}</td>
+      <td>${rankCell}</td>
       <td>${u.name||'-'}</td>
       <td>${u.level??'-'}</td>
       <td>${u.totalE??'-'}</td>
       <td>${u.updatedAt?new Date(u.updatedAt).toLocaleString():'-'}</td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 }
 
 /* ==============================
@@ -1816,7 +1909,11 @@ function performDayRollover(opts={}){
     const recMap = new Map();
     const recZoneKind = new Map();
     const validNoiseKeys = new Set();
+    const zoneEStreakStore = getZoneEStreakStore();
+    const nextZoneEStreakStore = { ...zoneEStreakStore };
+    const validZoneEKeys = new Set();
     let recsChanged = false;
+    let zoneEStoreChanged = false;
 
     recs.forEach((rec) => {
       if(!rec || typeof rec !== 'object') return;
@@ -1834,6 +1931,16 @@ function performDayRollover(opts={}){
       }else if('noiseBasePoints' in rec){
         delete rec.noiseBasePoints;
         recsChanged = true;
+      }
+      if(zoneKind === 'e'){
+        const key = `rec:${rec.id}`;
+        validZoneEKeys.add(key);
+      }else{
+        const key = `rec:${rec.id}`;
+        if(Object.prototype.hasOwnProperty.call(nextZoneEStreakStore, key)){
+          delete nextZoneEStreakStore[key];
+          zoneEStoreChanged = true;
+        }
       }
     });
 
@@ -1854,49 +1961,94 @@ function performDayRollover(opts={}){
 
     for(const task of tasks){
       const zoneKind = zoneKindMap.get(Number(task.zoneId));
-      if(zoneKind !== 'noise' || task.kind !== 'recurring') continue;
-      const key = getNoiseTaskKey(task);
-      if(!key) continue;
-      processedNoiseKeys.add(key);
-      validNoiseKeys.add(key);
+      if(task.kind !== 'recurring') continue;
 
-      const rec = recMap.get(task.recurringId);
-      const storedEntry = nextNoiseStreakStore[key];
-      const basePoints = pickNoiseBase(
-        storedEntry && storedEntry.basePoints,
-        rec && rec.noiseBasePoints,
-        rec && rec.points,
-        task.points
-      );
-      if(rec && rec.noiseBasePoints !== basePoints){
-        rec.noiseBasePoints = basePoints;
-        recsChanged = true;
+      if(zoneKind === 'e'){
+        const key = getNoiseTaskKey(task);
+        if(key){
+          validZoneEKeys.add(key);
+          const rec = recMap.get(task.recurringId);
+          const prevEntry = nextZoneEStreakStore[key];
+          const recPoints = rec && Number(rec.points);
+          const taskPoints = Number(task.points);
+          let basePointsCandidate = Number.isFinite(recPoints) ? recPoints : taskPoints;
+          if(prevEntry && prevEntry.crownActive){
+            basePointsCandidate -= 1;
+          }
+          if(!Number.isFinite(basePointsCandidate)){
+            basePointsCandidate = prevEntry ? prevEntry.basePoints : 0;
+          }
+          basePointsCandidate = Number.isFinite(basePointsCandidate) ? basePointsCandidate : 0;
+
+          let streak = parseNoiseStreak(prevEntry && prevEntry.streak);
+          if(task.done){
+            streak = streak + 1;
+          }else{
+            streak = 0;
+          }
+          const crownActive = streak > ZONE_E_CROWN_THRESHOLD;
+          const effectivePoints = basePointsCandidate + (crownActive ? 1 : 0);
+
+          if(!prevEntry || prevEntry.basePoints !== basePointsCandidate || prevEntry.streak !== streak || prevEntry.crownActive !== crownActive){
+            nextZoneEStreakStore[key] = { basePoints: basePointsCandidate, streak, crownActive };
+            zoneEStoreChanged = true;
+          }
+
+          if(Number(task.points) !== effectivePoints){
+            task.points = effectivePoints;
+          }
+          if(rec && Number(rec.points) !== effectivePoints){
+            rec.points = effectivePoints;
+            recsChanged = true;
+          }
+        }
       }
 
-      let streak = parseNoiseStreak(storedEntry && storedEntry.streak);
-      const wasDoneToday = !!task.done;
-      if(wasDoneToday){
-        streak = streak + 1;
-      }else{
-        streak = 0;
-      }
-      const extraPenalty = wasDoneToday ? Math.min(4, Math.max(0, streak - 1)) : 0;
-      const updatedPoints = wasDoneToday
-        ? Math.max(NOISE_STREAK_MIN_POINTS, basePoints - extraPenalty)
-        : basePoints;
+      if(zoneKind === 'noise'){
+        const key = getNoiseTaskKey(task);
+        if(!key) continue;
+        processedNoiseKeys.add(key);
+        validNoiseKeys.add(key);
 
-      if(task.points !== updatedPoints){
-        task.points = updatedPoints;
-      }
-      if(rec && rec.points !== updatedPoints){
-        rec.points = updatedPoints;
-        recsChanged = true;
-      }
+        const rec = recMap.get(task.recurringId);
+        const storedEntry = nextNoiseStreakStore[key];
+        const basePoints = pickNoiseBase(
+          storedEntry && storedEntry.basePoints,
+          rec && rec.noiseBasePoints,
+          rec && rec.points,
+          task.points
+        );
+        if(rec && rec.noiseBasePoints !== basePoints){
+          rec.noiseBasePoints = basePoints;
+          recsChanged = true;
+        }
 
-      const currentEntry = nextNoiseStreakStore[key];
-      if(!currentEntry || currentEntry.basePoints !== basePoints || currentEntry.streak !== streak){
-        nextNoiseStreakStore[key] = { basePoints, streak };
-        noiseStoreChanged = true;
+        let streak = parseNoiseStreak(storedEntry && storedEntry.streak);
+        const wasDoneToday = !!task.done;
+        if(wasDoneToday){
+          streak = streak + 1;
+        }else{
+          streak = 0;
+        }
+        const extraPenalty = wasDoneToday ? Math.min(4, Math.max(0, streak - 1)) : 0;
+        const bonusPenalty = wasDoneToday && streak >= NOISE_EXTRA_PENALTY_THRESHOLD ? 1 : 0;
+        const updatedPoints = wasDoneToday
+          ? Math.max(NOISE_STREAK_MIN_POINTS, basePoints - extraPenalty - bonusPenalty)
+          : basePoints;
+
+        if(task.points !== updatedPoints){
+          task.points = updatedPoints;
+        }
+        if(rec && rec.points !== updatedPoints){
+          rec.points = updatedPoints;
+          recsChanged = true;
+        }
+
+        const currentEntry = nextNoiseStreakStore[key];
+        if(!currentEntry || currentEntry.basePoints !== basePoints || currentEntry.streak !== streak){
+          nextNoiseStreakStore[key] = { basePoints, streak };
+          noiseStoreChanged = true;
+        }
       }
     }
 
@@ -1934,8 +2086,18 @@ function performDayRollover(opts={}){
       }
     });
 
+    Object.keys(nextZoneEStreakStore).forEach((key) => {
+      if(!validZoneEKeys.has(key)){
+        delete nextZoneEStreakStore[key];
+        zoneEStoreChanged = true;
+      }
+    });
+
     if(noiseStoreChanged){
       setNoiseStreakStore(nextNoiseStreakStore);
+    }
+    if(zoneEStoreChanged){
+      setZoneEStreakStore(nextZoneEStreakStore);
     }
     if(recsChanged){
       save(LS.RECUR, recs);
@@ -2485,6 +2647,9 @@ async function viewTasks(){
 
   let zones=getZones();
   const tasks=getTasks();
+  const noiseStore = getNoiseStreakStore();
+  const zoneEStore = getZoneEStreakStore();
+  const pointExtraStores = { noise: noiseStore, zoneE: zoneEStore };
   const dateNowDM = todayDM();
   let priorityZone = zones.find(z => z.kind === 'priority');
 
@@ -2557,7 +2722,7 @@ async function viewTasks(){
                     <input type="checkbox" data-id="${t.id}" ${t.done?'checked':''}>
                     <span class="txt">${t.text}</span>
                     ${renderTaskKindBadge(t, z)}
-                    ${renderTaskPoints(t.points, t.aiReason)}
+                    ${renderTaskPoints(t.points, t.aiReason, getTaskPointExtras(t, z.kind, pointExtraStores))}
                   </div>
                 </div>
                 <button class="del-btn" data-id="${t.id}">×</button>
@@ -2923,7 +3088,7 @@ function viewSettings(){
       </div>
       <div class="bar"><div class="fill" style="width:${need?Math.min(100,Math.round(xp/need*100)):100}%;"></div></div>
 
-      <div class="row">
+      <div class="row" style="display:none">
         <div>Hành động</div>
         <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px">
           <button class="btn-ghost" id="btnEnd">Qua ngày</button>
@@ -3039,7 +3204,7 @@ function viewSettings(){
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" style="display:none">
       <h3>Quản trị / Dữ liệu cục bộ</h3>
       <div class="row">
         <div>Xoá hồ sơ người chơi LOCAL (máy này)</div>
