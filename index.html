@@ -2597,6 +2597,15 @@ async function viewTasks(){
       }
     }
 
+    // Limit for Priority Zone
+    if (z.kind === 'priority') {
+      const activePriorityTasks = getZoneActiveTasks(getTasks(), z.id).length;
+      if (activePriorityTasks >= 3) {
+        alert('Zone Quan trọng chỉ có thể có tối đa 3 nhiệm vụ đang hoạt động. Hãy hoàn thành bớt trước khi thêm mới nhé!');
+        return;
+      }
+    }
+
     const ai = await getTaskPoints(text, z.kind);
     const normalizedAi = normalizeAiScoreForZone(ai, z.kind);
     const currentTasks = getTasks();
