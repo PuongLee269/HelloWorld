@@ -324,6 +324,23 @@ input[type="checkbox"]{
   color:#1b1e2e;
 }
 
+.rules-card p{
+  margin:0 0 10px;
+  font-size:14px;
+  color:var(--muted);
+}
+
+.rules-list{
+  margin:0;
+  padding-left:20px;
+  list-style:disc;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  font-size:14px;
+  color:var(--ink);
+}
+
 .bar{
   height:10px;
   background:rgba(0,0,0,.07);
@@ -2627,6 +2644,7 @@ function buildTabsBar(active){
     {id:'archive', label:'Lưu trữ', icon:'🗂️'},
     {id:'leaderboard', label:'Leaderboard', icon:'🏆'},
     {id:'stats', label:'Biểu đồ', icon:'📈'},
+    {id:'rules', label:'Luật chơi', icon:'📜'},
     {id:'settings', label:'Settings', icon:'⚙️'}
   ].map(t=>`
     <button class="tab-btn ${t.id===active?'active':''}" data-tab="${t.id}" aria-label="${t.label}" title="${t.label}">
@@ -3067,6 +3085,39 @@ function viewStats(){
   drawChart("chart30", last30);
 }
 
+/* RULES */
+function viewRules(){
+  view.innerHTML = `
+    <div class="card rules-card" style="margin-top:0">
+      <h3>Giới hạn Zone</h3>
+      <p>Giữ số lượng nhiệm vụ đang hoạt động ở từng Zone trong ngưỡng cho phép.</p>
+      <ul class="rules-list">
+        <li><strong>Zone Quan trọng:</strong> tối đa 3 nhiệm vụ đang mở. Hoàn thành bớt trước khi thêm mới.</li>
+        <li><strong>Zone E:</strong> tối đa 5 nhiệm vụ hoạt động mỗi ngày để duy trì nhịp độ phù hợp.</li>
+      </ul>
+    </div>
+
+    <div class="card rules-card">
+      <h3>Điểm E & thưởng</h3>
+      <p>Điểm E phản ánh tiến độ. Tick nhiệm vụ để cộng điểm và bỏ tick để hoàn tác.</p>
+      <ul class="rules-list">
+        <li>Hoàn thành nhiệm vụ cộng đúng số E hiển thị; bỏ tick sẽ trả lại số E đó.</li>
+        <li>Hoàn thành trên 3 nhiệm vụ Zone E trong ngày sẽ nhận thêm 3-5 E thưởng khi qua ngày.</li>
+      </ul>
+    </div>
+
+    <div class="card rules-card">
+      <h3>Qua ngày & đặt lại</h3>
+      <p>Cuối ngày hệ thống sẽ chốt điểm và làm mới nhiệm vụ.</p>
+      <ul class="rules-list">
+        <li>Mỗi lần qua ngày sẽ trừ 5 E để mô phỏng áp lực thời gian.</li>
+        <li>Thưởng Zone E được cộng ngay trong bước qua ngày nếu đủ điều kiện.</li>
+        <li>Ứng dụng tự kiểm tra ngày thực tế để tự động qua ngày khi sang ngày mới. Bạn vẫn có thể qua ngày thủ công trong Settings.</li>
+      </ul>
+    </div>
+  `;
+}
+
 /* SETTINGS */
 function viewSettings(){
   const p=getProfile();
@@ -3357,6 +3408,8 @@ function render(tab){
     viewLeaderboard();
   } else if(tab==='stats'){
     viewStats();
+  } else if(tab==='rules'){
+    viewRules();
   } else if(tab==='settings'){
     if(ensureSettingsAuth()){
       viewSettings();
