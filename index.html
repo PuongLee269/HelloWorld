@@ -1555,8 +1555,15 @@ function isTaskActiveToday(t){
   return !t.done;
 }
 
+function doesTaskOccupyCapacity(task){
+  if(!task) return false;
+  if(task.kind==='recurring') return true;
+  if(task.kind==='single') return true;
+  return !task.done;
+}
+
 function getZoneActiveTasks(tasks, zoneId){
-  return tasks.filter(t=>t.zoneId==zoneId && isTaskActiveToday(t));
+  return tasks.filter(t=>t.zoneId==zoneId && doesTaskOccupyCapacity(t));
 }
 
 function describeTaskKind(task, zone){
@@ -2695,15 +2702,18 @@ async function viewTasks(){
 
     const list = zoneTasks;
     const activeList = list.filter(isTaskActiveToday);
-    const activeDone = activeList.filter(t=>t.done).length;
+    const capacityList = list.filter(doesTaskOccupyCapacity);
+    const completedCount = list.filter(t=>t.done).length;
+    const totalCount = list.length;
     return {
       z,
       list,
       activeList,
-      activeDone,
-      activeTotal: activeList.length,
+      capacityList,
+      activeDone: completedCount,
+      activeTotal: totalCount,
       kindLabel: ZONE_KIND_LABELS[z.kind] || 'Zone',
-      progressText: activeList.length ? `${activeDone}/${activeList.length}` : '0'
+      progressText: totalCount ? `${completedCount}/${totalCount}` : '0'
     };
   });
 
