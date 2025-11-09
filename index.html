@@ -702,6 +702,7 @@ const LS = {
   ARCHIVE:'tq_archive',
   ZONE_E_BONUS_DAY:'tq_zone_e_bonus_day',
   NOISE_STREAKS:'tq_noise_streaks',
+  THEME:'tq_theme',
   ZONE_E_STREAKS:'tq_zone_e_streaks'
 };
 
@@ -820,6 +821,27 @@ function calcTotalE(level, xp){
 ============================== */
 function load(key, def){ try{ return JSON.parse(localStorage.getItem(key)) ?? def }catch{ return def } }
 function save(key, val){ localStorage.setItem(key, JSON.stringify(val)) }
+
+function getSavedThemeBackgrounds(){
+  const raw = load(LS.THEME, {});
+  const appBgUrl = raw && typeof raw.appBgUrl === 'string' ? raw.appBgUrl : '';
+  const heroBgUrl = raw && typeof raw.heroBgUrl === 'string' ? raw.heroBgUrl : '';
+  return { appBgUrl, heroBgUrl };
+}
+
+function updateSavedThemeBackgrounds(partial){
+  partial = partial || {};
+  const current = getSavedThemeBackgrounds();
+  const next = Object.assign({}, current);
+  if('appBgUrl' in partial){
+    next.appBgUrl = partial.appBgUrl || '';
+  }
+  if('heroBgUrl' in partial){
+    next.heroBgUrl = partial.heroBgUrl || '';
+  }
+  save(LS.THEME, next);
+  return next;
+}
 
 const NOISE_STREAK_MIN_POINTS = -5;
 const NOISE_SKULL_THRESHOLD = 5;
@@ -1127,7 +1149,19 @@ function pickHeroConfigFor(level){
 }
 
 function getBackgroundTheme(){
-  return CONFIG && typeof CONFIG === 'object' ? (CONFIG.BACKGROUND_THEME || {}) : {};
+  const base = CONFIG && typeof CONFIG === 'object' ? (CONFIG.BACKGROUND_THEME || {}) : {};
+  const saved = getSavedThemeBackgrounds();
+  const theme = Object.assign({}, base);
+
+  theme.customBackgrounds = saved;
+  theme.customAppBgUrl = saved.appBgUrl || '';
+  theme.customHeroBgUrl = saved.heroBgUrl || '';
+
+  if(saved.appBgUrl){
+    theme.appDefaultBgUrl = saved.appBgUrl;
+  }
+
+  return theme;
 }
 
 function pickHeroBackgroundThemeFor(level){
@@ -1194,11 +1228,15 @@ function renderHero(){
   const name = (profile.name || '').trim() || 'Player';
   const pct = need ? Math.min(100, Math.round(xp/need*100)) : 100;
 
+  const customHeroBg = backgroundTheme.customHeroBgUrl || '';
+  const customAppBg = backgroundTheme.customAppBgUrl || '';
+
   const defaultHeroBg = preset.backgroundImg || 'linear-gradient(135deg,#8b7cff 0%,#b09bff 100%)';
-  applyBackgroundToElement(heroEl, heroThemePreset.heroBgUrl, defaultHeroBg, { size:'cover', position:'center' });
+  const heroBgValue = customHeroBg || heroThemePreset.heroBgUrl || '';
+  applyBackgroundToElement(heroEl, heroBgValue, defaultHeroBg, { size:'cover', position:'center' });
 
   const appBgFallback = backgroundTheme.appDefaultBgUrl || '';
-  const appBgValue = heroThemePreset.appBgUrl || '';
+  const appBgValue = customAppBg || heroThemePreset.appBgUrl || '';
   if(appBgValue || appBgFallback){
     applyBackgroundToElement(document.body, appBgValue, appBgFallback, { size:'cover', attachment:'fixed' });
   } else {
@@ -3135,6 +3173,7 @@ function viewSettings(){
   const recs=getRecurring();
   const {level,xp,need}=getLevelInfo();
   const dateNowDM=todayDM();
+  const savedThemeBackgrounds = getSavedThemeBackgrounds();
 
   view.innerHTML = `
     <div class="card" style="margin-top:0">
@@ -3165,6 +3204,30 @@ function viewSettings(){
         <div class="grid" style="grid-template-columns:1fr auto;align-items:center">
           <input id="name" value="${p.name||''}">
           <button class="btn-primary" id="saveName">Lưu</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Tùy chỉnh nền</h3>
+      <div class="row">
+        <div>Nền giao diện</div>
+        <div class="grid" style="grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center">
+          <input id="appBgUpload" type="file" accept="image/*">
+          ${savedThemeBackgrounds.appBgUrl?`<button class="btn-ghost" id="resetAppBg">Reset</button>`:''}
+          <div style="grid-column:1/-1;font-size:12px;color:var(--muted);">
+            ${savedThemeBackgrounds.appBgUrl?'Đang dùng ảnh tuỳ chỉnh.':'Đang dùng nền mặc định.'}
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div>Nền mô tả level</div>
+        <div class="grid" style="grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center">
+          <input id="heroBgUpload" type="file" accept="image/*">
+          ${savedThemeBackgrounds.heroBgUrl?`<button class="btn-ghost" id="resetHeroBg">Reset</button>`:''}
+          <div style="grid-column:1/-1;font-size:12px;color:var(--muted);">
+            ${savedThemeBackgrounds.heroBgUrl?'Đang dùng ảnh tuỳ chỉnh.':'Đang dùng nền mặc định.'}
+          </div>
         </div>
       </div>
     </div>
@@ -3279,6 +3342,53 @@ function viewSettings(){
     setName(document.getElementById('name').value);
     alert('Đã lưu');
   };
+
+  /* Tùy chỉnh nền */
+  const appBgUpload=document.getElementById('appBgUpload');
+  if(appBgUpload){
+    appBgUpload.onchange=()=>{
+      const file=appBgUpload.files[0];
+      if(!file) return;
+      readFileAsDataURL(file, data=>{
+        updateSavedThemeBackgrounds({appBgUrl:data});
+        renderHero();
+        viewSettings();
+      });
+      appBgUpload.value='';
+    };
+  }
+
+  const heroBgUpload=document.getElementById('heroBgUpload');
+  if(heroBgUpload){
+    heroBgUpload.onchange=()=>{
+      const file=heroBgUpload.files[0];
+      if(!file) return;
+      readFileAsDataURL(file, data=>{
+        updateSavedThemeBackgrounds({heroBgUrl:data});
+        renderHero();
+        viewSettings();
+      });
+      heroBgUpload.value='';
+    };
+  }
+
+  const resetAppBg=document.getElementById('resetAppBg');
+  if(resetAppBg){
+    resetAppBg.onclick=()=>{
+      updateSavedThemeBackgrounds({appBgUrl:''});
+      renderHero();
+      viewSettings();
+    };
+  }
+
+  const resetHeroBg=document.getElementById('resetHeroBg');
+  if(resetHeroBg){
+    resetHeroBg.onclick=()=>{
+      updateSavedThemeBackgrounds({heroBgUrl:''});
+      renderHero();
+      viewSettings();
+    };
+  }
 
   /* Zone chỉnh sửa */
   const zoneTable=document.getElementById('zoneT');
