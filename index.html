@@ -3171,17 +3171,6 @@ function viewSettings(){
 
     <div class="card">
       <h3>Zones</h3>
-      <div class="grid">
-        <div class="row"><div>Tên Zone</div><input id="zName" placeholder="Công việc"></div>
-        <div class="row"><div>Loại Zone</div>
-          <select id="zKind">${renderZoneKindOptions('regular')}</select>
-        </div>
-        <div class="row"><div>Hình nền Zone</div>
-          <input id="zBg" type="file" accept="image/*">
-        </div>
-        <div class="row"><div></div><button class="btn-primary" id="addZone">+ Thêm Zone</button></div>
-      </div>
-
       <div class="table-wrap" style="margin-top:12px">
         <table>
           <thead>
@@ -3289,36 +3278,6 @@ function viewSettings(){
   document.getElementById('saveName').onclick=()=>{
     setName(document.getElementById('name').value);
     alert('Đã lưu');
-  };
-
-  /* Zone thêm mới */
-  document.getElementById('addZone').onclick=()=>{
-    const nameInp=document.getElementById('zName');
-    const kindSel=document.getElementById('zKind');
-    const nameVal=nameInp.value.trim();
-    if(!nameVal){ alert('Nhập tên Zone'); return; }
-
-    const file=document.getElementById('zBg').files[0];
-    const kindVal=kindSel.value;
-
-    function finishAdd(bgData){
-      const z={
-        name:nameVal,
-        kind:kindVal,
-        bg:bgData||''
-      };
-      addZone(z);
-      nameInp.value='';
-      kindSel.value='regular';
-      document.getElementById('zBg').value='';
-      viewSettings();
-    }
-
-    if(file){
-      readFileAsDataURL(file, data=>finishAdd(data));
-    }else{
-      finishAdd('');
-    }
   };
 
   /* Zone chỉnh sửa */
