@@ -324,21 +324,41 @@ input[type="checkbox"]{
   color:#1b1e2e;
 }
 
-.rules-card p{
-  margin:0 0 10px;
+.notes-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.notes-status{
+  font-size:13px;
+  color:var(--muted);
+}
+
+.notes-subtitle{
+  margin:0 0 12px;
   font-size:14px;
   color:var(--muted);
 }
 
-.rules-list{
-  margin:0;
-  padding-left:20px;
-  list-style:disc;
-  display:flex;
-  flex-direction:column;
-  gap:6px;
-  font-size:14px;
+.notes-editor{
+  width:100%;
+  min-height:260px;
+  padding:14px;
+  border-radius:12px;
+  border:1px solid var(--panel-border);
+  background:rgba(255,255,255,.9);
+  box-shadow:inset 0 4px 12px rgba(0,0,0,.06);
+  resize:vertical;
+  font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
   color:var(--ink);
+}
+
+.notes-editor:focus{
+  outline:none;
+  border-color:rgba(139,124,255,.7);
+  box-shadow:0 0 0 3px rgba(139,124,255,.18);
 }
 
 .bar{
@@ -703,7 +723,8 @@ const LS = {
   ZONE_E_BONUS_DAY:'tq_zone_e_bonus_day',
   NOISE_STREAKS:'tq_noise_streaks',
   THEME:'tq_theme',
-  ZONE_E_STREAKS:'tq_zone_e_streaks'
+  ZONE_E_STREAKS:'tq_zone_e_streaks',
+  NOTES:'tq_notes'
 };
 
 function normalizeArchiveText(raw){
@@ -821,6 +842,19 @@ function calcTotalE(level, xp){
 ============================== */
 function load(key, def){ try{ return JSON.parse(localStorage.getItem(key)) ?? def }catch{ return def } }
 function save(key, val){ localStorage.setItem(key, JSON.stringify(val)) }
+
+function getNotes(){
+  return localStorage.getItem(LS.NOTES) || '';
+}
+
+function saveNotes(text){
+  const content = String(text || '');
+  if(content){
+    localStorage.setItem(LS.NOTES, content);
+  }else{
+    localStorage.removeItem(LS.NOTES);
+  }
+}
 
 function getSavedThemeBackgrounds(){
   const raw = load(LS.THEME, {});
@@ -2689,7 +2723,7 @@ function buildTabsBar(active){
     {id:'archive', label:'Lưu trữ', icon:'🗂️'},
     {id:'leaderboard', label:'Leaderboard', icon:'🏆'},
     {id:'stats', label:'Biểu đồ', icon:'📈'},
-    {id:'rules', label:'Luật chơi', icon:'📜'},
+    {id:'notes', label:'Ghi chú', icon:'📝'},
     {id:'settings', label:'Settings', icon:'⚙️'}
   ].map(t=>`
     <button class="tab-btn ${t.id===active?'active':''}" data-tab="${t.id}" aria-label="${t.label}" title="${t.label}">
@@ -3133,37 +3167,61 @@ function viewStats(){
   drawChart("chart30", last30);
 }
 
-/* RULES */
-function viewRules(){
+/* NOTES */
+function viewNotes(){
+  const existing = getNotes();
+
   view.innerHTML = `
-    <div class="card rules-card" style="margin-top:0">
-      <h3>Giới hạn Zone</h3>
-      <p>Giữ số lượng nhiệm vụ đang hoạt động ở từng Zone trong ngưỡng cho phép.</p>
-      <ul class="rules-list">
-        <li><strong>Zone Quan trọng:</strong> tối đa 3 nhiệm vụ đang mở. Hoàn thành bớt trước khi thêm mới.</li>
-        <li><strong>Zone E:</strong> tối đa 5 nhiệm vụ hoạt động mỗi ngày để duy trì nhịp độ phù hợp.</li>
-      </ul>
-    </div>
-
-    <div class="card rules-card">
-      <h3>Điểm E & thưởng</h3>
-      <p>Điểm E phản ánh tiến độ. Tick nhiệm vụ để cộng điểm và bỏ tick để hoàn tác.</p>
-      <ul class="rules-list">
-        <li>Hoàn thành nhiệm vụ cộng đúng số E hiển thị; bỏ tick sẽ trả lại số E đó.</li>
-        <li>Hoàn thành trên 3 nhiệm vụ Zone E trong ngày sẽ nhận thêm 3-5 E thưởng khi qua ngày.</li>
-      </ul>
-    </div>
-
-    <div class="card rules-card">
-      <h3>Qua ngày & đặt lại</h3>
-      <p>Cuối ngày hệ thống sẽ chốt điểm và làm mới nhiệm vụ.</p>
-      <ul class="rules-list">
-        <li>Mỗi lần qua ngày sẽ trừ 5 E để mô phỏng áp lực thời gian.</li>
-        <li>Thưởng Zone E được cộng ngay trong bước qua ngày nếu đủ điều kiện.</li>
-        <li>Ứng dụng tự kiểm tra ngày thực tế để tự động qua ngày khi sang ngày mới. Bạn vẫn có thể qua ngày thủ công trong Settings.</li>
-      </ul>
+    <div class="card notes-card" style="margin-top:0">
+      <div class="notes-header">
+        <h3>Ghi chú</h3>
+        <span class="notes-status" id="notesStatus"></span>
+      </div>
+      <p class="notes-subtitle">Nội dung được lưu tự động trên thiết bị này.</p>
+      <textarea id="notesEditor" class="notes-editor" placeholder="Viết kế hoạch, ý tưởng hoặc nhật ký trong ngày..."></textarea>
     </div>
   `;
+
+  const textarea = document.getElementById('notesEditor');
+  const statusEl = document.getElementById('notesStatus');
+  if(textarea){
+    textarea.value = existing;
+  }
+
+  const setStatus = (text)=>{
+    if(statusEl){
+      statusEl.textContent = text;
+    }
+  };
+
+  setStatus(existing ? 'Đã lưu' : '');
+
+  if(!textarea) return;
+
+  let saveTimer = null;
+  const commitSave = ()=>{
+    saveNotes(textarea.value);
+    setStatus('Đã lưu');
+  };
+
+  textarea.addEventListener('input', ()=>{
+    setStatus('Đang lưu...');
+    if(saveTimer){
+      clearTimeout(saveTimer);
+    }
+    saveTimer = setTimeout(()=>{
+      commitSave();
+      saveTimer = null;
+    }, 250);
+  });
+
+  textarea.addEventListener('blur', ()=>{
+    if(saveTimer){
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+    commitSave();
+  });
 }
 
 /* SETTINGS */
@@ -3487,8 +3545,8 @@ function render(tab){
     viewLeaderboard();
   } else if(tab==='stats'){
     viewStats();
-  } else if(tab==='rules'){
-    viewRules();
+  } else if(tab==='notes'){
+    viewNotes();
   } else if(tab==='settings'){
     if(ensureSettingsAuth()){
       viewSettings();
