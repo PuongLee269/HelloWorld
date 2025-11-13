@@ -2689,8 +2689,24 @@ function attachSwipeHandlersForTasks(){
     btn.onclick = (e)=>{
       e.stopPropagation();
       const id = Number(btn.dataset.id);
-      setTasks(getTasks().filter(t=>t.id!==id));
+      const tasks = getTasks();
+      const targetTask = tasks.find(t=>t.id===id);
+
+      if(targetTask && targetTask.kind === 'recurring'){
+        const recId = Number(targetTask.recurringId);
+        if(recId){
+          delRecurring(recId);
+        }
+      }
+
+      const nextTasks = tasks.filter(t=>t.id!==id);
+      setTasks(nextTasks);
+
+      const wasSettingsOpen = currentTab === 'settings';
       render('tasks');
+      if(wasSettingsOpen){
+        render('settings');
+      }
     };
   });
 }
