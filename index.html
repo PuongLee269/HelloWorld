@@ -604,6 +604,7 @@ th{
         <div class="hero-meta">
           <span class="hero-level" data-hero="level">Level 1</span>
           <span class="hero-xp" data-hero="xp">0 E</span>
+          <span class="hero-weekly" data-hero="weekly-avg">TB tuần: --</span>
         </div>
         <div class="hero-progress">
           <div class="hero-progress-bar">
@@ -807,6 +808,7 @@ const heroRefs = heroEl ? {
   name: heroEl.querySelector('[data-hero="name"]'),
   level: heroEl.querySelector('[data-hero="level"]'),
   xp: heroEl.querySelector('[data-hero="xp"]'),
+  weeklyAvg: heroEl.querySelector('[data-hero="weekly-avg"]'),
   xpFill: heroEl.querySelector('[data-hero="xp-fill"]'),
   xpLabel: heroEl.querySelector('[data-hero="xp-label"]')
 } : {};
@@ -835,6 +837,41 @@ function calcTotalE(level, xp){
     total += Number(cfg.need) || 0;
   }
   return total;
+}
+
+function calcWeeklyAverageEGain(profile){
+  const currentProfile = (profile && typeof profile === 'object') ? profile : getProfile();
+  const hist = getHist();
+  if(!Array.isArray(hist) || hist.length < 6){
+    return null;
+  }
+
+  const recent = hist.slice(-6).map((entry) => ({
+    ts: Number(entry && entry.ts) || 0,
+    total: calcTotalE(entry && entry.level, entry && entry.xp)
+  }));
+
+  if(recent.length < 6){
+    return null;
+  }
+
+  const series = recent.concat({
+    ts: Date.now(),
+    total: calcTotalE(currentProfile && currentProfile.level, currentProfile && currentProfile.xp)
+  });
+
+  series.sort((a, b) => a.ts - b.ts);
+
+  if(series.length < 7){
+    return null;
+  }
+
+  let totalGain = 0;
+  for(let i = 1; i < series.length; i++){
+    totalGain += series[i].total - series[i - 1].total;
+  }
+
+  return totalGain / 7;
 }
 
 /* ==============================
@@ -1261,6 +1298,7 @@ function renderHero(){
   const heroThemePreset = pickHeroBackgroundThemeFor(level) || {};
   const name = (profile.name || '').trim() || 'Player';
   const pct = need ? Math.min(100, Math.round(xp/need*100)) : 100;
+  const weeklyAvgGain = calcWeeklyAverageEGain(profile);
 
   const customHeroBg = backgroundTheme.customHeroBgUrl || '';
   const customAppBg = backgroundTheme.customAppBgUrl || '';
@@ -1285,6 +1323,16 @@ function renderHero(){
   }
   if(heroRefs.xp){
     heroRefs.xp.textContent = `${xp} E`;
+  }
+  if(heroRefs.weeklyAvg){
+    if(weeklyAvgGain === null){
+      heroRefs.weeklyAvg.textContent = 'TB tuần: --';
+    } else {
+      const rounded = Math.round(weeklyAvgGain * 10) / 10;
+      const decimals = Number.isInteger(rounded) ? 0 : 1;
+      const valueText = `${rounded >= 0 ? '+' : '-'}${Math.abs(rounded).toFixed(decimals)}`;
+      heroRefs.weeklyAvg.textContent = `TB tuần: ${valueText} E/ngày`;
+    }
   }
   if(heroRefs.xpLabel){
     heroRefs.xpLabel.textContent = need ? `${xp} / ${need} E tới level tiếp theo` : `${xp} E (tối đa)`;
