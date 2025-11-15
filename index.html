@@ -2909,10 +2909,22 @@ async function viewTasks(){
         streakInfoHtml = `<div class="muted">Streak: ${streakCount} nhiệm vụ</div>`;
       }
 
+      const zoneHeaderNote = (() => {
+        switch(z.kind){
+          case 'e':
+            return `Streak > ${ZONE_E_CROWN_THRESHOLD} sẽ cộng thêm +1 E (crown).`;
+          case 'noise':
+            return `Penalty tăng dần; skull ở ${NOISE_SKULL_THRESHOLD}, phạt bổ sung tại ${NOISE_EXTRA_PENALTY_THRESHOLD}.`;
+          default:
+            return 'Không áp dụng streak.';
+        }
+      })();
+
       return `
       <section class="zone">
         <header class="${headerClass}" style="${headerStyle}">
           <div><b>${z.name}</b> <span class="badge">${g.kindLabel}</span></div>
+          <div class="muted zone-note">${zoneHeaderNote}</div>
           <div class="badge">${g.progressText}</div>
         </header>
         <ul>
