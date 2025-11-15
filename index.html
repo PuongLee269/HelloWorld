@@ -3211,8 +3211,15 @@ function viewLeaderboard(){
 /* STATS */
 function viewStats(){
   const hist = getHist();
-  const last7  = hist.slice(-7 ).map(r=>r.xp);
-  const last30 = hist.slice(-30).map(r=>r.xp);
+  const toTotalE = (entry)=>{
+    if(entry && typeof entry === 'object'){
+      const total = calcTotalE(entry.level, entry.xp);
+      return Number.isFinite(total) ? total : (Number(entry.xp) || 0);
+    }
+    return Number(entry) || 0;
+  };
+  const last7  = hist.slice(-7 ).map(toTotalE);
+  const last30 = hist.slice(-30).map(toTotalE);
 
   view.innerHTML = `
     <div class="card chart-card" style="margin-top:0">
