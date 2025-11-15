@@ -2895,6 +2895,20 @@ async function viewTasks(){
           }).join('')
         : emptyStateHtml;
 
+      let streakInfoHtml = '';
+      if(z.kind === 'noise' || z.kind === 'e'){
+        const targetStore = z.kind === 'noise' ? noiseStore : zoneEStore;
+        const streakCount = g.list
+          .filter(task => task.kind === 'recurring')
+          .reduce((count, task) => {
+            const key = getNoiseTaskKey(task);
+            if(!key || !targetStore[key]) return count;
+            const streakValue = parseNoiseStreak(targetStore[key].streak);
+            return streakValue > 0 ? count + 1 : count;
+          }, 0);
+        streakInfoHtml = `<div class="muted">Streak: ${streakCount} nhiệm vụ</div>`;
+      }
+
       return `
       <section class="zone">
         <header class="${headerClass}" style="${headerStyle}">
@@ -2904,6 +2918,7 @@ async function viewTasks(){
         <ul>
           ${listHtml}
         </ul>
+        ${streakInfoHtml}
       </section>`;
     }).join('')}
   `;
