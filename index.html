@@ -880,6 +880,71 @@ function calcWeeklyAverageEGain(profile){
 function load(key, def){ try{ return JSON.parse(localStorage.getItem(key)) ?? def }catch{ return def } }
 function save(key, val){ localStorage.setItem(key, JSON.stringify(val)) }
 
+function exportAllData(){
+  try{
+    const payload = {};
+    for(const key of Object.values(LS)){
+      payload[key] = localStorage.getItem(key);
+    }
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `mori-quest-backup-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(json).catch(()=>{});
+    }
+
+    alert('Đã xuất dữ liệu. File tải xuống và nội dung đã được copy nếu trình duyệt hỗ trợ.');
+    return json;
+  }catch(err){
+    console.error(err);
+    alert('Xuất dữ liệu thất bại.');
+    return null;
+  }
+}
+
+function importAllData(rawJson){
+  try{
+    const text = typeof rawJson === 'string' ? rawJson : '';
+    const parsed = JSON.parse(text);
+    if(!parsed || typeof parsed !== 'object'){
+      throw new Error('Dữ liệu không hợp lệ.');
+    }
+
+    const allowedKeys = new Set(Object.values(LS));
+    const entries = Object.entries(parsed).filter(([k]) => allowedKeys.has(k));
+    if(!entries.length){
+      throw new Error('Không tìm thấy key hợp lệ để import.');
+    }
+
+    for(const key of Object.values(LS)){
+      if(!(key in parsed)) continue;
+      const rawVal = parsed[key];
+      if(rawVal == null){
+        localStorage.removeItem(key);
+      }else{
+        localStorage.setItem(key, typeof rawVal === 'string' ? rawVal : String(rawVal));
+      }
+    }
+
+    renderHero();
+    render(currentTab || 'tasks');
+    alert('Import dữ liệu thành công.');
+    return true;
+  }catch(err){
+    console.error(err);
+    alert('Import dữ liệu thất bại: ' + (err && err.message ? err.message : err));
+    return false;
+  }
+}
+
 function getNotes(){
   return localStorage.getItem(LS.NOTES) || '';
 }
@@ -3333,6 +3398,7 @@ function viewSettings(){
   const {level,xp,need}=getLevelInfo();
   const dateNowDM=todayDM();
   const savedThemeBackgrounds = getSavedThemeBackgrounds();
+  const backupKeysLabel = Object.values(LS).join(', ');
 
   view.innerHTML = `
     <div class="card" style="margin-top:0">
@@ -3388,6 +3454,26 @@ function viewSettings(){
             ${savedThemeBackgrounds.heroBgUrl?'Đang dùng ảnh tuỳ chỉnh.':'Đang dùng nền mặc định.'}
           </div>
         </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Sao lưu dữ liệu</h3>
+      <p class="muted" style="margin-top:-4px;font-size:13px">Phạm vi sao lưu: ${backupKeysLabel}</p>
+      <div class="row">
+        <div>Hành động</div>
+        <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">
+          <button class="btn-primary" id="exportDataBtn">Lưu dữ liệu</button>
+          <button class="btn-ghost" id="importDataBtn">Load dữ liệu</button>
+        </div>
+      </div>
+      <div class="row">
+        <div>Chọn file</div>
+        <input id="importFileInput" type="file" accept="application/json,text/json">
+      </div>
+      <div class="row">
+        <div>Dán JSON</div>
+        <textarea id="importTextInput" placeholder="Dán nội dung JSON backup vào đây" style="min-height:100px"></textarea>
       </div>
     </div>
 
@@ -3546,6 +3632,50 @@ function viewSettings(){
       updateSavedThemeBackgrounds({heroBgUrl:''});
       renderHero();
       viewSettings();
+    };
+  }
+
+  /* Sao lưu / Phục hồi dữ liệu */
+  const exportDataBtn = document.getElementById('exportDataBtn');
+  const importDataBtn = document.getElementById('importDataBtn');
+  const importFileInput = document.getElementById('importFileInput');
+  const importTextInput = document.getElementById('importTextInput');
+
+  const handleImportRaw = (raw)=>{
+    const ok = importAllData(raw);
+    if(ok){
+      if(importTextInput){
+        importTextInput.value = '';
+      }
+      if(importFileInput){
+        importFileInput.value = '';
+      }
+    }
+  };
+
+  if(exportDataBtn){
+    exportDataBtn.onclick = ()=>{ exportAllData(); };
+  }
+
+  if(importDataBtn){
+    importDataBtn.onclick = ()=>{
+      const text = importTextInput ? importTextInput.value.trim() : '';
+      if(!text){
+        alert('Chọn file hoặc dán JSON trước khi import.');
+        return;
+      }
+      handleImportRaw(text);
+    };
+  }
+
+  if(importFileInput){
+    importFileInput.onchange = ()=>{
+      const file = importFileInput.files && importFileInput.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = ()=>{ handleImportRaw(reader.result); };
+      reader.onerror = ()=>{ alert('Không đọc được file backup.'); };
+      reader.readAsText(file);
     };
   }
 
