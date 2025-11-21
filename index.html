@@ -3459,7 +3459,11 @@ function viewSettings(){
 
     <div class="card">
       <h3>Sao lưu dữ liệu</h3>
-      <p class="muted" style="margin-top:-4px;font-size:13px">Phạm vi sao lưu: ${backupKeysLabel}</p>
+      <div class="muted" style="margin-top:-4px;font-size:13px;display:grid;gap:4px">
+        <div>Lưu dữ liệu: nhấn "Lưu dữ liệu" để tải file backup (.json) về máy.</div>
+        <div>Khôi phục: nhấn "Load dữ liệu" rồi chọn file backup đã sao lưu.</div>
+        <div>Phạm vi sao lưu: ${backupKeysLabel}</div>
+      </div>
       <div class="row">
         <div>Hành động</div>
         <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">
@@ -3468,12 +3472,8 @@ function viewSettings(){
         </div>
       </div>
       <div class="row">
-        <div>Chọn file</div>
+        <div>Chọn file backup để khôi phục dữ liệu</div>
         <input id="importFileInput" type="file" accept="application/json,text/json">
-      </div>
-      <div class="row">
-        <div>Dán JSON</div>
-        <textarea id="importTextInput" placeholder="Dán nội dung JSON backup vào đây" style="min-height:100px"></textarea>
       </div>
     </div>
 
@@ -3639,14 +3639,10 @@ function viewSettings(){
   const exportDataBtn = document.getElementById('exportDataBtn');
   const importDataBtn = document.getElementById('importDataBtn');
   const importFileInput = document.getElementById('importFileInput');
-  const importTextInput = document.getElementById('importTextInput');
 
   const handleImportRaw = (raw)=>{
     const ok = importAllData(raw);
     if(ok){
-      if(importTextInput){
-        importTextInput.value = '';
-      }
       if(importFileInput){
         importFileInput.value = '';
       }
@@ -3657,15 +3653,8 @@ function viewSettings(){
     exportDataBtn.onclick = ()=>{ exportAllData(); };
   }
 
-  if(importDataBtn){
-    importDataBtn.onclick = ()=>{
-      const text = importTextInput ? importTextInput.value.trim() : '';
-      if(!text){
-        alert('Chọn file hoặc dán JSON trước khi import.');
-        return;
-      }
-      handleImportRaw(text);
-    };
+  if(importDataBtn && importFileInput){
+    importDataBtn.onclick = ()=>{ importFileInput.click(); };
   }
 
   if(importFileInput){
