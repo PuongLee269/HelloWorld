@@ -1,0 +1,4208 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" type="image/png" sizes="192x192" href="image/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="image/icon-512.png">
+<link rel="apple-touch-icon" sizes="180x180" href="image/icon-180.png">
+<link rel="apple-touch-icon" sizes="192x192" href="image/icon-192.png">
+<link rel="apple-touch-icon" sizes="512x512" href="image/icon-512.png">
+<link rel="apple-touch-icon" sizes="1024x1024" href="image/icon-1024.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#8b7cff">
+<title data-app="document-title">Mori Quest</title>
+<style>
+:root{
+  --ink:#1b1e2e;
+  --muted:#7d82a8;
+  --tap:46px;
+  --radius-card:16px;
+  --radius-pill:999px;
+  --gradient-main:linear-gradient(135deg,#8b7cff 0%,#b09bff 100%);
+  --panel-bg:rgba(255,255,255,.85);
+  --panel-border:rgba(0,0,0,.05);
+  --panel-shadow:0 16px 40px rgba(0,0,0,.1);
+  --glass-bg:rgba(255,255,255,.08);
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  color:var(--ink);
+  font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  background:#f6f7ff;
+  background-attachment:fixed;
+}
+
+.wrap{
+  max-width:960px;
+  margin:12px auto;
+  padding:20px;
+}
+
+h1{
+  margin:0 0 12px;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:4px
+}
+
+h1 .app-title{
+  font-size:24px;
+  font-weight:600;
+  color:#1b1e2e;
+}
+
+h1 .app-version{
+  font-size:14px;
+  font-weight:500;
+  color:var(--muted);
+}
+
+/* Hero */
+.hero{
+  position:relative;
+  border-radius:24px;
+  background:var(--gradient-main);
+  background-size:cover;
+  background-position:center;
+  color:#fff;
+  overflow:hidden;
+  margin-bottom:20px;
+  box-shadow:0 24px 48px rgba(139,124,255,.35);
+}
+.hero::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(135deg,rgba(10,14,39,.55),rgba(10,14,39,.25));
+}
+.hero-inner{
+  position:relative;
+  z-index:1;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:20px;
+  padding:28px;
+  text-align:left;
+}
+.hero-info{flex:1;min-width:0}
+.hero-name{
+  margin:0;
+  font-size:26px;
+  font-weight:700;
+  letter-spacing:.4px;
+}
+.hero-meta{
+  margin-top:8px;
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  font-size:16px;
+  font-weight:500;
+}
+.hero-meta span{display:inline-flex;align-items:center;gap:6px}
+.hero-progress{
+  margin-top:18px;
+  width:100%;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.hero-progress-label{
+  font-size:14px;
+  font-weight:500;
+  letter-spacing:.3px;
+  color:rgba(255,255,255,.92);
+}
+.hero-progress-bar{
+  height:10px;
+  background:rgba(255,255,255,.35);
+  border-radius:999px;
+  overflow:hidden;
+  box-shadow:inset 0 2px 6px rgba(0,0,0,.25);
+}
+.hero-progress-fill{
+  height:100%;
+  width:0;
+  background:linear-gradient(90deg,#ff8ba7 0%,#ffd166 25%,#7ed957 50%,#5edfff 75%,#b794f4 100%);
+  background-size:200% 100%;
+  box-shadow:0 10px 24px rgba(0,0,0,.18);
+  border-radius:999px;
+  transition:width .6s ease;
+  animation:xpRainbow 4s linear infinite;
+}
+
+@keyframes xpRainbow{
+  0%{background-position:0% 50%;}
+  100%{background-position:200% 50%;}
+}
+
+/* Tabs bar */
+.tabs{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-bottom:16px;
+  overflow-x:auto;
+  padding-bottom:4px;
+}
+.tabs::-webkit-scrollbar{height:6px}
+.tabs::-webkit-scrollbar-thumb{background:#ddd;border-radius:6px}
+
+.tab-btn{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:var(--tap);
+  padding:8px 14px;
+  border:1px solid var(--panel-border);
+  background:rgba(255,255,255,.8);
+  border-radius:12px;
+  cursor:pointer;
+  white-space:nowrap;
+  font-weight:500;
+  box-shadow:0 6px 16px rgba(0,0,0,.08);
+  color:#1b1e2e;
+  font-size:18px;
+}
+.tab-btn.active{
+  background:var(--gradient-main);
+  color:#fff;
+  border-color:transparent;
+  box-shadow:0 10px 20px rgba(139,124,255,.4);
+}
+
+/* generic buttons */
+.btn-primary{
+  min-height:var(--tap);
+  background:var(--gradient-main);
+  color:#fff;border:none;border-radius:12px;
+  padding:10px 14px;font-weight:500;
+  cursor:pointer;
+  box-shadow:0 10px 20px rgba(139,124,255,.4);
+  font-size:14px;
+}
+.btn-ghost{
+  min-height:var(--tap);
+  background:rgba(255,255,255,.8);
+  border:1px solid var(--panel-border);
+  border-radius:12px;
+  padding:10px 14px;
+  font-size:14px;
+  font-weight:500;
+  color:#1b1e2e;
+  box-shadow:0 6px 16px rgba(0,0,0,.08);
+  cursor:pointer;
+}
+.btn-ghost:active{
+  transform:translateY(1px);
+  box-shadow:0 4px 12px rgba(0,0,0,.12);
+}
+.btn-ghost[disabled],
+.btn-ghost[data-loading]{
+  cursor:progress;
+  opacity:.6;
+  box-shadow:none;
+  transform:none;
+}
+.btn-danger{
+  min-height:var(--tap);
+  background:linear-gradient(135deg,#ff5f48 0%,#ff3425 100%);
+  color:#fff;border:none;border-radius:12px;
+  padding:10px 14px;font-weight:500;
+  cursor:pointer;
+  box-shadow:0 10px 20px rgba(255,60,48,.4);
+  font-size:14px;
+}
+.btn-primary.btn-sm,
+.btn-ghost.btn-sm,
+.btn-danger.btn-sm{
+  min-height:36px;
+  padding:6px 12px;
+  font-size:13px;
+}
+
+/* pills */
+.pill{
+  background:rgba(255,255,255,.8);
+  border:1px solid var(--panel-border);
+  border-radius:var(--radius-pill);
+  padding:4px 10px;
+  font-size:14px;
+  font-weight:500;
+  color:#1b1e2e;
+  box-shadow:0 6px 16px rgba(0,0,0,.08);
+}
+.task-points {
+  font-weight: bold;
+  margin-left: 8px;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.task-points.positive { color: #16a34a; }
+.task-points.negative { color: #dc2626; }
+.task-points.neutral { color: #4b5563; }
+.task-point-icon {
+  display: inline-flex;
+  align-items: center;
+  font-size: 14px;
+}
+.task-kind{
+  display:inline-flex;
+  align-items:center;
+  padding:2px 8px;
+  margin-left:8px;
+  font-size:11px;
+  font-weight:600;
+  border-radius:999px;
+  text-transform:uppercase;
+  letter-spacing:.4px;
+  background:rgba(139,124,255,.18);
+  color:#5a4cc1;
+}
+.task-kind.single{
+  background:rgba(34,197,94,.18);
+  color:#1f9d55;
+}
+.task-kind.recurring{
+  background:rgba(59,130,246,.18);
+  color:#2563eb;
+}
+.task-kind.recurring.negative{
+  background:rgba(248,113,113,.18);
+  color:#dc2626;
+}
+.task.done .task-kind{opacity:.7}
+.muted{color:var(--muted);font-size:14px}
+.top{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:12px;
+  flex-wrap:wrap
+}
+
+/* Inputs */
+input,select,textarea{
+  height:var(--tap);
+  padding:10px;
+  border-radius:12px;
+  border:1px solid rgba(0,0,0,.08);
+  width:100%;
+  font:inherit;
+  font-size:14px;
+  background:#fff;
+  box-shadow:0 6px 16px rgba(0,0,0,.05);
+}
+input[type="checkbox"]{
+  height:auto;width:auto;box-shadow:none;
+}
+
+/* layout (Settings rows) */
+.grid{display:grid;gap:10px}
+.row{
+  display:grid;
+  grid-template-columns:200px 1fr;
+  gap:10px;
+  align-items:flex-start;
+}
+
+.card{
+  padding:16px;
+  border:1px solid var(--panel-border);
+  border-radius:16px;
+  background:var(--panel-bg);
+  margin-top:16px;
+  box-shadow:var(--panel-shadow);
+  position:relative;
+  overflow:hidden;
+}
+.card h3{
+  margin:0 0 12px;
+  font-size:16px;
+  font-weight:600;
+  color:#1b1e2e;
+}
+
+.notes-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.notes-status{
+  font-size:13px;
+  color:var(--muted);
+}
+
+.notes-subtitle{
+  margin:0 0 12px;
+  font-size:14px;
+  color:var(--muted);
+}
+
+.notes-editor{
+  width:100%;
+  min-height:260px;
+  padding:14px;
+  border-radius:12px;
+  border:1px solid var(--panel-border);
+  background:rgba(255,255,255,.9);
+  box-shadow:inset 0 4px 12px rgba(0,0,0,.06);
+  resize:vertical;
+  font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  color:var(--ink);
+}
+
+.notes-editor:focus{
+  outline:none;
+  border-color:rgba(139,124,255,.7);
+  box-shadow:0 0 0 3px rgba(139,124,255,.18);
+}
+
+.bar{
+  height:10px;
+  background:rgba(0,0,0,.07);
+  border-radius:6px;
+  overflow:hidden;
+  margin-bottom:10px;
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.12);
+}
+.fill{
+  height:100%;
+  background:linear-gradient(90deg,#8b7cff 0%,#b09bff 100%);
+}
+
+.task-progress{
+  width:100%;
+  margin-top:8px;
+}
+
+.task-progress-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin-bottom:4px;
+  font-size:12px;
+  color:var(--muted);
+}
+
+.task-progress-label-text{line-height:1.4;}
+
+.task-progress-icons{
+  display:inline-flex;
+  align-items:center;
+  gap:2px;
+}
+
+.task-progress-bar{
+  width:100%;
+  height:4px;
+  border-radius:999px;
+  background:rgba(59,130,246,.25);
+  overflow:hidden;
+}
+
+.task-progress-fill{
+  width:0;
+  height:100%;
+  border-radius:999px;
+  background:#3b82f6;
+  box-shadow:0 0 6px rgba(59,130,246,.45);
+  transition:width .3s ease;
+}
+
+.zone-noise-progress{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  width:100%;
+  margin-top:8px;
+}
+
+.zone-noise-progress-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  font-size:13px;
+  font-weight:500;
+}
+
+.zone-noise-progress-label{
+  font-weight:600;
+}
+
+.zone-noise-progress-value{
+  color:var(--muted);
+}
+
+.zone-noise-progress-bar{
+  height:4px;
+  border-radius:999px;
+  background:rgba(148,163,184,.3);
+  overflow:hidden;
+}
+
+.zone-noise-progress-fill{
+  height:100%;
+  background:#94a3b8;
+  border-radius:999px;
+  transition:width .3s ease;
+}
+
+/* task lists */
+ul{list-style:none;margin:0;padding:0}
+.archive-toolbar{
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:12px;
+}
+.archive-list{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  margin:16px 0 0;
+}
+.archive-item{
+  display:flex;
+  gap:12px;
+  padding:12px;
+  border:1px solid var(--panel-border);
+  border-radius:12px;
+  background:rgba(255,255,255,.8);
+  box-shadow:0 6px 16px rgba(0,0,0,.06);
+}
+.archive-info{flex:1;min-width:0;}
+.archive-title{font-weight:600;word-break:break-word;}
+.archive-meta{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-top:6px;
+  font-size:12px;
+  color:var(--muted);
+  align-items:center;
+}
+.archive-meta .sep{color:rgba(0,0,0,.25);}
+.archive-reason{
+  margin-top:8px;
+  font-size:13px;
+  color:var(--muted);
+  word-break:break-word;
+}
+.archive-actions{display:flex;align-items:center;gap:8px;}
+.archive-empty{
+  margin-top:12px;
+  color:var(--muted);
+}
+
+.zone{
+  border:1px solid rgba(0,0,0,.05);
+  border-radius:16px;
+  margin:16px 0;
+  background:rgba(255,255,255,.8);
+  box-shadow:0 12px 32px rgba(0,0,0,.08);
+  overflow:hidden;
+}
+.zone header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  padding:12px 16px;
+  border-bottom:1px solid rgba(0,0,0,.05);
+  background:linear-gradient(135deg,#fafbff 0%,#f6f7ff 100%);
+  font-weight:500;
+  color:#1b1e2e;
+}
+.zone header.imgHead{
+  color:#fff;
+  border-bottom:1px solid rgba(255,255,255,.3);
+  background-size:cover;
+  background-position:center;
+  background-repeat:no-repeat;
+  background-blend-mode:normal;
+}
+.zone header.imgHead .badge{
+  background:rgba(0,0,0,.4);
+  color:#fff;
+  border:1px solid rgba(255,255,255,.3);
+}
+
+.badge{
+  font-size:12px;
+  padding:2px 8px;
+  border-radius:var(--radius-pill);
+  background:#fff;
+  border:1px solid rgba(0,0,0,.07);
+  color:#1b1e2e;
+  font-weight:500;
+  box-shadow:0 4px 10px rgba(0,0,0,.08);
+}
+
+/* swipe task row */
+li.task{
+  position:relative;
+  border-top:1px solid rgba(0,0,0,.03);
+  background:transparent;
+  padding:0;
+  overflow:hidden;
+}
+.task-inner{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  padding:12px 16px;
+  background:transparent;
+  transition:transform .2s;
+  width:100%;
+}
+.left{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  width:100%;
+}
+.done .txt{text-decoration:line-through;color:#9aa}
+.creator{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.left input[type="checkbox"]{transform:scale(1.25)}
+
+.del-btn{
+  position:absolute;
+  right:0;
+  top:0;
+  bottom:0;
+  width:60px;
+  min-width:60px;
+  padding:0;
+  border:none;
+  border-radius:0;
+  background:linear-gradient(135deg,#ff5f48 0%,#ff3425 100%);
+  color:#fff;
+  font-size:20px;
+  font-weight:600;
+  line-height:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:-4px 0 16px rgba(0,0,0,.2);
+  transition:transform .2s;
+  transform:translateX(60px); /* ẩn ban đầu */
+}
+
+li.task.show-del .task-inner{
+  transform:translateX(-60px);
+}
+li.task.show-del .del-btn{
+  transform:translateX(0);
+}
+
+/* tắt transition khi đang kéo */
+li.task.dragging .task-inner{
+  transition:none;
+}
+li.task.dragging .del-btn{
+  transition:none;
+}
+
+/* Leaderboard table */
+.table-wrap{
+  overflow:auto;
+  border:1px solid rgba(0,0,0,.05);
+  border-radius:16px;
+  background:rgba(255,255,255,.8);
+  box-shadow:0 16px 32px rgba(0,0,0,.08);
+}
+table{
+  width:100%;
+  border-collapse:collapse;
+  background:transparent;
+  font-size:14px;
+}
+th,td{
+  padding:12px 16px;
+  border-bottom:1px solid rgba(0,0,0,.05);
+  text-align:left;
+  white-space:nowrap;
+}
+th{
+  font-weight:600;
+  color:#1b1e2e;
+  background:rgba(255,255,255,.6)
+}
+.lb-medal{
+  margin-left:6px;
+  font-size:16px;
+}
+
+/* Charts */
+.chart-card canvas{
+  width:100%;
+  max-width:100%;
+  height:160px;
+  display:block;
+}
+
+/* thumb preview */
+.thumb{
+  width:48px;
+  height:48px;
+  border-radius:10px;
+  border:1px solid rgba(0,0,0,.1);
+  background-size:cover;
+  background-position:center;
+  background-color:#eee;
+  box-shadow:0 6px 16px rgba(0,0,0,.08);
+}
+
+  @media (max-width:768px){
+    .row{grid-template-columns:1fr}
+    .creator{flex-direction:column}
+    h1 .app-title{font-size:20px}
+  .hero-inner{gap:18px;padding:22px}
+  .hero-name{font-size:22px}
+  .hero-meta{font-size:15px}
+}
+@media (max-width:480px){
+  body{font-size:15px}
+  .tab-btn{padding:8px 12px}
+  .tabs{gap:6px}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <h1>
+    <span class="app-title" data-app="title">Mori Quest</span>
+    <span class="app-version" data-app="version"></span>
+  </h1>
+
+  <section id="hero" class="hero">
+    <div class="hero-inner">
+      <div class="hero-info">
+        <div class="hero-name" data-hero="name">Player</div>
+        <div class="hero-meta">
+          <span class="hero-level" data-hero="level">Level 1</span>
+          <span class="hero-xp" data-hero="xp">0 E</span>
+          <span class="hero-weekly" data-hero="weekly-avg">TB tuần: --</span>
+        </div>
+        <div class="hero-progress">
+          <div class="hero-progress-label" data-hero="xp-label">0 / 0 E</div>
+          <div class="hero-progress-bar">
+            <div class="hero-progress-fill" data-hero="xp-fill"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="tabs" id="tabsBar"></div>
+
+  <div id="view">Đang nạp…</div>
+</div>
+
+<script>
+/* ==============================
+   CONFIG
+============================== */
+const APP_NAME = 'Mori Quest';
+
+const CONFIG = {
+  VERSION:'1.0',
+  ENDPOINT:'https://script.google.com/macros/s/AKfycbyQ3imjnhKrzmuz4-KbPNsHzpYGY_Mv45os1bZEPoQrQ-UM8RjJvCznfP5x6RB6QX_Qpw/exec',
+  SETTINGS_PASS:'1000',
+  HERO_LEVELS:[
+    {
+      minLevel:1,
+      maxLevel:3,
+      characterImg:"url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 120\"><circle cx=\"50\" cy=\"38\" r=\"26\" fill=\"%23f97316\"/><rect x=\"22\" y=\"64\" width=\"56\" height=\"44\" rx=\"18\" fill=\"%23fb923c\"/></svg>')",
+      backgroundImg:'linear-gradient(135deg,#fde68a 0%,#f97316 100%)'
+    },
+    {
+      minLevel:4,
+      maxLevel:6,
+      characterImg:"url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 120\"><circle cx=\"50\" cy=\"38\" r=\"26\" fill=\"%232563eb\"/><rect x=\"22\" y=\"64\" width=\"56\" height=\"44\" rx=\"18\" fill=\"%2393c5fd\"/></svg>')",
+      backgroundImg:'linear-gradient(135deg,#bae6fd 0%,#2563eb 100%)'
+    },
+    {
+      minLevel:7,
+      characterImg:"url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 120\"><circle cx=\"50\" cy=\"38\" r=\"26\" fill=\"%237c3aed\"/><rect x=\"22\" y=\"64\" width=\"56\" height=\"44\" rx=\"18\" fill=\"%23c4b5fd\"/></svg>')",
+      backgroundImg:'linear-gradient(135deg,#e9d5ff 0%,#7c3aed 100%)'
+    }
+  ]
+};
+
+// Dùng link RAW để ảnh hiển thị trong CSS
+const RAW_APP_BG =
+  "https://raw.githubusercontent.com/PuongLee269/HelloWorld/cc1ea4b1d90dab277ff5138dc9eb9e928986d9ef/image/ChatGPT%20Image%2022_24_20%2031%20thg%2010%2C%202025.png";
+
+const RAW_LEVEL_BG =
+  "https://raw.githubusercontent.com/PuongLee269/HelloWorld/747e7bfebad622025035376e42939a217dde236b/image/ChatGPT%20Image%2016_04_12%2028%20thg%2010%2C%202025.png";
+
+// Ghi đè phần BACKGROUND_THEME
+CONFIG.BACKGROUND_THEME = {
+  // App dùng ảnh 1
+  appDefaultBgUrl: `url('${RAW_APP_BG}')`,
+  // Áp dụng cùng 1 nền cho mọi khoảng level
+  heroByLevel: [
+    {
+      minLevel: 1,
+      maxLevel: 3,
+      // Hero/Level area dùng ảnh 2
+      heroBgUrl: `url('${RAW_LEVEL_BG}')`,
+      appBgUrl: `url('${RAW_APP_BG}')`
+    },
+    {
+      minLevel: 4,
+      maxLevel: 6,
+      heroBgUrl: `url('${RAW_LEVEL_BG}')`,
+      appBgUrl: `url('${RAW_APP_BG}')`
+    },
+    {
+      minLevel: 7,
+      heroBgUrl: `url('${RAW_LEVEL_BG}')`,
+      appBgUrl: `url('${RAW_APP_BG}')`
+    }
+  ]
+};
+
+
+window.APP_CONFIG = CONFIG;
+
+const APP_VERSION = CONFIG.VERSION;
+
+(function syncAppMeta(){
+  const versionLabel = `v${APP_VERSION}`;
+  document.title = `${APP_NAME} – ${versionLabel}`;
+
+  const nameEl = document.querySelector('[data-app="title"]');
+  if(nameEl){
+    nameEl.textContent = APP_NAME;
+  }
+
+  const versionEl = document.querySelector('[data-app="version"]');
+  if(versionEl){
+    versionEl.textContent = versionLabel;
+  }
+})();
+
+/* ==============================
+   LOCAL STORAGE KEYS
+============================== */
+const LS = {
+  PROFILE:'tq_profile',
+  ZONES:'tq_zones',
+  TASKS:'tq_tasks',
+  RECUR:'tq_recurring',
+  DAY:'tq_sim_day',
+  BONUS:'tq_bonus_flags',
+  SPAWN:'tq_spawned_day',
+  LBCACHE:'tq_lb_cache',
+  HIST:'tq_hist',
+  REALDATE:'tq_real_date',
+  ARCHIVE:'tq_archive',
+  ZONE_E_BONUS_DAY:'tq_zone_e_bonus_day',
+  NOISE_STREAKS:'tq_noise_streaks',
+  THEME:'tq_theme',
+  ZONE_E_STREAKS:'tq_zone_e_streaks',
+  NOTES:'tq_notes'
+};
+
+const EXPORT_KEY_MAP = {
+  PROFILE: LS.PROFILE,
+  ZONES: LS.ZONES,
+  TASKS: LS.TASKS,
+  RECUR: LS.RECUR,
+  DAY: LS.DAY,
+  BONUS: LS.BONUS,
+  SPAWN: LS.SPAWN,
+  LBCACHE: LS.LBCACHE,
+  HIST: LS.HIST,
+  REALDATE: LS.REALDATE,
+  ARCHIVE: LS.ARCHIVE,
+  ZONE_E_BONUS_DAY: LS.ZONE_E_BONUS_DAY,
+  NOISE_STREAKS: LS.NOISE_STREAKS,
+  THEME: LS.THEME,
+  ZONE_E_STREAKS: LS.ZONE_E_STREAKS,
+  NOTES: LS.NOTES
+};
+
+const STRING_STORAGE_KEYS = new Set([
+  LS.DAY,
+  LS.SPAWN,
+  LS.REALDATE,
+  LS.ZONE_E_BONUS_DAY,
+  LS.NOTES
+]);
+
+const JSON_STORAGE_KEYS = new Set(
+  Object.values(EXPORT_KEY_MAP).filter(k => !STRING_STORAGE_KEYS.has(k))
+);
+
+function normalizeArchiveText(raw){
+  const text = String(raw || '').trim();
+  if(!text) return '';
+  const normalized = typeof text.normalize === 'function'
+    ? text.normalize('NFKC')
+    : text;
+  return normalized
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+function normalizeArchiveEntry(raw){
+  let text = '';
+  if(typeof raw === 'string'){
+    text = raw;
+  }else if(raw && typeof raw === 'object'){
+    text = raw.text != null ? raw.text : '';
+  }
+  const clean = String(text || '').trim();
+  const key = normalizeArchiveText(clean);
+  if(!key) return null;
+  return { text: clean };
+}
+
+function getArchive(){
+  const raw = load(LS.ARCHIVE, []);
+  if(!Array.isArray(raw)) return [];
+  const seen = new Set();
+  const result = [];
+  for(const item of raw){
+    const entry = normalizeArchiveEntry(item);
+    if(!entry) continue;
+    const key = normalizeArchiveText(entry.text);
+    if(seen.has(key)) continue;
+    seen.add(key);
+    result.push(entry);
+  }
+  return result;
+}
+function setArchive(list){
+  if(!Array.isArray(list)) list = [];
+  const seen = new Set();
+  const normalized = [];
+  for(const item of list){
+    const entry = normalizeArchiveEntry(item);
+    if(!entry) continue;
+    const key = normalizeArchiveText(entry.text);
+    if(seen.has(key)) continue;
+    seen.add(key);
+    normalized.push(entry);
+  }
+  save(LS.ARCHIVE, normalized);
+}
+
+const ZONE_KIND_LABELS = {
+  'e':'Zone E',
+  'priority':'Zone Quan trọng',
+  'noise':'Zone Noise',
+  'regular':'Zone Thường'
+};
+const ZONE_KIND_ORDER = ['e','priority','noise','regular'];
+const DEFAULT_ZONES = ZONE_KIND_ORDER.map((kind)=>({
+  name: ZONE_KIND_LABELS[kind],
+  kind,
+  bg:''
+}));
+
+const DEFAULT_ZONE_POINTS = {
+  e: 1,
+  noise: -1,
+  priority: 3,
+  regular: 1
+};
+
+function getDefaultPointsForZoneKind(zoneKind){
+  return DEFAULT_ZONE_POINTS[zoneKind] != null ? DEFAULT_ZONE_POINTS[zoneKind] : 1;
+}
+
+const DAILY_ZONE_KINDS = new Set(['e','noise']);
+const ARCHIVE_ZONE_KINDS = new Set(['priority','regular']);
+let lbTimer = null;
+
+
+/* ==============================
+   HERO ELEMENTS
+============================== */
+const heroEl = document.getElementById('hero');
+const heroRefs = heroEl ? {
+  name: heroEl.querySelector('[data-hero="name"]'),
+  level: heroEl.querySelector('[data-hero="level"]'),
+  xp: heroEl.querySelector('[data-hero="xp"]'),
+  weeklyAvg: heroEl.querySelector('[data-hero="weekly-avg"]'),
+  xpLabel: heroEl.querySelector('[data-hero="xp-label"]'),
+  xpFill: heroEl.querySelector('[data-hero="xp-fill"]')
+} : {};
+
+/* ==============================
+   LEVEL CONFIG
+============================== */
+const LEVELS = [
+  {lvl:1, need:100},
+  {lvl:2, need:250},
+  {lvl:3, need:500},
+  {lvl:4, need:800},
+  {lvl:5, need:1200},
+  {lvl:6, need:1700},
+  {lvl:7, need:2300},
+  {lvl:8, need:3000},
+  {lvl:9, need:3800},
+];
+
+function calcTotalE(level, xp){
+  const lvl = Number(level) || 0;
+  const currentXP = Number(xp) || 0;
+  let total = currentXP;
+  for(const cfg of LEVELS){
+    if(cfg.lvl >= lvl) break;
+    total += Number(cfg.need) || 0;
+  }
+  return total;
+}
+
+function calcWeeklyAverageEGain(profile){
+  const currentProfile = (profile && typeof profile === 'object') ? profile : getProfile();
+  const hist = getHist();
+  if(!Array.isArray(hist) || hist.length < 6){
+    return null;
+  }
+
+  const recent = hist.slice(-6).map((entry) => ({
+    ts: Number(entry && entry.ts) || 0,
+    total: calcTotalE(entry && entry.level, entry && entry.xp)
+  }));
+
+  if(recent.length < 6){
+    return null;
+  }
+
+  const series = recent.concat({
+    ts: Date.now(),
+    total: calcTotalE(currentProfile && currentProfile.level, currentProfile && currentProfile.xp)
+  });
+
+  series.sort((a, b) => a.ts - b.ts);
+
+  if(series.length < 7){
+    return null;
+  }
+
+  let totalGain = 0;
+  for(let i = 1; i < series.length; i++){
+    totalGain += series[i].total - series[i - 1].total;
+  }
+
+  return totalGain / 7;
+}
+
+/* ==============================
+   GENERIC HELPERS
+============================== */
+function load(key, def){ try{ return JSON.parse(localStorage.getItem(key)) ?? def }catch{ return def } }
+function save(key, val){ localStorage.setItem(key, JSON.stringify(val)) }
+
+function exportAllData(){
+  const data = {};
+  for(const [field, storageKey] of Object.entries(EXPORT_KEY_MAP)){
+    if(STRING_STORAGE_KEYS.has(storageKey)){
+      data[field] = localStorage.getItem(storageKey) || '';
+    }else{
+      data[field] = load(storageKey, null);
+    }
+  }
+
+  const payload = {
+    version: APP_VERSION,
+    exportedAt: new Date().toISOString(),
+    data
+  };
+
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `testquest-data-${Date.now()}.json`;
+  a.click();
+  setTimeout(()=> URL.revokeObjectURL(url), 500);
+}
+
+async function importAllData(file){
+  if(!file){
+    alert('Chọn file JSON để import.');
+    return;
+  }
+
+  let content = '';
+  try{
+    content = await new Promise((resolve, reject)=>{
+      const reader = new FileReader();
+      reader.onload = ()=> resolve(reader.result || '');
+      reader.onerror = ()=> reject(reader.error || new Error('Không đọc được file.'));
+      reader.readAsText(file);
+    });
+  }catch(err){
+    console.error(err);
+    alert('Không thể đọc file. Vui lòng thử lại.');
+    return;
+  }
+
+  const clean = String(content || '').trim();
+  if(!clean){
+    alert('File trống hoặc không chứa dữ liệu.');
+    return;
+  }
+
+  let parsed;
+  try{
+    parsed = JSON.parse(clean);
+  }catch(err){
+    console.error(err);
+    alert('File không phải JSON hợp lệ.');
+    return;
+  }
+
+  if(!parsed || typeof parsed !== 'object'){
+    alert('Cấu trúc file không hợp lệ.');
+    return;
+  }
+
+  const data = parsed.data;
+  if(!data || typeof data !== 'object'){
+    alert('File thiếu trường dữ liệu cần import.');
+    return;
+  }
+
+  for(const field of Object.keys(EXPORT_KEY_MAP)){
+    if(!(field in data)){
+      alert(`Thiếu trường ${field} trong file.`);
+      return;
+    }
+  }
+
+  const normalized = {};
+  for(const [field, storageKey] of Object.entries(EXPORT_KEY_MAP)){
+    const value = data[field];
+    if(STRING_STORAGE_KEYS.has(storageKey)){
+      if(value == null){
+        normalized[storageKey] = '';
+      }else if(typeof value !== 'string'){
+        alert(`Trường ${field} phải là chuỗi.`);
+        return;
+      }else{
+        normalized[storageKey] = value;
+      }
+      continue;
+    }
+
+    if(value !== null && typeof value !== 'object'){
+      alert(`Trường ${field} phải là object/array hoặc null.`);
+      return;
+    }
+    normalized[storageKey] = value;
+  }
+
+  if(!confirm('Ghi đè toàn bộ dữ liệu cục bộ bằng file này?')){
+    return;
+  }
+
+  for(const [storageKey, value] of Object.entries(normalized)){
+    if(value === null || value === undefined || value === ''){
+      localStorage.removeItem(storageKey);
+      continue;
+    }
+    if(STRING_STORAGE_KEYS.has(storageKey)){
+      localStorage.setItem(storageKey, value);
+    }else{
+      save(storageKey, value);
+    }
+  }
+
+  renderHero();
+  render('settings');
+}
+
+function getNotes(){
+  return localStorage.getItem(LS.NOTES) || '';
+}
+
+function saveNotes(text){
+  const content = String(text || '');
+  if(content){
+    localStorage.setItem(LS.NOTES, content);
+  }else{
+    localStorage.removeItem(LS.NOTES);
+  }
+}
+
+function getSavedThemeBackgrounds(){
+  const raw = load(LS.THEME, {});
+  const appBgUrl = raw && typeof raw.appBgUrl === 'string' ? raw.appBgUrl : '';
+  const heroBgUrl = raw && typeof raw.heroBgUrl === 'string' ? raw.heroBgUrl : '';
+  return { appBgUrl, heroBgUrl };
+}
+
+function updateSavedThemeBackgrounds(partial){
+  partial = partial || {};
+  const current = getSavedThemeBackgrounds();
+  const next = Object.assign({}, current);
+  if('appBgUrl' in partial){
+    next.appBgUrl = partial.appBgUrl || '';
+  }
+  if('heroBgUrl' in partial){
+    next.heroBgUrl = partial.heroBgUrl || '';
+  }
+  save(LS.THEME, next);
+  return next;
+}
+
+const NOISE_STREAK_MIN_POINTS = -5;
+const NOISE_SKULL_THRESHOLD = 3;
+const NOISE_EXTRA_PENALTY_THRESHOLD = 10;
+const ZONE_E_START_LEVEL = 1;
+const ZONE_E_CROWN_LEVEL = 7;
+const ZONE_E_FIRST_MILESTONE = 7;
+const ZONE_E_MILESTONE_MULTIPLIER = 1.2;
+const ZONE_E_CROWN_ICON_DAYS = 7;
+const ZONE_E_MAX_CROWN_ICONS = 3;
+const ZONE_E_CROWN_REACTIVATION_STREAK = 7;
+const ZONE_E_FALLBACK_LEVEL_AFTER_CROWN_LOSS = 4;
+
+function clampNoiseBasePoints(value){
+  const n = Number(value);
+  if(!Number.isFinite(n)) return -1;
+  if(n > -1) return -1;
+  if(n < NOISE_STREAK_MIN_POINTS) return NOISE_STREAK_MIN_POINTS;
+  return Math.round(n);
+}
+
+function tryParseNoiseBase(value){
+  const n = Number(value);
+  if(!Number.isFinite(n)) return null;
+  return clampNoiseBasePoints(n);
+}
+
+function pickNoiseBase(...candidates){
+  for(const value of candidates){
+    const parsed = tryParseNoiseBase(value);
+    if(parsed !== null) return parsed;
+  }
+  return clampNoiseBasePoints(-1);
+}
+
+function parseNoiseStreak(value){
+  const n = Number(value);
+  if(!Number.isFinite(n) || n <= 0) return 0;
+  return Math.floor(n);
+}
+
+function parseCrownIcons(value){
+  const n = Number(value);
+  if(!Number.isFinite(n) || n <= 0) return 0;
+  return Math.max(0, Math.min(ZONE_E_MAX_CROWN_ICONS, Math.floor(n)));
+}
+
+function parseCrownMaintainedDays(value){
+  const n = Number(value);
+  if(!Number.isFinite(n) || n <= 0) return 0;
+  return Math.max(0, Math.floor(n));
+}
+
+function clampZoneELevel(value){
+  const n = Number(value);
+  if(!Number.isFinite(n)) return ZONE_E_START_LEVEL;
+  return Math.min(ZONE_E_CROWN_LEVEL, Math.max(ZONE_E_START_LEVEL, Math.floor(n)));
+}
+
+const ZONE_E_MILESTONES = (() => {
+  const requirements = {};
+  let needed = ZONE_E_FIRST_MILESTONE;
+  for(let level = ZONE_E_START_LEVEL; level < ZONE_E_CROWN_LEVEL; level++){
+    requirements[level] = Math.ceil(needed);
+    needed = Math.ceil(needed * ZONE_E_MILESTONE_MULTIPLIER);
+  }
+  return requirements;
+})();
+
+function getZoneENextRequirement(level){
+  const clamped = clampZoneELevel(level);
+  if(clamped >= ZONE_E_CROWN_LEVEL) return null;
+  return ZONE_E_MILESTONES[clamped] || null;
+}
+
+function applyZoneEProgress(prevEntry, didComplete){
+  const prevLevel = clampZoneELevel(prevEntry && (prevEntry.level ?? prevEntry.basePoints));
+  let streak = parseNoiseStreak(prevEntry && prevEntry.streak);
+  let level = prevLevel;
+  const prevCrownActive = prevEntry && Object.prototype.hasOwnProperty.call(prevEntry, 'crownActive')
+    ? !!prevEntry.crownActive
+    : prevLevel >= ZONE_E_CROWN_LEVEL;
+  let crownActive = prevCrownActive;
+  let crownIcons = parseCrownIcons(prevEntry && prevEntry.crownIcons);
+  let crownMaintainedDays = parseCrownMaintainedDays(prevEntry && prevEntry.crownMaintainedDays);
+
+  if(didComplete){
+    streak += 1;
+    while(level < ZONE_E_CROWN_LEVEL){
+      const needed = getZoneENextRequirement(level);
+      if(needed && streak >= needed){
+        streak -= needed;
+        level += 1;
+      }else{
+        break;
+      }
+    }
+    if(level >= ZONE_E_CROWN_LEVEL){
+      if(!crownActive && streak >= ZONE_E_CROWN_REACTIVATION_STREAK){
+        streak -= ZONE_E_CROWN_REACTIVATION_STREAK;
+        crownActive = true;
+        crownMaintainedDays = 0;
+      }
+
+      if(crownActive){
+        if(crownIcons >= ZONE_E_MAX_CROWN_ICONS){
+          crownMaintainedDays = 0;
+        }else{
+          crownMaintainedDays = crownMaintainedDays + 1;
+          if(crownMaintainedDays >= ZONE_E_CROWN_ICON_DAYS){
+            crownIcons = Math.min(ZONE_E_MAX_CROWN_ICONS, crownIcons + 1);
+            crownMaintainedDays = 0;
+          }
+        }
+      }else{
+        crownMaintainedDays = 0;
+      }
+    }else{
+      crownActive = false;
+      crownMaintainedDays = 0;
+    }
+  }else{
+    const atCrownLevel = level >= ZONE_E_CROWN_LEVEL;
+    if(atCrownLevel){
+      if(crownIcons > 0){
+        crownIcons = crownIcons - 1;
+        crownActive = false;
+        level = ZONE_E_CROWN_LEVEL;
+      }else{
+        level = Math.max(ZONE_E_START_LEVEL, Math.min(ZONE_E_CROWN_LEVEL, ZONE_E_FALLBACK_LEVEL_AFTER_CROWN_LOSS));
+        crownActive = false;
+      }
+    }else{
+      level = ZONE_E_START_LEVEL;
+      crownActive = false;
+    }
+    streak = 0;
+    crownMaintainedDays = 0;
+  }
+
+  return { basePoints: level, level, streak, crownActive, crownIcons, crownMaintainedDays };
+}
+
+function getNoiseStreakStore(){
+  const raw = load(LS.NOISE_STREAKS, {});
+  if(!raw || typeof raw !== 'object') return {};
+  const result = {};
+  Object.keys(raw).forEach((key)=>{
+    const entry = raw[key];
+    if(!entry || typeof entry !== 'object') return;
+    const base = clampNoiseBasePoints(entry.basePoints);
+    const rawStreak = Number(entry.streak);
+    const streak = Number.isFinite(rawStreak) && rawStreak > 0 ? Math.floor(rawStreak) : 0;
+    result[key] = { basePoints: base, streak };
+  });
+  return result;
+}
+
+function setNoiseStreakStore(store){
+  const normalized = {};
+  if(store && typeof store === 'object'){
+    Object.keys(store).forEach((key)=>{
+      const entry = store[key];
+      if(!entry || typeof entry !== 'object') return;
+      const base = clampNoiseBasePoints(entry.basePoints);
+      const rawStreak = Number(entry.streak);
+      const streak = Number.isFinite(rawStreak) && rawStreak > 0 ? Math.floor(rawStreak) : 0;
+      normalized[key] = { basePoints: base, streak };
+    });
+  }
+  save(LS.NOISE_STREAKS, normalized);
+}
+
+function normalizeZoneEEntry(raw){
+  if(!raw || typeof raw !== 'object') return null;
+  const levelVal = raw.level != null ? raw.level : raw.basePoints;
+  const level = clampZoneELevel(levelVal);
+  const streak = parseNoiseStreak(raw.streak);
+  const hasCrownActiveFlag = Object.prototype.hasOwnProperty.call(raw, 'crownActive');
+  const crownActive = level >= ZONE_E_CROWN_LEVEL
+    ? (hasCrownActiveFlag ? !!raw.crownActive : true)
+    : false;
+  const crownIcons = parseCrownIcons(raw.crownIcons);
+  const crownMaintainedDays = parseCrownMaintainedDays(raw.crownMaintainedDays);
+  return { basePoints: level, level, streak, crownActive, crownIcons, crownMaintainedDays };
+}
+
+function getZoneEStreakStore(){
+  const raw = load(LS.ZONE_E_STREAKS, {});
+  if(!raw || typeof raw !== 'object') return {};
+  const result = {};
+  Object.keys(raw).forEach((key)=>{
+    const entry = normalizeZoneEEntry(raw[key]);
+    if(entry) result[key] = entry;
+  });
+  return result;
+}
+
+function setZoneEStreakStore(store){
+  const normalized = {};
+  if(store && typeof store === 'object'){
+    Object.keys(store).forEach((key)=>{
+      const entry = normalizeZoneEEntry(store[key]);
+      if(entry) normalized[key] = entry;
+    });
+  }
+  save(LS.ZONE_E_STREAKS, normalized);
+}
+
+function renderZoneETaskProgress(task, zoneEStore){
+  if(!zoneEStore || !task || task.kind !== 'recurring') return '';
+  const key = getNoiseTaskKey(task);
+  if(!key) return '';
+  const entry = zoneEStore[key] || { level: ZONE_E_START_LEVEL, streak: 0, crownIcons: 0, crownMaintainedDays: 0 };
+
+  const level = (entry.level ?? entry.basePoints ?? ZONE_E_START_LEVEL);
+  const streakValue = parseNoiseStreak(entry.streak);
+  const nextRequirement = getZoneENextRequirement(level);
+  const crownIcons = parseCrownIcons(entry.crownIcons);
+  const crownMaintainedDays = parseCrownMaintainedDays(entry.crownMaintainedDays);
+  const crownActive = level >= ZONE_E_CROWN_LEVEL ? entry.crownActive !== false : !!entry.crownActive;
+  const reactivationRequirement = !crownActive && level >= ZONE_E_CROWN_LEVEL ? ZONE_E_CROWN_REACTIVATION_STREAK : null;
+  const progressRatio = crownActive
+    ? (crownIcons >= ZONE_E_MAX_CROWN_ICONS
+      ? 1
+      : Math.max(0, Math.min(1, crownMaintainedDays / ZONE_E_CROWN_ICON_DAYS)))
+    : reactivationRequirement
+      ? Math.max(0, Math.min(1, streakValue / reactivationRequirement))
+      : Math.max(0, Math.min(1, nextRequirement ? streakValue / nextRequirement : 0));
+  const widthPercent = Math.round(progressRatio * 1000) / 10;
+  const progressLabel = crownActive
+    ? (crownIcons >= ZONE_E_MAX_CROWN_ICONS
+      ? `Crown icons: ${crownIcons}/${ZONE_E_MAX_CROWN_ICONS}`
+      : `Crown day: ${crownMaintainedDays}/${ZONE_E_CROWN_ICON_DAYS}`)
+    : reactivationRequirement
+      ? `Khôi phục crown: ${streakValue}/${reactivationRequirement}`
+      : nextRequirement
+        ? `${streakValue}/${nextRequirement}`
+        : `${streakValue}`;
+  const crownIconDisplay = crownIcons > 0
+    ? `<span class="task-progress-icons" aria-label="Crown icons: ${crownIcons}/${ZONE_E_MAX_CROWN_ICONS}">${'👑'.repeat(crownIcons)}</span>`
+    : '';
+
+  return `
+    <div class="task-progress" aria-label="Tiến độ ${progressLabel}">
+      <div class="task-progress-header">
+        <span class="task-progress-label-text">${progressLabel}</span>
+        ${crownIconDisplay}
+      </div>
+      <div class="task-progress-bar">
+        <div class="task-progress-fill" style="width:${widthPercent}%"></div>
+      </div>
+    </div>
+  `;
+}
+
+function renderZoneNoiseTaskProgress(task, noiseStore){
+  if(!noiseStore || !task || task.kind !== 'recurring') return '';
+  const key = getNoiseTaskKey(task);
+  if(!key) return '';
+  const entry = noiseStore[key] || { basePoints: NOISE_STREAK_MIN_POINTS, streak: 0 };
+
+  const basePoints = clampNoiseBasePoints(entry.basePoints);
+  if(basePoints < NOISE_STREAK_MIN_POINTS) return '';
+  const currentPoints = clampNoiseBasePoints(task.points);
+  const totalPenaltyWindow = Math.max(1, basePoints - NOISE_STREAK_MIN_POINTS);
+  const penaltyDepth = Math.max(0, Math.min(totalPenaltyWindow, basePoints - currentPoints));
+  const remainingBuffer = Math.max(0, totalPenaltyWindow - penaltyDepth);
+  const progressRatio = penaltyDepth / totalPenaltyWindow;
+  const widthPercent = Math.round(progressRatio * 1000) / 10;
+  const penaltyLabel = `${penaltyDepth}/${totalPenaltyWindow}`;
+  const tooltip = `Đệm phạt còn lại: ${remainingBuffer}`;
+  const safeTitle = tooltip.replace(/"/g, '&quot;');
+
+  return `
+    <div class="zone-noise-progress" title="${safeTitle}">
+      <div class="zone-noise-progress-header">
+        <span class="zone-noise-progress-label">Phạt tích lũy</span>
+        <span class="zone-noise-progress-value">${penaltyLabel}</span>
+      </div>
+      <div class="zone-noise-progress-bar">
+        <div class="zone-noise-progress-fill" style="width:${widthPercent}%"></div>
+      </div>
+    </div>
+  `;
+}
+
+function getNoiseTaskKey(task){
+  if(!task || typeof task !== 'object') return null;
+  if(typeof task.recurringId === 'number') return `rec:${task.recurringId}`;
+  if(task.id != null) return `task:${task.id}`;
+  return null;
+}
+
+function generateProfileId(){
+  try {
+    if(typeof crypto !== 'undefined'){
+      if(typeof crypto.randomUUID === 'function'){
+        return crypto.randomUUID();
+      }
+      if(typeof crypto.getRandomValues === 'function'){
+        const arr = new Uint32Array(4);
+        crypto.getRandomValues(arr);
+        return Array.from(arr).map(n=>n.toString(16).padStart(8,'0')).join('');
+      }
+    }
+  } catch(_err) {
+    // ignore and fallback below
+  }
+  const time = Date.now().toString(36);
+  const rand = Math.random().toString(36).slice(2,10);
+  return `p-${time}-${rand}`;
+}
+
+function formatSignedNumber(n){
+  const val = Number(n)||0;
+  return `${val>=0?'+':''}${val}`;
+}
+function todayDM(){
+  const d=new Date();
+  const dd=String(d.getDate()).padStart(2,'0');
+  const mm=String(d.getMonth()+1).padStart(2,'0');
+  return `${dd}-${mm}`;
+}
+function getLastRealDate(){
+  return localStorage.getItem(LS.REALDATE) || '';
+}
+function setLastRealDate(val){
+  if(val){
+    localStorage.setItem(LS.REALDATE, val);
+  }
+}
+function lastLevelCfg(){ return LEVELS[LEVELS.length-1]; }
+
+/* ==============================
+   AI TASK SCORING (FINAL)
+============================== */
+const AI_ENDPOINT = "https://todo-quest-proxyp260992.vercel.app/api/score"; // sửa đúng URL proxy đang chạy
+
+
+/**
+ * Chấm điểm 1 task và trả về object đầy đủ từ proxy.
+ * @param {string} taskText
+ * @param {string} zoneKind: 'e' | 'priority' | 'noise' | 'regular'
+ * @returns {{zone:string, category:string, points:number, reason:string}}
+ */
+async function getTaskPoints(taskText, zoneKind) {
+  const zoneLabel = ZONE_KIND_LABELS[zoneKind] || "Zone Thường";
+  const r = await fetch(AI_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Scoring-Version": "v2" },
+    body: JSON.stringify({ text: taskText, zone: zoneLabel })
+  });
+  if (!r.ok) return { points: 0, reason: "" };
+  const data = await r.json();
+  const reason = String(data.reason || "").trim().split(/\s+/).slice(0,10).join(" ");
+  return { points: Number(data.points)||0, reason, category: data.category, zone: data.zone };
+}
+
+function normalizeAiScoreForZone(ai, zoneKind){
+  const basePoints = Number(ai.points);
+  const normalized = {
+    points: Number.isFinite(basePoints) ? basePoints : 0,
+    reason: String(ai.reason || '').trim(),
+    category: ai.category,
+    zone: ai.zone
+  };
+
+  if(zoneKind === 'noise'){
+    const initialPoints = Number.isFinite(basePoints) ? basePoints : 0;
+    let nextPoints = initialPoints;
+    if(nextPoints > -1){
+      nextPoints = -1;
+    }
+    if(nextPoints === 0){
+      nextPoints = -1;
+    }
+
+    const segments = [];
+    const addSegment = (part) => {
+      const trimmed = String(part || '').trim();
+      if(!trimmed) return;
+      const lower = trimmed.toLowerCase();
+      if(!segments.some(seg => seg.toLowerCase() === lower)){
+        segments.push(trimmed);
+      }
+    };
+
+    if(initialPoints >= 0){
+      addSegment('Nhầm Zone');
+    }
+
+    normalized.reason.split(/—| - /).forEach(addSegment);
+
+    normalized.points = nextPoints;
+    normalized.reason = segments.join(' — ');
+  }
+
+  return normalized;
+}
+
+/* ==============================
+   PROFILE / LEVEL / XP ("E")
+============================== */
+function getProfile(){
+  let p = load(LS.PROFILE);
+  let changed = false;
+
+  if(!p || typeof p !== 'object' || Array.isArray(p)){
+    p = { id: generateProfileId(), name:'', level:1, xp:0 };
+    changed = true;
+  } else {
+    if(!p.id){
+      p.id = generateProfileId();
+      changed = true;
+    }
+    if(typeof p.name !== 'string'){
+      p.name = '';
+      changed = true;
+    }
+    const lvl = Number(p.level);
+    if(!Number.isFinite(lvl) || lvl < 1){
+      p.level = 1;
+      changed = true;
+    } else if(typeof p.level !== 'number'){
+      p.level = lvl;
+      changed = true;
+    }
+    const xpVal = Number(p.xp);
+    if(!Number.isFinite(xpVal) || xpVal < 0){
+      p.xp = 0;
+      changed = true;
+    } else if(typeof p.xp !== 'number'){
+      p.xp = xpVal;
+      changed = true;
+    }
+  }
+
+  if(changed){
+    save(LS.PROFILE, p);
+  }
+  return p;
+}
+function setName(name){
+  const p=getProfile(); p.name=(name||'').trim(); save(LS.PROFILE,p);
+  renderHero();
+}
+function addXP(delta){
+  const p=getProfile();
+  p.xp = Math.max(0, Number(p.xp||0)+Number(delta||0));
+  while(true){
+    const cfg = LEVELS.find(x=>x.lvl===p.level) || lastLevelCfg();
+    const need = cfg.need || 0;
+    if(need>0 && p.xp>=need){
+      p.xp -= need;
+      const maxLvl = lastLevelCfg().lvl;
+      p.level = Math.min(maxLvl, p.level+1);
+    } else {
+      break;
+    }
+  }
+  save(LS.PROFILE,p);
+  scheduleAutoSync();
+  renderHero();
+}
+function getLevelInfo(){
+  const p=getProfile();
+  const cfg = LEVELS.find(x=>x.lvl===p.level) || lastLevelCfg();
+  return {level:p.level, xp:p.xp, need:cfg.need||0};
+}
+function getDailyPenalty(levelInput){
+  const level = Math.max(1, Math.floor(Number(levelInput ?? getLevelInfo().level) || 1));
+  return -5 - 2 * (level - 1);
+}
+  function resetPoints(){
+    const p=getProfile(); p.level=1; p.xp=0; save(LS.PROFILE,p);
+    renderHero();
+  }
+function ensureName(){
+  const p=getProfile();
+  if(!p.name){
+    const n=prompt('Nhập tên người chơi:');
+    if(n) setName(n);
+  }
+}
+
+/* ==============================
+   HERO RENDERING
+============================== */
+function pickHeroConfigFor(level){
+  const list = Array.isArray(CONFIG.HERO_LEVELS) ? CONFIG.HERO_LEVELS : [];
+  const fallback = list[list.length-1] || null;
+  for(const item of list){
+    if(typeof item.level === 'number' && item.level === level) return item;
+    if(Array.isArray(item.levels) && item.levels.includes(level)) return item;
+    const min = typeof item.minLevel === 'number' ? item.minLevel : (typeof item.min === 'number' ? item.min : -Infinity);
+    const max = typeof item.maxLevel === 'number' ? item.maxLevel : (typeof item.max === 'number' ? item.max : Infinity);
+    if(level>=min && level<=max) return item;
+  }
+  return fallback;
+}
+
+function getBackgroundTheme(){
+  const base = CONFIG && typeof CONFIG === 'object' ? (CONFIG.BACKGROUND_THEME || {}) : {};
+  const saved = getSavedThemeBackgrounds();
+  const theme = Object.assign({}, base);
+
+  theme.customBackgrounds = saved;
+  theme.customAppBgUrl = saved.appBgUrl || '';
+  theme.customHeroBgUrl = saved.heroBgUrl || '';
+
+  if(saved.appBgUrl){
+    theme.appDefaultBgUrl = saved.appBgUrl;
+  }
+
+  return theme;
+}
+
+function pickHeroBackgroundThemeFor(level){
+  const theme = getBackgroundTheme();
+  const list = Array.isArray(theme.heroByLevel) ? theme.heroByLevel : [];
+  const fallback = list[list.length-1] || null;
+  for(const item of list){
+    if(typeof item.level === 'number' && item.level === level) return item;
+    if(Array.isArray(item.levels) && item.levels.includes(level)) return item;
+    const min = typeof item.minLevel === 'number' ? item.minLevel : (typeof item.min === 'number' ? item.min : -Infinity);
+    const max = typeof item.maxLevel === 'number' ? item.maxLevel : (typeof item.max === 'number' ? item.max : Infinity);
+    if(level>=min && level<=max) return item;
+  }
+  return fallback;
+}
+
+function normalizeBackgroundValue(raw){
+  const result = { image:'', color:'' };
+  if(!raw) return result;
+  const trimmed = `${raw}`.trim();
+  if(!trimmed) return result;
+  const lower = trimmed.toLowerCase();
+  if(/^(#[0-9a-f]{3,8}|rgba?\(|hsla?\()/i.test(trimmed)){
+    result.color = trimmed;
+    return result;
+  }
+  const shouldWrap = !(lower.startsWith('url(') || lower.includes('gradient('));
+  result.image = shouldWrap ? `url('${trimmed.replace(/'/g,"\\'")}')` : trimmed;
+  return result;
+}
+
+function applyBackgroundToElement(el, value, fallbackValue, options){
+  if(!el) return;
+  const opts = Object.assign({ size:null, position:null, attachment:null, repeat:null }, options);
+  const normalized = normalizeBackgroundValue(value);
+  const fallbackNormalized = normalizeBackgroundValue(fallbackValue);
+  const final = (normalized.image || normalized.color) ? normalized : fallbackNormalized;
+
+  el.style.backgroundImage = final.image || '';
+  el.style.backgroundColor = final.color || '';
+
+  if(opts.size !== null){
+    el.style.backgroundSize = opts.size;
+  }
+  if(opts.position !== null){
+    el.style.backgroundPosition = opts.position;
+  }
+  if(opts.attachment !== null){
+    el.style.backgroundAttachment = opts.attachment;
+  }
+  if(opts.repeat !== null){
+    el.style.backgroundRepeat = opts.repeat;
+  }
+}
+
+function renderHero(){
+  if(!heroEl) return;
+
+  const profile = getProfile();
+  const {level,xp,need} = getLevelInfo();
+  const preset = pickHeroConfigFor(level) || {};
+  const backgroundTheme = getBackgroundTheme();
+  const heroThemePreset = pickHeroBackgroundThemeFor(level) || {};
+  const name = (profile.name || '').trim() || 'Player';
+  const pct = need ? Math.min(100, Math.round(xp/need*100)) : 100;
+  const weeklyAvgGain = calcWeeklyAverageEGain(profile);
+
+  const customHeroBg = backgroundTheme.customHeroBgUrl || '';
+  const customAppBg = backgroundTheme.customAppBgUrl || '';
+
+  const defaultHeroBg = preset.backgroundImg || 'linear-gradient(135deg,#8b7cff 0%,#b09bff 100%)';
+  const heroBgValue = customHeroBg || heroThemePreset.heroBgUrl || '';
+  applyBackgroundToElement(heroEl, heroBgValue, defaultHeroBg, { size:'cover', position:'center' });
+
+  const appBgFallback = backgroundTheme.appDefaultBgUrl || '';
+  const appBgValue = customAppBg || heroThemePreset.appBgUrl || '';
+  if(appBgValue || appBgFallback){
+    applyBackgroundToElement(document.body, appBgValue, appBgFallback, { size:'cover', attachment:'fixed' });
+  } else {
+    applyBackgroundToElement(document.body, '', '', { size:'', attachment:'fixed' });
+  }
+
+  if(heroRefs.name){
+    heroRefs.name.textContent = name;
+  }
+  if(heroRefs.level){
+    heroRefs.level.textContent = `Level ${level}`;
+  }
+  if(heroRefs.xp){
+    heroRefs.xp.textContent = `${xp} E`;
+  }
+  if(heroRefs.xpLabel){
+    heroRefs.xpLabel.textContent = need ? `${xp} / ${need} E` : `${xp} E`;
+  }
+  if(heroRefs.weeklyAvg){
+    if(weeklyAvgGain === null){
+      heroRefs.weeklyAvg.textContent = 'TB tuần: --';
+    } else {
+      const rounded = Math.round(weeklyAvgGain * 10) / 10;
+      const decimals = Number.isInteger(rounded) ? 0 : 1;
+      const valueText = `${rounded >= 0 ? '+' : '-'}${Math.abs(rounded).toFixed(decimals)}`;
+      heroRefs.weeklyAvg.textContent = `TB tuần: ${valueText} E/ngày`;
+    }
+  }
+  if(heroRefs.xpFill){
+    heroRefs.xpFill.style.width = `${pct}%`;
+  }
+}
+
+/* ==============================
+   HISTORY SNAPSHOT (Stats)
+============================== */
+function getHist(){ return load(LS.HIST,[]); }
+function setHist(h){ save(LS.HIST,h); }
+function pushHistSnapshot(){
+  const p=getProfile();
+  const h=getHist();
+  h.push({
+    ts:Date.now(),
+    level:p.level,
+    xp:p.xp
+  });
+  if(h.length>60){
+    h.splice(0, h.length-60);
+  }
+  setHist(h);
+}
+
+/* ==============================
+   DAY / FLAGS
+============================== */
+function getDay(){
+  let d=Number(localStorage.getItem(LS.DAY)||0);
+  if(!d){ d=1; localStorage.setItem(LS.DAY,d); }
+  return d;
+}
+function nextDay(){
+  const d=getDay()+1;
+  localStorage.setItem(LS.DAY,d);
+  return d;
+}
+function loadFlags(){ return load(LS.BONUS,{}); }
+function saveFlags(f){ save(LS.BONUS,f); }
+function bonusGiven(zoneId){
+  const day=getDay();
+  const f=loadFlags();
+  return !!(f[day] && f[day][zoneId]);
+}
+function markBonus(zoneId){
+  const day=getDay();
+  const f=loadFlags();
+  if(!f[day]) f[day]={};
+  f[day][zoneId]=true;
+  saveFlags(f);
+}
+function clearFlagsFor(day){
+  const f=loadFlags();
+  delete f[day];
+  saveFlags(f);
+}
+
+/* ==============================
+   ZONES / TASKS / RECURRING
+============================== */
+function normalizeZoneRecord(raw, idx, idBase){
+  if(!raw || typeof raw!=='object') return {changed:true, zone:null};
+  const zone = {...raw};
+  let changed=false;
+
+  if(typeof zone.id!=='number'){
+    zone.id = idBase + idx;
+    changed=true;
+  }
+
+  zone.name = typeof zone.name==='string' ? zone.name.trim() : '';
+  if(!zone.name){
+    zone.name = `Zone ${idx+1}`;
+    changed=true;
+  }
+
+  if(zone.kind === 'public'){
+    zone.kind = 'regular';
+    if(zone.name === 'Zone Giao việc'){
+      zone.name = ZONE_KIND_LABELS['regular'];
+    }
+    changed = true;
+  }
+
+  if(typeof zone.bg!=='string'){
+    zone.bg='';
+    changed=true;
+  }
+
+  if(!ZONE_KIND_LABELS[zone.kind]){
+    const fallbackKind = DEFAULT_ZONES.find(d=>d.name===zone.name)?.kind || 'regular';
+    zone.kind = fallbackKind;
+    changed=true;
+  }
+
+  return {changed, zone};
+}
+
+function getZones(){
+  const loaded = load(LS.ZONES, []);
+  const idBase = Date.now();
+  let zones = [];
+  let changed=false;
+
+  if(Array.isArray(loaded) && loaded.length){
+    loaded.forEach((item, idx)=>{
+      const {changed: rowChanged, zone} = normalizeZoneRecord(item, idx, idBase+idx*10);
+      if(rowChanged) changed=true;
+      if(zone) zones.push(zone);
+    });
+  }
+
+  if(!zones.length){
+    const base = Date.now();
+    zones = DEFAULT_ZONES.map((z, idx)=>({
+      id: base + idx,
+      name: z.name,
+      kind: z.kind,
+      bg: z.bg
+    }));
+    changed=true;
+  }
+
+  const existingKinds = new Set(zones.map(z=>z.kind));
+  const missingDefaults = DEFAULT_ZONES.filter(def=>!existingKinds.has(def.kind));
+  if(missingDefaults.length){
+    const base = Date.now();
+    missingDefaults.forEach((def, idx)=>{
+      zones.push({
+        id: base + idx,
+        name: def.name,
+        kind: def.kind,
+        bg: def.bg
+      });
+    });
+    changed=true;
+  }
+
+  if(changed){
+    setZones(zones);
+  }
+
+  return zones;
+}
+function setZones(z){ save(LS.ZONES,z) }
+function sanitizeZoneInput(z){
+  return {
+    name: typeof z.name==='string' ? z.name.trim() : '',
+    kind: ZONE_KIND_LABELS[z.kind] ? z.kind : 'regular',
+    bg: typeof z.bg==='string' ? z.bg : ''
+  };
+}
+function renderZoneKindOptions(selected){
+  return ZONE_KIND_ORDER.map(kind=>`<option value="${kind}" ${kind===selected?'selected':''}>${ZONE_KIND_LABELS[kind]}</option>`).join('');
+}
+function addZone(z){
+  const list=getZones();
+  const clean = sanitizeZoneInput(z);
+  clean.id = Date.now() + Math.floor(Math.random()*1000);
+  if(!clean.name){
+    clean.name = `Zone ${list.length+1}`;
+  }
+  setZones([...list, clean]);
+}
+function updZone(id,patch){
+  const clean={...patch};
+  if('name' in clean){
+    clean.name = (clean.name||'').trim();
+    if(!clean.name) delete clean.name;
+  }
+  if('bg' in clean && typeof clean.bg!=='string'){
+    delete clean.bg;
+  }
+  if('kind' in clean){
+    clean.kind = ZONE_KIND_LABELS[clean.kind] ? clean.kind : 'regular';
+  }
+  setZones(getZones().map(z=>z.id===id?{...z,...clean}:z));
+}
+function delZone(id){
+  setZones(getZones().filter(z=>z.id!==id));
+}
+
+async function addRecurring(r){
+  const rec = {...r};
+  rec.id = Date.now() + Math.floor(Math.random()*1000);
+
+  // Lấy zone để biết kind
+  const zones = getZones();
+  const z = zones.find(z => z.id == rec.zoneId);
+  const zoneKind = z ? z.kind : 'regular';
+
+  const fallbackPoints = getDefaultPointsForZoneKind(zoneKind);
+  const normalizedPoints = Number.isFinite(Number(rec.points)) ? Number(rec.points) : fallbackPoints;
+  rec.points = normalizedPoints; // lưu điểm base cho recurring
+  if('reason' in rec){
+    delete rec.reason;
+  }
+  if(zoneKind === 'noise'){
+    rec.noiseBasePoints = clampNoiseBasePoints(rec.points);
+  }else if('noiseBasePoints' in rec){
+    delete rec.noiseBasePoints;
+  }
+
+  const list = [...getRecurring(), rec];
+  save(LS.RECUR, list);
+  return rec;
+}
+
+function delRecurring(id){
+  save(LS.RECUR,getRecurring().filter(r=>r.id!==id));
+}
+
+function getRecurring(){ return load(LS.RECUR,[]) }
+
+function getTasks(){
+  const raw = load(LS.TASKS, []);
+  if(!Array.isArray(raw)) return [];
+
+  const zones = getZones();
+  const zoneKindMap = new Map(zones.map(z=>[Number(z.id), z.kind]));
+
+  let recs = getRecurring();
+  let recChanged=false;
+  const adjustedRecs = recs.map((r)=>{
+    if(!r || typeof r!=='object') return r;
+    const zoneKind = zoneKindMap.get(Number(r.zoneId));
+    const next = { ...r };
+    let changedRow = false;
+
+    const desiredPoints = Number.isFinite(Number(next.points)) ? Number(next.points) : getDefaultPointsForZoneKind(zoneKind);
+    if(next.points !== desiredPoints){
+      next.points = desiredPoints;
+      changedRow = true;
+    }
+
+    if(zoneKind === 'noise'){
+      const noiseBase = clampNoiseBasePoints(next.points);
+      if(next.points !== noiseBase){
+        next.points = noiseBase;
+        changedRow = true;
+      }
+      if(next.noiseBasePoints !== noiseBase){
+        next.noiseBasePoints = noiseBase;
+        changedRow = true;
+      }
+    }else if('noiseBasePoints' in next){
+      delete next.noiseBasePoints;
+      changedRow = true;
+    }
+
+    if('reason' in next){
+      delete next.reason;
+      changedRow = true;
+    }
+
+    if(changedRow) recChanged = true;
+    return changedRow ? next : r;
+  });
+  if(recChanged){
+    save(LS.RECUR, adjustedRecs);
+  }
+  recs = adjustedRecs;
+
+  const recIndex = new Map();
+  for(const r of recs){
+    const key = `${Number(r.zoneId)}|${String(r.text||'')}`;
+    if(!recIndex.has(key)) recIndex.set(key, []);
+    recIndex.get(key).push(r);
+  }
+
+  let changed=false;
+  const normalized = raw.map(item=>{
+    if(!item || typeof item!=='object'){
+      changed=true;
+      return null;
+    }
+
+    const zoneId = Number(item.zoneId);
+    const zoneKind = zoneKindMap.get(zoneId);
+    let kind = item.kind==='recurring' ? 'recurring' : (item.kind==='single' ? 'single' : null);
+    let recurringId = typeof item.recurringId==='number' ? item.recurringId : null;
+    let done = !!item.done;
+    let points = Number(item.points);
+    if(!Number.isFinite(points)){
+      points = getDefaultPointsForZoneKind(zoneKind);
+    }
+
+    if(kind===null){
+      const key = `${zoneId}|${String(item.text||'')}`;
+      const match = recIndex.get(key) || [];
+      if(recurringId!=null){
+        kind='recurring';
+      }else if(match.length===1){
+        kind='recurring';
+        recurringId = match[0].id;
+      }else{
+        kind='single';
+      }
+      if(kind==='recurring' && done){
+        done=false;
+      }
+    }
+
+    if(kind==='recurring' && recurringId==null){
+      const key = `${zoneId}|${String(item.text||'')}`;
+      const match = recIndex.get(key) || [];
+      if(match.length===1){
+        recurringId = match[0].id;
+      }
+    }
+
+    const next = { ...item, zoneId, done, kind, points };
+    if(kind==='recurring'){
+      const existing = typeof next.recurringId==='number' ? next.recurringId : null;
+      next.recurringId = recurringId!=null ? recurringId : existing;
+      // Set points from recurring
+      const rec = recs.find(r => r.id === next.recurringId);
+      if (rec) {
+        next.points = Number(rec.points) || 0;
+      }
+    }else if('recurringId' in next){
+      delete next.recurringId;
+    }
+
+    if(zoneKind==='noise'){
+      const noisePoints = clampNoiseBasePoints(next.points);
+      if(next.points !== noisePoints){
+        next.points = noisePoints;
+        changed=true;
+      }
+    }
+
+    if('aiReason' in next){
+      delete next.aiReason;
+      changed=true;
+    }
+
+    if(item.zoneId!==next.zoneId || item.done!==next.done || item.kind!==next.kind || (kind==='recurring' && item.recurringId!==next.recurringId) || (kind!=='recurring' && 'recurringId' in item) || item.points !== next.points){
+      changed=true;
+    }
+
+    return next;
+  }).filter(Boolean);
+
+  if(changed){
+    save(LS.TASKS, normalized);
+  }
+
+  return normalized;
+}
+
+function isTaskActiveToday(t){
+  if(!t) return false;
+  if(t.kind==='recurring') return true;
+  if(t.kind==='single') return !t.done;
+  return !t.done;
+}
+
+function doesTaskOccupyCapacity(task){
+  if(!task) return false;
+  if(task.kind==='recurring') return !task.done;
+  if(task.kind==='single') return !task.done;
+  return !task.done;
+}
+
+function getZoneActiveTasks(tasks, zoneId){
+  return tasks.filter(t=>t.zoneId==zoneId && doesTaskOccupyCapacity(t));
+}
+
+function countZoneTasks(tasks, zoneId){
+  return tasks.filter(t=>t.zoneId==zoneId).length;
+}
+
+function describeTaskKind(task, zone){
+  if(task.kind==='recurring'){
+    return zone && zone.kind==='noise' ? 'Hằng ngày (-)' : 'Hằng ngày';
+  }
+  return 'Một lần';
+}
+
+function taskKindClass(task, zone){
+  if(task.kind==='recurring'){
+    return zone && zone.kind==='noise' ? 'task-kind recurring negative' : 'task-kind recurring';
+  }
+  return 'task-kind single';
+}
+
+function renderTaskKindBadge(task, zone){
+  return `<span class="${taskKindClass(task, zone)}">${describeTaskKind(task, zone)}</span>`;
+}
+
+function renderTaskPoints(points, reasonText, options) {
+  const opts = options && typeof options === 'object' ? options : {};
+  const sign = points >= 0 ? '+' : '';
+  const className = points >= 0 ? 'positive' : 'negative';
+  const rawReason = String(reasonText || '').trim();
+  let prioritizedReason = rawReason;
+  if(rawReason){
+    const segments = rawReason.split(/—| - /).map(part=>part.trim()).filter(Boolean);
+    if(segments.length){
+      const seen = new Set();
+      const noiseSegments = [];
+      const otherSegments = [];
+      segments.forEach(seg=>{
+        const key = seg.toLowerCase();
+        if(seen.has(key)) return;
+        seen.add(key);
+        if(key.startsWith('nhầm zone')){
+          noiseSegments.push(seg);
+        }else{
+          otherSegments.push(seg);
+        }
+      });
+      prioritizedReason = [...noiseSegments, ...otherSegments].join(' — ');
+    }
+  }
+  const extraTooltip = opts.tooltip != null ? String(opts.tooltip).trim() : '';
+  const tooltipParts = [];
+  if(prioritizedReason){
+    tooltipParts.push(prioritizedReason);
+  }
+  if(extraTooltip){
+    tooltipParts.push(extraTooltip);
+  }
+  const tooltipText = tooltipParts.join(' — ');
+  const safeTitle = tooltipText.replace(/"/g, '&quot;');
+  const titleAttr = tooltipText ? ` title="${safeTitle}"` : '';
+  const icon = opts.icon ? `<span class="task-point-icon" aria-hidden="true">${opts.icon}</span>` : '';
+  return `<span class="task-points ${className}"${titleAttr}>${icon}${sign}${points}</span>`;
+}
+
+function getTaskPointExtras(task, zoneKind, stores){
+  if(!task || !stores) return {};
+  const noiseStore = stores.noise || {};
+  const zoneEStore = stores.zoneE || {};
+  if(zoneKind === 'noise' && task.kind === 'recurring'){
+    const key = getNoiseTaskKey(task);
+    if(key && noiseStore[key]){
+      const streak = parseNoiseStreak(noiseStore[key].streak);
+      if(streak >= NOISE_SKULL_THRESHOLD){
+        const penaltyNote = streak >= NOISE_EXTRA_PENALTY_THRESHOLD ? ' — -1 E bổ sung' : '';
+        return {
+          icon:'💀',
+          tooltip:`Streak Noise: ${streak}${penaltyNote}`
+        };
+      }
+    }
+  }
+  if(zoneKind === 'e' && task.kind === 'recurring'){
+    const key = getNoiseTaskKey(task);
+    if(key && zoneEStore[key]){
+      const entry = zoneEStore[key];
+      const level = clampZoneELevel(entry.level ?? entry.basePoints);
+      const streak = parseNoiseStreak(entry.streak);
+      const crownActive = level >= ZONE_E_CROWN_LEVEL ? entry.crownActive !== false : !!entry.crownActive;
+      const crownIcons = parseCrownIcons(entry.crownIcons);
+      const crownMaintainedDays = parseCrownMaintainedDays(entry.crownMaintainedDays);
+      const next = getZoneENextRequirement(level);
+      const tooltipParts = [`Zone E Level ${level}/${ZONE_E_CROWN_LEVEL}`];
+      if(crownActive){
+        tooltipParts.push('Crown đang kích hoạt');
+        tooltipParts.push(`Biểu tượng vương miện: ${crownIcons}/${ZONE_E_MAX_CROWN_ICONS}`);
+        if(crownIcons < ZONE_E_MAX_CROWN_ICONS){
+          tooltipParts.push(`Ngày duy trì crown: ${crownMaintainedDays}/${ZONE_E_CROWN_ICON_DAYS}`);
+        }
+      }else if(level >= ZONE_E_CROWN_LEVEL){
+        tooltipParts.push('Crown đang tắt do miss, cần streak mới để bật lại');
+        tooltipParts.push(`Streak khôi phục: ${streak}/${ZONE_E_CROWN_REACTIVATION_STREAK}`);
+        tooltipParts.push(`Biểu tượng còn lại: ${crownIcons}/${ZONE_E_MAX_CROWN_ICONS}`);
+      }else if(next){
+        tooltipParts.push(`Streak: ${streak}/${next}`);
+      }else{
+        tooltipParts.push(`Streak: ${streak}`);
+      }
+      const iconRepeat = crownIcons > 0 && level >= ZONE_E_CROWN_LEVEL
+        ? Math.max(1, Math.min(ZONE_E_MAX_CROWN_ICONS, crownIcons || 1))
+        : 0;
+      return {
+        icon: iconRepeat ? '👑'.repeat(iconRepeat) : '',
+        tooltip: tooltipParts.join(' — ')
+      };
+    }
+  }
+  return {};
+}
+function setTasks(a){ save(LS.TASKS,a) }
+
+/* ==============================
+   ARCHIVE STORAGE HELPERS
+============================== */
+function isArchiveEligibleKind(kind){
+  return ARCHIVE_ZONE_KINDS.has(kind);
+}
+
+function archiveTaskCompletion(task, zone){
+  if(!task) return;
+
+  const zoneKind = zone ? zone.kind : '';
+  if(!isArchiveEligibleKind(zoneKind)) return;
+
+  const text = String(task.text || '').trim();
+  const key = normalizeArchiveText(text);
+  if(!key) return;
+
+  const current = getArchive();
+  const index = current.findIndex(item => normalizeArchiveText(item.text) === key);
+  const next = [...current];
+  if(index>-1){
+    next[index] = { text };
+  }else{
+    next.push({ text });
+  }
+  setArchive(next);
+}
+
+function removeTaskFromArchive(taskText){
+  const key = normalizeArchiveText(taskText);
+  if(!key) return;
+  const list = getArchive();
+  const next = list.filter(item => normalizeArchiveText(item.text) !== key);
+  if(next.length !== list.length){
+    setArchive(next);
+  }
+}
+
+/* ==============================
+   LB CACHE
+============================== */
+function getLBCache(){
+  return load(LS.LBCACHE, { ts:0, list:[] });
+}
+function setLBCache(v){
+  save(LS.LBCACHE, v);
+}
+function renderLBRows(rowsEl, list){
+  if(!Array.isArray(list) || !list.length){
+    rowsEl.innerHTML = '<tr><td colspan="5" class="muted">Chưa có dữ liệu</td></tr>';
+    return;
+  }
+  const enriched = list.map(item=>({
+    ...item,
+    totalE: calcTotalE(item.level, item.xp)
+  }));
+  enriched.sort((a,b)=>
+    (b.totalE-a.totalE) || (b.level-a.level) || (b.xp-a.xp) || (a.name||'').localeCompare(b.name||'')
+  );
+  rowsEl.innerHTML = enriched.map((u,i)=>{
+    const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+    const rankCell = medal ? `${i+1}<span class="lb-medal">${medal}</span>` : `${i+1}`;
+    return `
+    <tr>
+      <td>${rankCell}</td>
+      <td>${u.name||'-'}</td>
+      <td>${u.level??'-'}</td>
+      <td>${u.totalE??'-'}</td>
+      <td>${u.updatedAt?new Date(u.updatedAt).toLocaleString():'-'}</td>
+    </tr>
+  `;
+  }).join('');
+}
+
+/* ==============================
+   SPAWN RECURRING EACH DAY
+============================== */
+function spawnRecurringIfNeeded(){
+  const mark = Number(localStorage.getItem(LS.SPAWN)||0);
+  if(mark===getDay()) return;
+
+  const weekday = new Date().getDay();
+  const recs = getRecurring();
+  const zones = getZones();
+  const tasks = getTasks();
+  const existingRecurring = new Set(
+    tasks
+      .filter(t=>t.kind==='recurring' && typeof t.recurringId==='number')
+      .map(t=>t.recurringId)
+  );
+  const fallbackRecurringKeys = new Set(
+    tasks
+      .filter(t=>t.kind==='recurring' && typeof t.recurringId!=='number')
+      .map(t=>`${t.zoneId}|${String(t.text||'')}`)
+  );
+
+  for(const r of recs){
+    const match = r.type==='daily' ||
+      (r.type==='weekly' && Array.isArray(r.days)&&r.days.includes(weekday));
+    if(!match) continue;
+
+    const z = zones.find(z=>z.id==r.zoneId);
+    if(!z) continue;
+
+    const recKey = `${r.zoneId}|${String(r.text||'')}`;
+    if(existingRecurring.has(r.id) || fallbackRecurringKeys.has(recKey)) continue;
+
+    const newTask = {
+          id: Date.now() + Math.random(),
+          text: r.text,
+          zoneId: r.zoneId,
+          done: false,
+          kind: 'recurring',
+          recurringId: r.id,
+          points: Number(r.points) || 0
+        };
+
+
+    tasks.push(newTask);
+    existingRecurring.add(r.id);
+    fallbackRecurringKeys.add(recKey);
+  }
+
+  setTasks(tasks);
+  localStorage.setItem(LS.SPAWN, String(getDay()));
+}
+
+/* ==============================
+   SYNC / LB FETCH
+============================== */
+function getSyncCfg(){ return { endpoint: CONFIG.ENDPOINT, autosync: true }; }
+
+async function autoSync(){
+  const cfg = getSyncCfg();
+  if(!cfg.autosync || !cfg.endpoint) return;
+  const p = getProfile();
+
+  const form = new URLSearchParams({
+    id:    String(p.id || ''),
+    name:  (p.name || 'Player'),
+    level: String(p.level || 1),
+    xp:    String(p.xp   || 0)
+  }).toString();
+
+  try {
+    const res = await fetch(cfg.endpoint, {
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:form
+    });
+    if(!res.ok){
+      console.warn('autoSync: server trả mã', res.status);
+    }
+  } catch(e){
+    console.warn('autoSync failed', e);
+  }
+}
+
+const scheduleAutoSync = (() => {
+  let timer = null;
+  const DELAY = 2000;
+  return function scheduleAutoSync(){
+    if(timer){
+      clearTimeout(timer);
+    }
+    timer = setTimeout(()=>{
+      timer = null;
+      autoSync();
+    }, DELAY);
+  };
+})();
+
+async function fetchLeaderboardAndCache(){
+  const cfg = getSyncCfg();
+  if (!cfg.endpoint) return;
+
+  // Tăng timeout và xử lý AbortError êm
+  const controller = new AbortController();
+  const timeoutMs = 15000; // 15s (trước là 8000)
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const r = await fetch(cfg.endpoint, {
+      signal: controller.signal,
+      cache: 'no-store' // tránh cache treo
+    });
+    clearTimeout(t);
+
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+
+    const data = await r.json();
+
+    const leaderboardList = Array.isArray(data)
+      ? data
+      : Array.isArray(data.lb)
+        ? data.lb
+        : [];
+    if (leaderboardList.length > 0) {
+      setLBCache({ ts: Date.now(), list: leaderboardList });
+    }
+
+  } catch (e) {
+    clearTimeout(t);
+    // CHỈ SỬA LẠI 3 DÒNG NÀY: AbortError thì im lặng, không log cảnh báo
+    if (e && e.name === 'AbortError') {
+      // console.debug('Leaderboard fetch timed out');
+      return;
+    }
+    console.warn('fetchLeaderboardAndCache failed', e);
+  }
+}
+
+
+function backgroundBoardRefresh(){
+  // Gọi nhẹ, không ném lỗi ra console
+  fetchLeaderboardAndCache().catch(() => {});
+}
+
+
+/* ==============================
+   DANGER LOCAL WIPE
+============================== */
+function wipeLocalPlayer(){
+  localStorage.removeItem(LS.PROFILE);
+  localStorage.removeItem(LS.LBCACHE);
+  alert('Đã xoá hồ sơ local. Reload trang để tạo người chơi mới.');
+  location.reload();
+}
+
+/* ==============================
+   END DAY / RESET
+============================== */
+function handleResetPoints(){
+  if(confirm('Reset Level=1 & E=0?')){
+    resetPoints();
+    alert('Đã reset điểm.');
+    render('settings');
+  }
+}
+
+function performDayRollover(opts={}){
+  const auto=!!opts.auto;
+  if(isRolloverRunning) return false;
+  isRolloverRunning=true;
+  try{
+    const zones=getZones();
+    const tasks=getTasks();
+    const todaySim=getDay();
+
+    const zoneKindMap = new Map(zones.map(z => [Number(z.id), z.kind]));
+    const todayTasks = tasks.filter(t => isTaskActiveToday(t) && t.done);
+    const completedZoneECount = todayTasks.reduce((count, task) => {
+      const zoneKind = zoneKindMap.get(Number(task.zoneId));
+      return zoneKind === 'e' ? count + 1 : count;
+    }, 0);
+
+    const lastZoneEBonusDay = Number(localStorage.getItem(LS.ZONE_E_BONUS_DAY) || 0);
+    const isZoneEBonusEligible = completedZoneECount > 3;
+    const isZoneEBonusApplied = lastZoneEBonusDay === todaySim;
+    const shouldApplyZoneEBonus = isZoneEBonusEligible && !isZoneEBonusApplied;
+    const zoneEBonus = shouldApplyZoneEBonus
+      ? Math.min(5, Math.max(3, completedZoneECount))
+      : 0;
+
+      if (zoneEBonus > 0) {
+        localStorage.setItem(LS.ZONE_E_BONUS_DAY, String(todaySim));
+        addXP(zoneEBonus);
+      }
+
+      // Daily penalty
+      const { level: currentLevel } = getLevelInfo();
+      const dailyPenalty = getDailyPenalty(currentLevel);
+      addXP(dailyPenalty);
+
+      const recsRaw = getRecurring();
+      const recs = Array.isArray(recsRaw) ? recsRaw : [];
+      const recMap = new Map();
+      const recZoneKind = new Map();
+    const validNoiseKeys = new Set();
+    const zoneEStreakStore = getZoneEStreakStore();
+    const nextZoneEStreakStore = { ...zoneEStreakStore };
+    const validZoneEKeys = new Set();
+    let recsChanged = false;
+    let zoneEStoreChanged = false;
+
+    recs.forEach((rec) => {
+      if(!rec || typeof rec !== 'object') return;
+      recMap.set(rec.id, rec);
+      const zoneKind = zoneKindMap.get(Number(rec.zoneId));
+      recZoneKind.set(rec.id, zoneKind);
+      if(zoneKind === 'noise'){
+        const key = `rec:${rec.id}`;
+        validNoiseKeys.add(key);
+        const normalizedBase = pickNoiseBase(rec.noiseBasePoints, rec.points);
+        if(rec.noiseBasePoints !== normalizedBase){
+          rec.noiseBasePoints = normalizedBase;
+          recsChanged = true;
+        }
+      }else if('noiseBasePoints' in rec){
+        delete rec.noiseBasePoints;
+        recsChanged = true;
+      }
+      if(zoneKind === 'e'){
+        const key = `rec:${rec.id}`;
+        validZoneEKeys.add(key);
+      }else{
+        const key = `rec:${rec.id}`;
+        if(Object.prototype.hasOwnProperty.call(nextZoneEStreakStore, key)){
+          delete nextZoneEStreakStore[key];
+          zoneEStoreChanged = true;
+        }
+      }
+    });
+
+    const noiseStreakStore = getNoiseStreakStore();
+    const nextNoiseStreakStore = { ...noiseStreakStore };
+    let noiseStoreChanged = false;
+    const processedNoiseKeys = new Set();
+
+    recZoneKind.forEach((zoneKind, recId) => {
+      if(zoneKind !== 'noise'){
+        const key = `rec:${recId}`;
+        if(Object.prototype.hasOwnProperty.call(nextNoiseStreakStore, key)){
+          delete nextNoiseStreakStore[key];
+          noiseStoreChanged = true;
+        }
+      }
+    });
+
+    for(const task of tasks){
+      const zoneKind = zoneKindMap.get(Number(task.zoneId));
+      if(task.kind !== 'recurring') continue;
+
+      if(zoneKind === 'e'){
+        const key = getNoiseTaskKey(task);
+        if(key){
+          validZoneEKeys.add(key);
+          const rec = recMap.get(task.recurringId);
+          const prevEntry = nextZoneEStreakStore[key];
+          const updated = applyZoneEProgress(prevEntry, !!task.done);
+
+          if(!prevEntry
+            || prevEntry.basePoints !== updated.basePoints
+            || prevEntry.level !== updated.level
+            || prevEntry.streak !== updated.streak
+            || prevEntry.crownActive !== updated.crownActive
+            || prevEntry.crownIcons !== updated.crownIcons
+            || prevEntry.crownMaintainedDays !== updated.crownMaintainedDays){
+            nextZoneEStreakStore[key] = updated;
+            zoneEStoreChanged = true;
+          }
+
+          if(Number(task.points) !== updated.level){
+            task.points = updated.level;
+          }
+          if(rec && Number(rec.points) !== updated.level){
+            rec.points = updated.level;
+            recsChanged = true;
+          }
+        }
+      }
+
+      if(zoneKind === 'noise'){
+        const key = getNoiseTaskKey(task);
+        if(!key) continue;
+        processedNoiseKeys.add(key);
+        validNoiseKeys.add(key);
+
+        const rec = recMap.get(task.recurringId);
+        const storedEntry = nextNoiseStreakStore[key];
+        const basePoints = pickNoiseBase(
+          storedEntry && storedEntry.basePoints,
+          rec && rec.noiseBasePoints,
+          rec && rec.points,
+          task.points
+        );
+        if(rec && rec.noiseBasePoints !== basePoints){
+          rec.noiseBasePoints = basePoints;
+          recsChanged = true;
+        }
+
+        let streak = parseNoiseStreak(storedEntry && storedEntry.streak);
+        const wasDoneToday = !!task.done;
+        if(wasDoneToday){
+          streak = streak + 1;
+        }else{
+          streak = 0;
+        }
+        const extraPenalty = wasDoneToday ? Math.min(4, Math.max(0, streak - 1)) : 0;
+        const bonusPenalty = wasDoneToday && streak >= NOISE_EXTRA_PENALTY_THRESHOLD ? 1 : 0;
+        const updatedPoints = wasDoneToday
+          ? Math.max(NOISE_STREAK_MIN_POINTS, basePoints - extraPenalty - bonusPenalty)
+          : basePoints;
+
+        if(task.points !== updatedPoints){
+          task.points = updatedPoints;
+        }
+        if(rec && rec.points !== updatedPoints){
+          rec.points = updatedPoints;
+          recsChanged = true;
+        }
+
+        const currentEntry = nextNoiseStreakStore[key];
+        if(!currentEntry || currentEntry.basePoints !== basePoints || currentEntry.streak !== streak){
+          nextNoiseStreakStore[key] = { basePoints, streak };
+          noiseStoreChanged = true;
+        }
+      }
+    }
+
+    recs.forEach((rec) => {
+      if(!rec || typeof rec !== 'object') return;
+      const zoneKind = recZoneKind.get(rec.id);
+      if(zoneKind !== 'noise') return;
+      const key = `rec:${rec.id}`;
+      if(processedNoiseKeys.has(key)) return;
+      validNoiseKeys.add(key);
+      const basePoints = pickNoiseBase(
+        nextNoiseStreakStore[key] && nextNoiseStreakStore[key].basePoints,
+        rec.noiseBasePoints,
+        rec.points
+      );
+      if(rec.noiseBasePoints !== basePoints){
+        rec.noiseBasePoints = basePoints;
+        recsChanged = true;
+      }
+      if(rec.points !== basePoints){
+        rec.points = basePoints;
+        recsChanged = true;
+      }
+      const currentEntry = nextNoiseStreakStore[key];
+      if(!currentEntry || currentEntry.basePoints !== basePoints || currentEntry.streak !== 0){
+        nextNoiseStreakStore[key] = { basePoints, streak: 0 };
+        noiseStoreChanged = true;
+      }
+    });
+
+    Object.keys(nextNoiseStreakStore).forEach((key) => {
+      if(!validNoiseKeys.has(key)){
+        delete nextNoiseStreakStore[key];
+        noiseStoreChanged = true;
+      }
+    });
+
+    Object.keys(nextZoneEStreakStore).forEach((key) => {
+      if(!validZoneEKeys.has(key)){
+        delete nextZoneEStreakStore[key];
+        zoneEStoreChanged = true;
+      }
+    });
+
+    if(noiseStoreChanged){
+      setNoiseStreakStore(nextNoiseStreakStore);
+    }
+    if(zoneEStoreChanged){
+      setZoneEStreakStore(nextZoneEStreakStore);
+    }
+    if(recsChanged){
+      save(LS.RECUR, recs);
+    }
+
+    pushHistSnapshot();
+
+    clearFlagsFor(todaySim);
+    nextDay();
+    const remaining = tasks
+      .filter(t => {
+        if (t && t.kind === 'recurring') return true;
+        return t && !t.done;
+      })
+      .map(t => t.kind === 'recurring' ? { ...t, done: false } : t);
+    setTasks(remaining);
+    localStorage.removeItem(LS.SPAWN);
+    spawnRecurringIfNeeded();
+
+    setLastRealDate(todayDM());
+
+    if(!auto){
+      const penaltyAmount = Math.abs(dailyPenalty);
+      alert(`Đã qua ngày. Bạn bị trừ ${penaltyAmount} E theo luật ngày mới.`);
+    }
+
+    autoSync()
+      .then(()=>fetchLeaderboardAndCache())
+      .catch(()=>{});
+
+    renderHero();
+    return true;
+  } finally {
+    isRolloverRunning=false;
+  }
+}
+
+function handleEndDay(){
+  if(performDayRollover({auto:false})){
+    render('settings');
+  }
+}
+
+function syncDayWithCalendar(){
+  const today = todayDM();
+  const lastReal = getLastRealDate();
+  if(!lastReal){
+    setLastRealDate(today);
+    return false;
+  }
+  if(lastReal===today){
+    return false;
+  }
+  return performDayRollover({auto:true});
+}
+
+function startDaySyncMonitoring(){
+  if(daySyncTimer!==null) return;
+  daySyncTimer=setInterval(()=>{
+    if(syncDayWithCalendar()){
+      render('tasks');
+    }
+  }, 60*1000);
+
+  if(!daySyncVisHandler){
+    daySyncVisHandler=()=>{
+      if(!document.hidden && syncDayWithCalendar()){
+        render('tasks');
+      }
+    };
+    document.addEventListener('visibilitychange', daySyncVisHandler);
+  }
+}
+
+function stopDaySyncMonitoring(){
+  if(daySyncTimer!==null){
+    clearInterval(daySyncTimer);
+    daySyncTimer=null;
+  }
+  if(daySyncVisHandler){
+    document.removeEventListener('visibilitychange', daySyncVisHandler);
+    daySyncVisHandler=null;
+  }
+}
+
+/* ==============================
+   MINI CHART DRAWER
+============================== */
+function drawChart(canvasId, values){
+  const cvs = document.getElementById(canvasId);
+  if(!cvs) return;
+  const ctx = cvs.getContext('2d');
+
+  const ratio = window.devicePixelRatio || 1;
+  const displayWidth = Math.floor(cvs.clientWidth || cvs.offsetWidth || 300);
+  const displayHeight = Math.floor(cvs.clientHeight || cvs.offsetHeight || 160);
+  if(displayWidth === 0 || displayHeight === 0){
+    return;
+  }
+
+  cvs.width = Math.round(displayWidth * ratio);
+  cvs.height = Math.round(displayHeight * ratio);
+
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.scale(ratio, ratio);
+  ctx.clearRect(0,0,displayWidth,displayHeight);
+  ctx.lineJoin = ctx.lineCap = 'round';
+
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.fillRect(0,0,displayWidth,displayHeight);
+
+  if(!values || !values.length){
+    ctx.fillStyle="#555";
+    ctx.font="14px system-ui";
+    ctx.textBaseline = 'top';
+    ctx.fillText("Chưa có dữ liệu", 10, 24);
+    return;
+  }
+
+  const minV = Math.min(...values);
+  const maxV = Math.max(...values);
+  const padX = 24;
+  const padY = 24;
+  const span = (maxV-minV)||1;
+  const usableW = (displayWidth-2*padX);
+  const usableH = (displayHeight-2*padY);
+
+  const points = values.map((v,i)=>{
+    const ratioX = (values.length===1)?0:(i/(values.length-1));
+    const x = padX + (usableW * ratioX);
+    const y = displayHeight - padY - (usableH * ((v-minV)/span));
+    return {x,y,value:v};
+  });
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(27,30,46,0.08)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4,6]);
+  const gridLines = 4;
+  for(let i=0;i<=gridLines;i++){
+    const gy = padY + (usableH * (i/gridLines));
+    ctx.beginPath();
+    ctx.moveTo(padX, gy);
+    ctx.lineTo(displayWidth-padX, gy);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(27,30,46,0.14)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(padX, padY-4);
+  ctx.lineTo(padX, displayHeight-padY);
+  ctx.lineTo(displayWidth-padX+4, displayHeight-padY);
+  ctx.stroke();
+  ctx.restore();
+
+  const gradLine = ctx.createLinearGradient(padX,0,displayWidth-padX,0);
+  gradLine.addColorStop(0,"#8b7cff");
+  gradLine.addColorStop(1,"#b09bff");
+
+  ctx.beginPath();
+  points.forEach((pt,i)=>{
+    if(i===0){
+      ctx.moveTo(pt.x, pt.y);
+    }else{
+      ctx.lineTo(pt.x, pt.y);
+    }
+  });
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = gradLine;
+  ctx.shadowColor = 'rgba(139,124,255,0.35)';
+  ctx.shadowBlur = 12;
+  ctx.stroke();
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+
+  ctx.beginPath();
+  points.forEach((pt,i)=>{
+    if(i===0){
+      ctx.moveTo(pt.x, pt.y);
+    }else{
+      ctx.lineTo(pt.x, pt.y);
+    }
+  });
+  ctx.lineTo(points[points.length-1].x, displayHeight-padY);
+  ctx.lineTo(points[0].x, displayHeight-padY);
+  ctx.closePath();
+  const gradFill = ctx.createLinearGradient(0,padY,0,displayHeight-padY);
+  gradFill.addColorStop(0,'rgba(139,124,255,0.18)');
+  gradFill.addColorStop(1,'rgba(139,124,255,0)');
+  ctx.fillStyle = gradFill;
+  ctx.fill();
+
+  ctx.beginPath();
+  points.forEach((pt,i)=>{
+    if(i===0){
+      ctx.moveTo(pt.x, pt.y);
+    }else{
+      ctx.lineTo(pt.x, pt.y);
+    }
+  });
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = gradLine;
+  ctx.stroke();
+
+  points.forEach((pt,i)=>{
+    ctx.beginPath();
+    const isLast = i === points.length-1;
+    const radius = isLast ? 5 : 3;
+    ctx.arc(pt.x, pt.y, radius, 0, Math.PI*2);
+    if(isLast){
+      ctx.fillStyle = '#ff3425';
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.lineWidth = 3;
+    }else{
+      ctx.fillStyle = '#fff';
+      ctx.strokeStyle = 'rgba(139,124,255,0.6)';
+      ctx.lineWidth = 2;
+    }
+    ctx.fill();
+    ctx.stroke();
+  });
+
+  const lastPoint = points[points.length-1];
+  const lastVal = lastPoint.value;
+  const label = String(lastVal);
+  ctx.font = '600 13px system-ui';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  const metrics = ctx.measureText(label);
+  const labelPadX = 8;
+  const labelHeight = 24;
+  const labelWidth = metrics.width + labelPadX*2;
+  let labelX = lastPoint.x + 12;
+  let labelY = lastPoint.y - labelHeight/2 - 6;
+  if(labelX + labelWidth > displayWidth - padX){
+    labelX = displayWidth - padX - labelWidth;
+  }
+  if(labelY < padY){
+    labelY = padY;
+  }
+  if(labelY + labelHeight > displayHeight - padY){
+    labelY = displayHeight - padY - labelHeight;
+  }
+
+  const radiusRect = 10;
+  ctx.beginPath();
+  const r = Math.min(radiusRect, labelHeight/2, labelWidth/2);
+  ctx.moveTo(labelX + r, labelY);
+  ctx.lineTo(labelX + labelWidth - r, labelY);
+  ctx.quadraticCurveTo(labelX + labelWidth, labelY, labelX + labelWidth, labelY + r);
+  ctx.lineTo(labelX + labelWidth, labelY + labelHeight - r);
+  ctx.quadraticCurveTo(labelX + labelWidth, labelY + labelHeight, labelX + labelWidth - r, labelY + labelHeight);
+  ctx.lineTo(labelX + r, labelY + labelHeight);
+  ctx.quadraticCurveTo(labelX, labelY + labelHeight, labelX, labelY + labelHeight - r);
+  ctx.lineTo(labelX, labelY + r);
+  ctx.quadraticCurveTo(labelX, labelY, labelX + r, labelY);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(27,30,46,0.9)';
+  ctx.shadowColor = 'rgba(0,0,0,0.12)';
+  ctx.shadowBlur = 6;
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+
+  ctx.fillStyle = '#fff';
+  ctx.fillText(label, labelX + labelPadX, labelY + labelHeight/2);
+}
+
+/* ==============================
+   SWIPE TASK HANDLERS
+============================== */
+function attachSwipeHandlersForTasks(){
+  const rows = [...document.querySelectorAll('li.task')];
+
+  rows.forEach(li=>{
+    const inner  = li.querySelector('.task-inner');
+    const delBtn = li.querySelector('.del-btn');
+
+    let startX = 0;
+    let currentX = 0;
+    let isDown = false;
+    let opened = li.classList.contains('show-del');
+    let justSwiped = false;
+    let swipeResetTimer = null;
+    let hasDragged = false;
+    let pendingDragFromDel = false;
+    let pendingStartX = 0;
+
+    function openRow(){
+      li.classList.add('show-del');
+      li.classList.remove('dragging');
+      inner.style.transform = '';
+      delBtn.style.transform = '';
+      opened = true;
+    }
+
+    function closeRow(){
+      li.classList.remove('show-del');
+      li.classList.remove('dragging');
+      inner.style.transform = '';
+      delBtn.style.transform = 'translateX(60px)';
+      opened = false;
+      justSwiped = false;
+      if(swipeResetTimer){
+        clearTimeout(swipeResetTimer);
+        swipeResetTimer = null;
+      }
+    }
+
+    function applyDrag(dx){
+      let offset = dx;
+      if(offset < -60) offset = -60;
+      if(offset > 0)   offset = 0;
+
+      inner.style.transform = `translateX(${offset}px)`;
+
+      const btnOffset = 60 + offset;
+      delBtn.style.transform = `translateX(${btnOffset}px)`;
+    }
+
+    function startDrag(clientX){
+      isDown = true;
+      hasDragged = false;
+      pendingDragFromDel = false;
+      startX = clientX;
+      currentX = clientX;
+      li.classList.add('dragging');
+
+      if(opened){
+        inner.style.transform   = 'translateX(-60px)';
+        delBtn.style.transform  = 'translateX(0px)';
+      }
+    }
+
+    function canStartDrag(target, clientX){
+      if(target.closest('.del-btn')){
+        return true;
+      }
+
+      if(target.closest('input, button, select, textarea, a, label')){
+        return false;
+      }
+
+      if(target.closest('.task-inner') || target.closest('.txt')){
+        return true;
+      }
+
+      const liRect = li.getBoundingClientRect();
+      return clientX >= (liRect.right - 60);
+    }
+
+    function moveDrag(clientX){
+      if(!isDown) return;
+      currentX = clientX;
+      const dx = currentX - startX;
+
+      if(opened){
+        applyDrag(-60 + dx);
+      }else{
+        applyDrag(dx);
+      }
+    }
+
+    function endDrag(){
+      if(!isDown) return;
+      isDown = false;
+
+      const dx = currentX - startX;
+
+      let openedViaSwipe = false;
+
+      if(opened){
+        if(dx > 30){
+          closeRow();
+        }else{
+          openRow();
+          openedViaSwipe = true;
+        }
+      }else{
+        if(dx < -30){
+          openRow();
+          openedViaSwipe = true;
+        }else{
+          closeRow();
+        }
+      }
+
+      if(openedViaSwipe){
+        justSwiped = true;
+        if(swipeResetTimer){
+          clearTimeout(swipeResetTimer);
+        }
+        swipeResetTimer = setTimeout(()=>{
+          justSwiped = false;
+          swipeResetTimer = null;
+        }, 250);
+      }
+
+      hasDragged = false;
+    }
+
+    // Touch
+    li.addEventListener('touchstart', e=>{
+      const clientX = e.touches[0].clientX;
+      if(e.target.closest('.del-btn')){
+        pendingDragFromDel = true;
+        pendingStartX = clientX;
+        return;
+      }
+
+      pendingDragFromDel = false;
+      pendingStartX = 0;
+
+      if(!canStartDrag(e.target, clientX)) return;
+      startDrag(clientX);
+    }, {passive:false});
+
+    li.addEventListener('touchmove', e=>{
+      const clientX = e.touches[0].clientX;
+
+      if(pendingDragFromDel){
+        const dx = clientX - pendingStartX;
+        if(Math.abs(dx) > 3){
+          startDrag(pendingStartX);
+          hasDragged = true;
+          moveDrag(clientX);
+          e.preventDefault();
+        }
+        return;
+      }
+
+      if(!isDown) return;
+
+      const dx = clientX - startX;
+      if(!hasDragged && Math.abs(dx) > 3){
+        hasDragged = true;
+      }
+
+      if(hasDragged){
+        moveDrag(clientX);
+        e.preventDefault();
+      }
+    }, {passive:false});
+
+    li.addEventListener('touchend', ()=>{
+      if(pendingDragFromDel){
+        pendingDragFromDel = false;
+        pendingStartX = 0;
+        return;
+      }
+      endDrag();
+    });
+
+    // Mouse
+    li.addEventListener('mousedown', e=>{
+      if(!canStartDrag(e.target, e.clientX)) return;
+      startDrag(e.clientX);
+      e.preventDefault();
+    });
+
+    li.addEventListener('mousemove', e=>{
+      if(!isDown) return;
+      moveDrag(e.clientX);
+    });
+
+    li.addEventListener('mouseup', ()=>{
+      endDrag();
+    });
+
+    li.addEventListener('mouseleave', ()=>{
+      if(isDown){
+        endDrag();
+      }
+    });
+
+    inner.addEventListener('click', e=>{
+      if(li.classList.contains('show-del')){
+        if(justSwiped){
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        closeRow();
+      }
+    });
+  });
+
+  document.querySelectorAll('.del-btn').forEach(btn=>{
+    btn.onclick = (e)=>{
+      e.stopPropagation();
+      const id = Number(btn.dataset.id);
+      const tasks = getTasks();
+      const targetTask = tasks.find(t=>t.id===id);
+
+      const zones = getZones();
+      const zone = targetTask ? zones.find(z=>z.id===targetTask.zoneId) : null;
+      const isNoiseZone = zone && zone.kind === 'noise';
+
+      if(isNoiseZone && targetTask){
+        const points = Number(targetTask.points);
+        const isBasePenalty = points === -1;
+        if(!isBasePenalty){
+          if(points <= -2){
+            alert('Không thể xoá nhiệm vụ Zone Noise khi điểm phạt thấp hơn -1. Hãy reset về -1 trước rồi thử lại.');
+          }else{
+            alert('Chỉ có thể xoá nhiệm vụ Zone Noise khi điểm phạt đang ở -1.');
+          }
+          return;
+        }
+      }
+
+      if(targetTask && targetTask.kind === 'recurring'){
+        const recId = Number(targetTask.recurringId);
+        if(recId){
+          delRecurring(recId);
+        }
+      }
+
+      const nextTasks = tasks.filter(t=>t.id!==id);
+      setTasks(nextTasks);
+
+      const wasSettingsOpen = currentTab === 'settings';
+      render('tasks');
+      if(wasSettingsOpen){
+        render('settings');
+      }
+    };
+  });
+}
+
+/* ==============================
+   VIEW FUNCTIONS
+============================== */
+const view = document.getElementById('view');
+const tabsBar = document.getElementById('tabsBar');
+let settingsUnlocked=false;
+let daySyncTimer=null;
+let daySyncVisHandler=null;
+let isRolloverRunning=false;
+
+function ensureSettingsAuth(){
+  if(settingsUnlocked) return true;
+  const pass=prompt('Nhập mật khẩu Settings:');
+  if(pass===CONFIG.SETTINGS_PASS){
+    settingsUnlocked=true;
+    return true;
+  }
+  alert('Sai mật khẩu');
+  return false;
+}
+
+/* Build tabs bar */
+function buildTabsBar(active){
+  tabsBar.innerHTML = [
+    {id:'tasks', label:'Nhiệm vụ', icon:'✅'},
+    {id:'archive', label:'Lưu trữ', icon:'🗂️'},
+    {id:'leaderboard', label:'Leaderboard', icon:'🏆'},
+    {id:'stats', label:'Biểu đồ', icon:'📈'},
+    {id:'notes', label:'Ghi chú', icon:'📝'},
+    {id:'settings', label:'Settings', icon:'⚙️'}
+  ].map(t=>`
+    <button class="tab-btn ${t.id===active?'active':''}" data-tab="${t.id}" aria-label="${t.label}" title="${t.label}">
+      ${t.icon}
+    </button>
+  `).join('');
+
+  [...tabsBar.querySelectorAll('.tab-btn')].forEach(btn=>{
+    btn.onclick=()=>{
+      render(btn.dataset.tab);
+    };
+  });
+}
+
+/* TASKS */
+async function viewTasks(){
+  spawnRecurringIfNeeded();
+
+  let zones=getZones();
+  const tasks=getTasks();
+  const noiseStore = getNoiseStreakStore();
+  const zoneEStore = getZoneEStreakStore();
+  const pointExtraStores = { noise: noiseStore, zoneE: zoneEStore };
+  const dateNowDM = todayDM();
+  let priorityZone = zones.find(z => z.kind === 'priority');
+
+  if (!priorityZone) {
+    const fallback = DEFAULT_ZONES.find(z=>z.kind==='priority') || {name: 'Zone Quan trọng', kind: 'priority', bg: ''};
+    const restored = {
+      id: Date.now(),
+      name: fallback.name,
+      kind: fallback.kind,
+      bg: fallback.bg
+    };
+    zones = [...zones, restored];
+    setZones(zones);
+    priorityZone = restored;
+    alert('Không tìm thấy Zone Quan trọng, hệ thống đã tạo mới để bạn tiếp tục.');
+  }
+
+  const groups = zones.map(z=>{
+    const zoneTasks = tasks
+      .filter(t=>t.zoneId==z.id)
+      .sort((a,b)=>{
+        if(a.kind===b.kind) return Number(a.done)-Number(b.done);
+        return a.kind==='recurring' ? -1 : 1;
+      });
+
+    const list = zoneTasks;
+    const activeList = list.filter(isTaskActiveToday);
+    const capacityList = list.filter(doesTaskOccupyCapacity);
+    const completedCount = list.filter(t=>t.done).length;
+    const totalCount = list.length;
+    return {
+      z,
+      list,
+      activeList,
+      capacityList,
+      activeDone: completedCount,
+      activeTotal: totalCount,
+      kindLabel: ZONE_KIND_LABELS[z.kind] || 'Zone',
+      progressText: totalCount ? `${completedCount}/${totalCount}` : '0'
+    };
+  });
+
+  view.innerHTML = `
+    <div class="top">
+      <span class="pill">Ngày: <b>${dateNowDM}</b></span>
+    </div>
+
+    <div class="creator">
+      <input id="taskText" placeholder="Thêm nhiệm vụ… (Enter)">
+      <select id="taskZone">${zones.map(z=>`<option value="${z.id}">${z.name}</option>`).join('')}</select>
+      <button class="btn-primary" id="btnAdd">Thêm</button>
+    </div>
+
+    ${groups.map(g=>{
+      const z=g.z;
+      const headerClass = z.bg ? 'imgHead' : '';
+      const headerStyle = z.bg
+        ? `background-image:linear-gradient(0deg,rgba(0,0,0,.5),rgba(0,0,0,.15)),url('${z.bg}');`
+        : '';
+      const emptyStateHtml = `
+        <li class="task">
+          <div class="task-inner">
+            <span class="muted">Chưa có task trong Zone này.</span>
+          </div>
+        </li>`;
+
+      const listHtml = g.list.length
+        ? g.list.map(t=>{
+            const zoneEProgressHtml = z.kind === 'e'
+              ? renderZoneETaskProgress(t, zoneEStore)
+              : '';
+            const zoneNoiseProgressHtml = z.kind === 'noise'
+              ? renderZoneNoiseTaskProgress(t, noiseStore)
+              : '';
+            const progressHtml = zoneEProgressHtml || zoneNoiseProgressHtml;
+            return `
+              <li class="task ${t.done?'done':''}" data-id="${t.id}" data-kind="${t.kind||'single'}">
+                <div class="task-inner">
+                  <div class="left">
+                    <input type="checkbox" data-id="${t.id}" ${t.done?'checked':''}>
+                    <span class="txt">${t.text}</span>
+                    ${renderTaskKindBadge(t, z)}
+                    ${renderTaskPoints(t.points, t.aiReason, getTaskPointExtras(t, z.kind, pointExtraStores))}
+                  </div>
+                  ${progressHtml}
+                </div>
+                <button class="del-btn" data-id="${t.id}">×</button>
+              </li>
+            `;
+          }).join('')
+        : emptyStateHtml;
+
+      return `
+      <section class="zone">
+        <header class="${headerClass}" style="${headerStyle}">
+          <div><b>${z.name}</b> <span class="badge">${g.kindLabel}</span></div>
+          <div class="badge">${g.progressText}</div>
+        </header>
+        <ul>
+          ${listHtml}
+        </ul>
+      </section>`;
+    }).join('')}
+  `;
+
+  const inp = document.getElementById('taskText');
+  const sel = document.getElementById('taskZone');
+
+  async function createTaskForZone(textInput, zoneId, pointsOverride){
+    const text=(textInput||'').trim(); if(!text) return false;
+    const z = zones.find(z=>z.id==zoneId);
+    if(!z) return false;
+
+    const currentTasks = getTasks();
+
+    // Limit for Zone E
+    if (z.kind === 'e') {
+      const { level } = getLevelInfo();
+      const zoneELimit = 5 + Math.max(0, level - 1);
+      const totalInE = countZoneTasks(currentTasks, z.id);
+      if (totalInE >= zoneELimit) {
+        alert(`Zone E hiện giới hạn ${zoneELimit} task (5 + Level - 1), tính cả nhiệm vụ đã hoàn thành. Mỗi cấp độ tăng thêm 1 task, hãy dọn bớt trước khi thêm mới nhé!`);
+        return false;
+      }
+    }
+
+    // Limit for Priority Zone
+    if (z.kind === 'priority') {
+      const totalPriorityTasks = countZoneTasks(currentTasks, z.id);
+      if (totalPriorityTasks >= 3) {
+        alert('Zone Quan trọng chỉ có thể có tối đa 3 nhiệm vụ tổng cộng (kể cả đã hoàn thành). Hãy dọn bớt trước khi thêm mới nhé!');
+        return false;
+      }
+    }
+
+    const overridePoints = Number(pointsOverride);
+    const basePoints = Number.isFinite(overridePoints) ? overridePoints : getDefaultPointsForZoneKind(z.kind);
+    const newTasks = [...currentTasks];
+
+    if(DAILY_ZONE_KINDS.has(z.kind)){
+      const recs = getRecurring();
+      const existingRec = recs.find(r=>r.zoneId==z.id && r.type==='daily' && (r.text||'')===text);
+      let rec = existingRec;
+      if(!rec){
+        rec = await addRecurring({
+          text,
+          zoneId:z.id,
+          type:'daily',
+          autoKind:z.kind,
+          points: basePoints
+        });
+      }else{
+        let recChanged = false;
+        const nextRec = { ...rec };
+        if(Number(nextRec.points) !== basePoints){
+          nextRec.points = basePoints;
+          recChanged = true;
+        }
+        if('reason' in nextRec){
+          delete nextRec.reason;
+          recChanged = true;
+        }
+        if(z.kind === 'noise'){
+          const noiseBase = clampNoiseBasePoints(basePoints);
+          if(nextRec.noiseBasePoints !== noiseBase){
+            nextRec.noiseBasePoints = noiseBase;
+            recChanged = true;
+          }
+        }else if('noiseBasePoints' in nextRec){
+          delete nextRec.noiseBasePoints;
+          recChanged = true;
+        }
+        if(recChanged){
+          const updatedRecs = recs.map(r=>r.id===rec.id?nextRec:r);
+          save(LS.RECUR, updatedRecs);
+          rec = nextRec;
+        }
+      }
+      const duplicate = newTasks.some(t=>t.zoneId==z.id && t.kind==='recurring' && t.recurringId===rec.id);
+      if(!duplicate){
+        newTasks.push({
+                  id: Date.now() + Math.random(),
+                  text,
+                  zoneId: z.id,
+                  done: false,
+                  kind: 'recurring',
+                  recurringId: rec.id,
+                  points: Number(rec.points) || basePoints
+                });
+
+      }
+    } else {
+      newTasks.push({
+                  id: Date.now(),
+                  text,
+                  zoneId: z.id,
+                  done: false,
+                  kind: 'single',
+                  points: basePoints
+                });
+    }
+
+    setTasks(newTasks);
+    render('tasks');
+    return true;
+  }
+
+  async function addNow(){
+    const success = await createTaskForZone(inp.value, Number(sel.value));
+    if(success){
+      inp.value='';
+    }
+  }
+
+  document.getElementById('btnAdd').onclick = addNow;
+  inp.onkeydown=(e)=>{ if(e.key==='Enter') addNow(); };
+
+  window.onkeydown=(e)=>{
+    const tag=(document.activeElement?.tagName||'').toLowerCase();
+    if(e.key==='Tab' && !['input','select','textarea','button'].includes(tag)){
+      e.preventDefault();
+      inp.focus();
+    }
+  };
+
+  // tick task
+  view.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
+    cb.onchange=()=>{
+      const id = Number(cb.dataset.id);
+      const list = getTasks();
+      const index = list.findIndex(task=>task.id===id);
+      if(index<0) return;
+
+      const original = list[index];
+      const updated = { ...original, done: cb.checked };
+      const delta = cb.checked ? (Number(original.points) || 0) : -(Number(original.points) || 0);
+      const zone = zones.find(z=>z.id==updated.zoneId);
+      const zoneKind = zone ? zone.kind : '';
+
+      const nextTasks = list.map(task=>task.id===id?updated:task);
+      addXP(delta);
+      setTasks(nextTasks);
+
+      if(cb.checked){
+        if(isArchiveEligibleKind(zoneKind)){
+          archiveTaskCompletion(updated, zone);
+        }
+      }else{
+        removeTaskFromArchive(updated.text);
+      }
+
+      render('tasks');
+    };
+  });
+
+  attachSwipeHandlersForTasks();
+}
+
+function formatArchiveDisplayTime(iso){
+  if(!iso) return '';
+  const date = new Date(iso);
+  if(Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString('vi-VN');
+}
+
+function renderArchiveItem(item){
+  const key = normalizeArchiveText(item.text);
+  const safeKey = key
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  return `
+    <li class="archive-item" data-archive-key="${safeKey}">
+      <div class="archive-info">
+        <div class="archive-title">${item.text}</div>
+      </div>
+      <div class="archive-actions">
+        <button class="btn-ghost btn-sm" type="button" data-copy="${safeKey}" title="Copy tiêu đề nhiệm vụ">Copy</button>
+      </div>
+    </li>
+  `;
+}
+
+function formatArchiveCopyText(item){
+  return String(item?.text || '').trim();
+}
+
+function viewArchive(){
+  const archived = getArchive();
+  const sorted = [...archived].sort((a,b)=>
+    a.text.localeCompare(b.text, 'vi', { sensitivity: 'base' })
+  );
+
+  const listHtml = sorted.length
+    ? `<ul class="archive-list">${sorted.map(renderArchiveItem).join('')}</ul>`
+    : `<p class="archive-empty">Chưa có nhiệm vụ nào được lưu trữ.</p>`;
+
+  view.innerHTML = `
+    <div class="card" style="margin-top:0">
+      <h3>Lưu trữ nhiệm vụ</h3>
+      <div class="muted">Các nhiệm vụ đã hoàn thành từ Zone Quan trọng và Zone Thường.</div>
+      <div class="archive-toolbar">
+        <button class="btn-danger btn-sm" type="button" id="btnClearArchive" ${sorted.length?'':'disabled'}>Xóa tất cả</button>
+      </div>
+      ${listHtml}
+    </div>
+  `;
+
+  const archiveMap = new Map(sorted.map(item=>[normalizeArchiveText(item.text), item]));
+  view.querySelectorAll('[data-copy]').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const key = normalizeArchiveText(btn.dataset.copy || '');
+      const entry = archiveMap.get(key);
+      if(!entry) return;
+      if(!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function'){
+        alert('Trình duyệt không hỗ trợ copy vào clipboard.');
+        return;
+      }
+      try{
+        await navigator.clipboard.writeText(formatArchiveCopyText(entry));
+        btn.textContent = 'Đã copy!';
+        btn.disabled = true;
+        setTimeout(()=>{ render('archive'); }, 800);
+      }catch(err){
+        console.error(err);
+        alert('Không thể copy vào clipboard. Vui lòng thử lại.');
+      }
+    };
+  });
+
+  const clearBtn = document.getElementById('btnClearArchive');
+  if(clearBtn){
+    clearBtn.onclick = ()=>{
+      if(!sorted.length) return;
+      if(confirm('Bạn có chắc muốn xóa tất cả nhiệm vụ đã lưu?')){
+        setArchive([]);
+        render('archive');
+      }
+    };
+  }
+}
+
+/* LEADERBOARD */
+function viewLeaderboard(){
+  const cache = getLBCache();
+
+  view.innerHTML = `
+    <div class="card" style="margin-top:0">
+      <h3>Leaderboard</h3>
+      <div class="muted">
+        Dữ liệu được tải nền khi mở app. Nhấn "Tải lại" để cập nhật.
+      </div>
+      <div style="margin:10px 0;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-ghost" id="reload">Tải lại</button>
+        <p id="lbStatus" class="muted" style="margin:0"></p>
+      </div>
+      <div class="table-wrap">
+        <table id="tbl">
+          <thead>
+            <tr>
+              <th>#</th><th>Người chơi</th><th>Level</th><th>E</th><th>Cập nhật</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  const rows = document.getElementById('rows');
+
+  function fallbackLocalProfileList(){
+    const p=getProfile();
+    const totalE = calcTotalE(p.level, p.xp);
+    return [{
+      name:p.name||'Player',
+      level:p.level||1,
+      xp:p.xp||0,
+      totalE,
+      updatedAt:new Date().toISOString()
+    }];
+  }
+
+  renderLBRows(rows, cache.list.length ? cache.list : fallbackLocalProfileList());
+
+  const reloadBtn = document.getElementById('reload');
+  const statusEl = document.getElementById('lbStatus');
+  reloadBtn.dataset.defaultLabel = reloadBtn.textContent;
+
+  function setLoadingState(isLoading){
+    if(isLoading){
+      reloadBtn.disabled = true;
+      reloadBtn.dataset.loading = 'true';
+      reloadBtn.textContent = 'Đang tải...';
+    }else{
+      reloadBtn.disabled = false;
+      reloadBtn.removeAttribute('data-loading');
+      reloadBtn.textContent = reloadBtn.dataset.defaultLabel;
+    }
+  }
+
+  reloadBtn.onclick = async ()=>{
+    setLoadingState(true);
+    statusEl.textContent = 'Đang tải bảng xếp hạng...';
+    try{
+      await fetchLeaderboardAndCache();
+      const fresh = getLBCache();
+      renderLBRows(rows, fresh.list.length ? fresh.list : fallbackLocalProfileList());
+      statusEl.textContent = `Đã cập nhật lúc ${new Date().toLocaleTimeString('vi-VN')}`;
+    }catch(err){
+      console.error(err);
+      statusEl.textContent = 'Không thể tải leaderboard. Vui lòng thử lại sau.';
+    }finally{
+      setLoadingState(false);
+    }
+  };
+}
+
+/* STATS */
+function viewStats(){
+  const hist = getHist();
+  const toTotalE = (entry)=>{
+    if(entry && typeof entry === 'object'){
+      const total = calcTotalE(entry.level, entry.xp);
+      return Number.isFinite(total) ? total : (Number(entry.xp) || 0);
+    }
+    return Number(entry) || 0;
+  };
+  const last7  = hist.slice(-7 ).map(toTotalE);
+  const last30 = hist.slice(-30).map(toTotalE);
+
+  view.innerHTML = `
+    <div class="card chart-card" style="margin-top:0">
+      <h3>Biểu đồ 7 ngày (E)</h3>
+      <canvas id="chart7"></canvas>
+    </div>
+
+    <div class="card chart-card">
+      <h3>Biểu đồ 30 ngày (E)</h3>
+      <canvas id="chart30"></canvas>
+    </div>
+
+    <div class="muted" style="margin-top:12px;font-size:13px">
+      Lịch sử được lưu mỗi lần bạn bấm "Qua ngày".
+    </div>
+  `;
+
+  drawChart("chart7", last7);
+  drawChart("chart30", last30);
+}
+
+/* NOTES */
+function viewNotes(){
+  const existing = getNotes();
+
+  view.innerHTML = `
+    <div class="card notes-card" style="margin-top:0">
+      <div class="notes-header">
+        <h3>Ghi chú</h3>
+        <span class="notes-status" id="notesStatus"></span>
+      </div>
+      <p class="notes-subtitle">Nội dung được lưu tự động trên thiết bị này.</p>
+      <textarea id="notesEditor" class="notes-editor" placeholder="Viết kế hoạch, ý tưởng hoặc nhật ký trong ngày..."></textarea>
+    </div>
+  `;
+
+  const textarea = document.getElementById('notesEditor');
+  const statusEl = document.getElementById('notesStatus');
+  if(textarea){
+    textarea.value = existing;
+  }
+
+  const setStatus = (text)=>{
+    if(statusEl){
+      statusEl.textContent = text;
+    }
+  };
+
+  setStatus(existing ? 'Đã lưu' : '');
+
+  if(!textarea) return;
+
+  let saveTimer = null;
+  const commitSave = ()=>{
+    saveNotes(textarea.value);
+    setStatus('Đã lưu');
+  };
+
+  textarea.addEventListener('input', ()=>{
+    setStatus('Đang lưu...');
+    if(saveTimer){
+      clearTimeout(saveTimer);
+    }
+    saveTimer = setTimeout(()=>{
+      commitSave();
+      saveTimer = null;
+    }, 250);
+  });
+
+  textarea.addEventListener('blur', ()=>{
+    if(saveTimer){
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+    commitSave();
+  });
+}
+
+/* SETTINGS */
+function viewSettings(){
+  const p=getProfile();
+  const zones=getZones();
+  const recs=getRecurring();
+  const {level,xp,need}=getLevelInfo();
+  const dateNowDM=todayDM();
+  const savedThemeBackgrounds = getSavedThemeBackgrounds();
+
+  view.innerHTML = `
+    <div class="card" style="margin-top:0">
+      <h3>Ngày & Điểm</h3>
+      <div class="row">
+        <div>Thông tin hiện tại</div>
+        <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px">
+          <div class="pill">Ngày: <b>${dateNowDM}</b></div>
+          <div class="pill">Level: <b>${level}</b></div>
+          <div class="pill">E: <b>${xp}</b>${need?` / ${need}`:''}</div>
+        </div>
+      </div>
+      <div class="bar"><div class="fill" style="width:${need?Math.min(100,Math.round(xp/need*100)):100}%;"></div></div>
+
+    </div>
+
+    <div class="card">
+      <h3>Hồ sơ người chơi</h3>
+      <div class="row">
+        <div>Tên người chơi</div>
+        <div class="grid" style="grid-template-columns:1fr auto;align-items:center">
+          <input id="name" value="${p.name||''}">
+          <button class="btn-primary" id="saveName">Lưu</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Tùy chỉnh nền</h3>
+      <div class="row">
+        <div>Nền giao diện</div>
+        <div class="grid" style="grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center">
+          <input id="appBgUpload" type="file" accept="image/*">
+          ${savedThemeBackgrounds.appBgUrl?`<button class="btn-ghost" id="resetAppBg">Reset</button>`:''}
+          <div style="grid-column:1/-1;font-size:12px;color:var(--muted);">
+            ${savedThemeBackgrounds.appBgUrl?'Đang dùng ảnh tuỳ chỉnh.':'Đang dùng nền mặc định.'}
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div>Nền mô tả level</div>
+        <div class="grid" style="grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center">
+          <input id="heroBgUpload" type="file" accept="image/*">
+          ${savedThemeBackgrounds.heroBgUrl?`<button class="btn-ghost" id="resetHeroBg">Reset</button>`:''}
+          <div style="grid-column:1/-1;font-size:12px;color:var(--muted);">
+            ${savedThemeBackgrounds.heroBgUrl?'Đang dùng ảnh tuỳ chỉnh.':'Đang dùng nền mặc định.'}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Zones</h3>
+      <div class="table-wrap" style="margin-top:12px">
+        <table>
+          <thead>
+            <tr>
+              <th>Tên</th>
+              <th>Loại</th>
+              <th>Nền</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="zoneT">
+            ${zones.map(z=>`
+              <tr data-id="${z.id}">
+                <td><input name="name" value="${z.name}"></td>
+                <td>
+                  <select name="kind">${renderZoneKindOptions(z.kind)}</select>
+                </td>
+                <td>
+                  <div class="thumb" style="background-image:url('${z.bg||''}')"></div>
+                  <input class="bgUpload" data-id="${z.id}" type="file" accept="image/*" style="margin-top:6px">
+                </td>
+                <td><button class="btn-danger zdel" data-id="${z.id}">Xoá</button></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Tasks lặp (Hằng ngày / Theo tuần)</h3>
+      <div class="row"><div>Mô tả</div><input id="rText" placeholder="Tập thể dục 15’"></div>
+      <div class="row"><div>Zone</div>
+        <select id="rZone">
+          ${zones.filter(z => !DAILY_ZONE_KINDS.has(z.kind)).map(z=>`<option value="${z.id}">${z.name}</option>`).join('')}
+        </select>
+      </div>
+      <div class="row"><div>Kiểu</div>
+        <select id="rType">
+          <option value="daily">Hằng ngày</option>
+          <option value="weekly">Theo thứ</option>
+        </select>
+      </div>
+      <div class="row" id="rDaysRow" style="display:none">
+        <div>Chọn thứ</div>
+        <div class="grid" style="grid-template-columns:repeat(7, minmax(40px,1fr));gap:4px;font-size:14px">
+          ${['CN','T2','T3','T4','T5','T6','T7'].map((l,i)=>`
+            <label style="display:flex;align-items:center;gap:4px">
+              <input type="checkbox" value="${i}"> ${l}
+            </label>
+          `).join('')}
+        </div>
+      </div>
+      <div class="row">
+        <div></div>
+        <button class="btn-primary" id="addRec">+ Thêm Task lặp</button>
+      </div>
+
+      <div class="table-wrap" style="margin-top:12px">
+        <table>
+          <thead>
+            <tr>
+              <th>Mô tả</th><th>Zone</th><th>Kiểu</th><th>Thứ</th><th>Điểm</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="recT">
+            ${recs.map(r=>{
+              const zn = zones.find(z=>z.id==r.zoneId)?.name||'(xoá)';
+              return `
+                <tr>
+                  <td>${r.text}</td>
+                  <td>${zn}</td>
+                  <td>${r.type}</td>
+                  <td>${r.type==='weekly'?(r.days||[]).join(', '):'-'}</td>
+                  <td>${formatSignedNumber(r.points || 0)}</td>
+                  <td><button class="btn-danger rdel" data-id="${r.id}">Xoá</button></td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Quản trị / Sao lưu dữ liệu</h3>
+      <div class="row">
+        <div>Sao lưu & khôi phục</div>
+        <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;align-items:center">
+          <button class="btn-primary" id="exportDataBtn">Lưu dữ liệu</button>
+          <button class="btn-ghost" id="importDataBtn">Load dữ liệu</button>
+        </div>
+      </div>
+      <input id="importDataInput" type="file" accept="application/json" style="display:none">
+      <div class="muted" style="font-size:12px;margin-top:8px">Sao lưu/khôi phục dữ liệu cục bộ trên thiết bị này.</div>
+    </div>
+
+    <div class="card" style="display:none">
+      <h3>Quản trị / Dữ liệu cục bộ</h3>
+      <div class="row">
+        <div>Xoá hồ sơ người chơi LOCAL (máy này)</div>
+        <div><button class="btn-danger" id="wipeLocalBtn">Xoá hồ sơ local</button></div>
+      </div>
+    </div>
+  `;
+
+  // helper đọc file => base64
+  function readFileAsDataURL(file, cb){
+    const reader=new FileReader();
+    reader.onload=()=>cb(reader.result);
+    reader.readAsDataURL(file);
+  }
+
+  /* Hồ sơ người chơi */
+  document.getElementById('saveName').onclick=()=>{
+    setName(document.getElementById('name').value);
+    alert('Đã lưu');
+  };
+
+  /* Tùy chỉnh nền */
+  const appBgUpload=document.getElementById('appBgUpload');
+  if(appBgUpload){
+    appBgUpload.onchange=()=>{
+      const file=appBgUpload.files[0];
+      if(!file) return;
+      readFileAsDataURL(file, data=>{
+        updateSavedThemeBackgrounds({appBgUrl:data});
+        renderHero();
+        viewSettings();
+      });
+      appBgUpload.value='';
+    };
+  }
+
+  const heroBgUpload=document.getElementById('heroBgUpload');
+  if(heroBgUpload){
+    heroBgUpload.onchange=()=>{
+      const file=heroBgUpload.files[0];
+      if(!file) return;
+      readFileAsDataURL(file, data=>{
+        updateSavedThemeBackgrounds({heroBgUrl:data});
+        renderHero();
+        viewSettings();
+      });
+      heroBgUpload.value='';
+    };
+  }
+
+  const resetAppBg=document.getElementById('resetAppBg');
+  if(resetAppBg){
+    resetAppBg.onclick=()=>{
+      updateSavedThemeBackgrounds({appBgUrl:''});
+      renderHero();
+      viewSettings();
+    };
+  }
+
+  const resetHeroBg=document.getElementById('resetHeroBg');
+  if(resetHeroBg){
+    resetHeroBg.onclick=()=>{
+      updateSavedThemeBackgrounds({heroBgUrl:''});
+      renderHero();
+      viewSettings();
+    };
+  }
+
+  /* Zone chỉnh sửa */
+  const zoneTable=document.getElementById('zoneT');
+  const handleZoneChange=(e)=>{
+    const tr=e.target.closest('tr[data-id]'); if(!tr) return;
+    const id=Number(tr.dataset.id);
+    const name=e.target.name;
+    if(!name) return;
+    const val=e.target.value;
+    updZone(id,{[name]:val});
+  };
+  zoneTable.oninput=handleZoneChange;
+  zoneTable.onchange=handleZoneChange;
+
+  /* Zone đổi hình nền */
+  document.querySelectorAll('.bgUpload').forEach(inp=>{
+    inp.onchange=()=>{
+      const file=inp.files[0];
+      const id=Number(inp.dataset.id);
+      if(!file) return;
+      readFileAsDataURL(file, data=>{
+        updZone(id,{bg:data});
+        viewSettings();
+      });
+    };
+  });
+
+  /* Zone xoá */
+  document.querySelectorAll('.zdel').forEach(b=> b.onclick=()=>{
+    delZone(Number(b.dataset.id));
+    viewSettings();
+  });
+
+  /* Recurring */
+  const typeSel=document.getElementById('rType');
+  const daysRow=document.getElementById('rDaysRow');
+  typeSel.onchange=()=>{
+    daysRow.style.display = typeSel.value==='weekly'?'grid':'none';
+  };
+
+  document.getElementById('addRec').onclick=async ()=>{
+    const text=document.getElementById('rText').value.trim();
+    if(!text){ alert('Nhập mô tả'); return; }
+    const zoneId=Number(document.getElementById('rZone').value);
+    const type=typeSel.value;
+    const days=[...daysRow.querySelectorAll('input:checked')].map(c=>Number(c.value));
+    if(type==='weekly' && !days.length){
+      alert('Chọn thứ');
+      return;
+    }
+    await addRecurring({text, zoneId, type, days});
+    document.getElementById('rText').value = '';
+    document.getElementById('rZone').selectedIndex = 0;
+    typeSel.value = 'daily';
+    daysRow.style.display = 'none';
+    [...daysRow.querySelectorAll('input[type="checkbox"]')].forEach(cb => cb.checked = false);
+    viewSettings();
+  };
+
+  document.querySelectorAll('.rdel').forEach(b=> b.onclick=()=>{
+    delRecurring(Number(b.dataset.id));
+    viewSettings();
+  });
+
+  /* Export / Import local data */
+  const exportDataBtn = document.getElementById('exportDataBtn');
+  if(exportDataBtn){
+    exportDataBtn.onclick = ()=>{ exportAllData(); };
+  }
+
+  const importDataBtn = document.getElementById('importDataBtn');
+  const importDataInput = document.getElementById('importDataInput');
+  if(importDataBtn && importDataInput){
+    importDataBtn.onclick = ()=>{ importDataInput.click(); };
+    importDataInput.onchange = async ()=>{
+      const file = importDataInput.files && importDataInput.files[0];
+      if(!file){
+        importDataInput.value='';
+        return;
+      }
+      try{
+        await importAllData(file);
+      }catch(err){
+        console.error(err);
+        alert('Không thể import dữ liệu. Vui lòng thử lại.');
+      }finally{
+        importDataInput.value='';
+      }
+    };
+  }
+
+  /* Local wipe */
+  document.getElementById('wipeLocalBtn').onclick = ()=>{
+    if(confirm('Xoá hồ sơ local và cache leaderboard trên máy này?')){
+      wipeLocalPlayer();
+    }
+  };
+}
+
+/* ==============================
+   ROUTER
+============================== */
+let currentTab='tasks';
+
+function render(tab){
+  currentTab = tab;
+  renderHero();
+  buildTabsBar(tab);
+
+  if(tab==='tasks'){
+    stopDaySyncMonitoring();
+    syncDayWithCalendar();
+    viewTasks();
+    startDaySyncMonitoring();
+    return;
+  }
+
+  stopDaySyncMonitoring();
+
+  if(tab==='archive'){
+    viewArchive();
+  } else if(tab==='leaderboard'){
+    viewLeaderboard();
+  } else if(tab==='stats'){
+    viewStats();
+  } else if(tab==='notes'){
+    viewNotes();
+  } else if(tab==='settings'){
+    if(ensureSettingsAuth()){
+      viewSettings();
+    } else {
+      render('tasks');
+    }
+  } else {
+    render('tasks');
+  }
+}
+
+/* ==============================
+   BOOT
+============================== */
+ensureName();
+render('tasks');
+fetchLeaderboardAndCache().catch(()=>{});
+backgroundBoardRefresh();
+if(lbTimer===null){
+  // Runs for the duration of the session to keep leaderboard data fresh.
+  lbTimer = setInterval(()=>{
+    fetchLeaderboardAndCache().catch(()=>{});
+  }, 60000);
+}
+</script>
+</body>
+</html>
