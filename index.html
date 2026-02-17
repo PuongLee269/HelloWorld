@@ -930,6 +930,23 @@ function getDefaultPointsForZoneKind(zoneKind){
   return DEFAULT_ZONE_POINTS[zoneKind] != null ? DEFAULT_ZONE_POINTS[zoneKind] : 1;
 }
 
+function normalizeRecurringPointsForZoneKind(points, zoneKind){
+  const fallback = getDefaultPointsForZoneKind(zoneKind);
+  const raw = Number(points);
+  const normalized = Number.isFinite(raw) ? raw : fallback;
+
+  if(zoneKind === 'noise'){
+    return clampNoiseBasePoints(normalized);
+  }
+
+  if(zoneKind === 'priority'){
+    if(normalized <= 0) return fallback;
+    return Math.round(normalized);
+  }
+
+  return Math.round(normalized);
+}
+
 const DAILY_ZONE_KINDS = new Set(['e','noise']);
 const ARCHIVE_ZONE_KINDS = new Set(['priority','regular']);
 let lbTimer = null;
@@ -1979,8 +1996,7 @@ async function addRecurring(r){
   const z = zones.find(z => z.id == rec.zoneId);
   const zoneKind = z ? z.kind : 'regular';
 
-  const fallbackPoints = getDefaultPointsForZoneKind(zoneKind);
-  const normalizedPoints = Number.isFinite(Number(rec.points)) ? Number(rec.points) : fallbackPoints;
+  const normalizedPoints = normalizeRecurringPointsForZoneKind(rec.points, zoneKind);
   rec.points = normalizedPoints; // lưu điểm base cho recurring
   if('reason' in rec){
     delete rec.reason;
@@ -2017,7 +2033,7 @@ function getTasks(){
     const next = { ...r };
     let changedRow = false;
 
-    const desiredPoints = Number.isFinite(Number(next.points)) ? Number(next.points) : getDefaultPointsForZoneKind(zoneKind);
+    const desiredPoints = normalizeRecurringPointsForZoneKind(next.points, zoneKind);
     if(next.points !== desiredPoints){
       next.points = desiredPoints;
       changedRow = true;
@@ -2106,7 +2122,7 @@ function getTasks(){
       // Set points from recurring
       const rec = recs.find(r => r.id === next.recurringId);
       if (rec) {
-        next.points = Number(rec.points) || 0;
+        next.points = normalizeRecurringPointsForZoneKind(rec.points, zoneKind);
       }
     }else if('recurringId' in next){
       delete next.recurringId;
@@ -2389,7 +2405,7 @@ function spawnRecurringIfNeeded(){
           done: false,
           kind: 'recurring',
           recurringId: r.id,
-          points: Number(r.points) || 0
+          points: normalizeRecurringPointsForZoneKind(r.points, z.kind)
         };
 
 
@@ -3504,7 +3520,7 @@ async function viewTasks(){
                   done: false,
                   kind: 'recurring',
                   recurringId: rec.id,
-                  points: Number(rec.points) || basePoints
+                  points: normalizeRecurringPointsForZoneKind(rec.points, z.kind)
                 });
 
       }
@@ -3925,8 +3941,12 @@ function viewSettings(){
       <div class="row"><div>Mô tả</div><input id="rText" placeholder="Tập thể dục 15’"></div>
       <div class="row"><div>Zone</div>
         <select id="rZone">
-          ${zones.filter(z => !DAILY_ZONE_KINDS.has(z.kind)).map(z=>`<option value="${z.id}">${z.name}</option>`).join('')}
+          ${zones.filter(z => z.kind !== 'e').map(z=>`<option value="${z.id}">${z.name} (${ZONE_KIND_LABELS[z.kind]||z.kind})</option>`).join('')}
         </select>
+      </div>
+      <div class="row">
+        <div>Điểm mặc định task lặp</div>
+        <input id="rPoints" type="number" step="1" placeholder="Ví dụ: 3 (priority), -1 (noise)">
       </div>
       <div class="row"><div>Kiểu</div>
         <select id="rType">
@@ -3965,7 +3985,7 @@ function viewSettings(){
                   <td>${zn}</td>
                   <td>${r.type}</td>
                   <td>${r.type==='weekly'?(r.days||[]).join(', '):'-'}</td>
-                  <td>${formatSignedNumber(r.points || 0)}</td>
+                  <td>${formatSignedNumber(normalizeRecurringPointsForZoneKind(r.points, zones.find(z=>z.id==r.zoneId)?.kind))}</td>
                   <td><button class="btn-danger rdel" data-id="${r.id}">Xoá</button></td>
                 </tr>`;
             }).join('')}
@@ -4096,7 +4116,20 @@ function viewSettings(){
 
   /* Recurring */
   const typeSel=document.getElementById('rType');
+  const zoneSel=document.getElementById('rZone');
+  const pointsInput=document.getElementById('rPoints');
   const daysRow=document.getElementById('rDaysRow');
+
+  const syncRecurringPointsFromZoneDefault = ()=>{
+    const zoneId = Number(zoneSel.value);
+    const zone = zones.find(z=>z.id==zoneId);
+    const zoneKind = zone ? zone.kind : 'regular';
+    pointsInput.value = String(normalizeRecurringPointsForZoneKind(getDefaultPointsForZoneKind(zoneKind), zoneKind));
+  };
+
+  zoneSel.onchange = syncRecurringPointsFromZoneDefault;
+  syncRecurringPointsFromZoneDefault();
+
   typeSel.onchange=()=>{
     daysRow.style.display = typeSel.value==='weekly'?'grid':'none';
   };
@@ -4111,12 +4144,16 @@ function viewSettings(){
       alert('Chọn thứ');
       return;
     }
-    await addRecurring({text, zoneId, type, days});
+    const zone = zones.find(z=>z.id==zoneId);
+    const zoneKind = zone ? zone.kind : 'regular';
+    const points = normalizeRecurringPointsForZoneKind(pointsInput.value, zoneKind);
+    await addRecurring({text, zoneId, type, days, points});
     document.getElementById('rText').value = '';
-    document.getElementById('rZone').selectedIndex = 0;
+    zoneSel.selectedIndex = 0;
     typeSel.value = 'daily';
     daysRow.style.display = 'none';
     [...daysRow.querySelectorAll('input[type="checkbox"]')].forEach(cb => cb.checked = false);
+    syncRecurringPointsFromZoneDefault();
     viewSettings();
   };
 
