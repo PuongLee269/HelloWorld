@@ -3292,7 +3292,6 @@ function buildTabsBar(active){
   tabsBar.innerHTML = [
     {id:'tasks', label:'Nhiệm vụ', icon:'✅'},
     {id:'archive', label:'Lưu trữ', icon:'🗂️'},
-    {id:'leaderboard', label:'Leaderboard', icon:'🏆'},
     {id:'stats', label:'Biểu đồ', icon:'📈'},
     {id:'notes', label:'Ghi chú', icon:'📝'},
     {id:'settings', label:'Settings', icon:'⚙️'}
@@ -4184,6 +4183,7 @@ function render(tab){
   if(tab==='archive'){
     viewArchive();
   } else if(tab==='leaderboard'){
+    // Hidden route: kept for backward compatibility with legacy/internal navigation.
     viewLeaderboard();
   } else if(tab==='stats'){
     viewStats();
