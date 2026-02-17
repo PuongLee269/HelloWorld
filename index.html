@@ -3761,8 +3761,10 @@ function viewStats(){
     }
     return Number(entry) || 0;
   };
-  const last7  = hist.slice(-7 ).map(toTotalE);
+  const last7 = hist.slice(-7).map(toTotalE);
   const last30 = hist.slice(-30).map(toTotalE);
+  const last180 = hist.slice(-180).map(toTotalE);
+  const last365 = hist.slice(-365).map(toTotalE);
 
   view.innerHTML = `
     <div class="card chart-card" style="margin-top:0">
@@ -3775,6 +3777,16 @@ function viewStats(){
       <canvas id="chart30"></canvas>
     </div>
 
+    <div class="card chart-card">
+      <h3>Biểu đồ 6 tháng (E)</h3>
+      <canvas id="chart180"></canvas>
+    </div>
+
+    <div class="card chart-card">
+      <h3>Biểu đồ 1 năm (E)</h3>
+      <canvas id="chart365"></canvas>
+    </div>
+
     <div class="muted" style="margin-top:12px;font-size:13px">
       Lịch sử được lưu mỗi lần bạn bấm "Qua ngày".
     </div>
@@ -3782,6 +3794,8 @@ function viewStats(){
 
   drawChart("chart7", last7);
   drawChart("chart30", last30);
+  drawChart("chart180", last180);
+  drawChart("chart365", last365);
 }
 
 /* NOTES */
