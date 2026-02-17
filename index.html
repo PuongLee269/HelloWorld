@@ -3291,7 +3291,6 @@ function ensureSettingsAuth(){
 function buildTabsBar(active){
   tabsBar.innerHTML = [
     {id:'tasks', label:'Nhiệm vụ', icon:'✅'},
-    {id:'archive', label:'Lưu trữ', icon:'🗂️'},
     {id:'leaderboard', label:'Leaderboard', icon:'🏆'},
     {id:'stats', label:'Biểu đồ', icon:'📈'},
     {id:'notes', label:'Ghi chú', icon:'📝'},
@@ -3641,7 +3640,7 @@ function viewArchive(){
         await navigator.clipboard.writeText(formatArchiveCopyText(entry));
         btn.textContent = 'Đã copy!';
         btn.disabled = true;
-        setTimeout(()=>{ render('archive'); }, 800);
+        setTimeout(()=>{ render('tasks'); }, 800);
       }catch(err){
         console.error(err);
         alert('Không thể copy vào clipboard. Vui lòng thử lại.');
@@ -3655,7 +3654,7 @@ function viewArchive(){
       if(!sorted.length) return;
       if(confirm('Bạn có chắc muốn xóa tất cả nhiệm vụ đã lưu?')){
         setArchive([]);
-        render('archive');
+        render('tasks');
       }
     };
   }
@@ -4167,6 +4166,9 @@ function viewSettings(){
 let currentTab='tasks';
 
 function render(tab){
+  if(tab==='archive'){
+    tab='tasks';
+  }
   currentTab = tab;
   renderHero();
   buildTabsBar(tab);
@@ -4181,9 +4183,7 @@ function render(tab){
 
   stopDaySyncMonitoring();
 
-  if(tab==='archive'){
-    viewArchive();
-  } else if(tab==='leaderboard'){
+  if(tab==='leaderboard'){
     viewLeaderboard();
   } else if(tab==='stats'){
     viewStats();
