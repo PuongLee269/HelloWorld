@@ -2368,14 +2368,26 @@ function renderLBRows(rowsEl, list){
 /* ==============================
    SPAWN RECURRING EACH DAY
 ============================== */
-function spawnRecurringIfNeeded(){
+function recurringFallbackKey(zoneId, text){
+  return `${Number(zoneId)}|${String(text||'').trim()}`;
+}
+
+function canRecurringSpawnToday(recurring, weekday){
+  return recurring.type==='daily' ||
+    (recurring.type==='weekly' && Array.isArray(recurring.days) && recurring.days.includes(weekday));
+}
+
+function spawnMissingRecurringForToday({force=false} = {}){
   const mark = Number(localStorage.getItem(LS.SPAWN)||0);
-  if(mark===getDay()) return;
+  if(!force && mark===getDay()){
+    return { tasks: getTasks(), changed: false, spawned: 0 };
+  }
 
   const weekday = new Date().getDay();
   const recs = getRecurring();
   const zones = getZones();
-  const tasks = getTasks();
+  const zoneMap = new Map(zones.map(z=>[Number(z.id), z]));
+  const tasks = [...getTasks()];
   const existingRecurring = new Set(
     tasks
       .filter(t=>t.kind==='recurring' && typeof t.recurringId==='number')
@@ -2384,38 +2396,45 @@ function spawnRecurringIfNeeded(){
   const fallbackRecurringKeys = new Set(
     tasks
       .filter(t=>t.kind==='recurring' && typeof t.recurringId!=='number')
-      .map(t=>`${t.zoneId}|${String(t.text||'')}`)
+      .map(t=>recurringFallbackKey(t.zoneId, t.text))
   );
 
+  let spawned = 0;
   for(const r of recs){
-    const match = r.type==='daily' ||
-      (r.type==='weekly' && Array.isArray(r.days)&&r.days.includes(weekday));
-    if(!match) continue;
+    if(!canRecurringSpawnToday(r, weekday)) continue;
 
-    const z = zones.find(z=>z.id==r.zoneId);
+    const z = zoneMap.get(Number(r.zoneId));
     if(!z) continue;
 
-    const recKey = `${r.zoneId}|${String(r.text||'')}`;
+    const recKey = recurringFallbackKey(r.zoneId, r.text);
     if(existingRecurring.has(r.id) || fallbackRecurringKeys.has(recKey)) continue;
 
-    const newTask = {
-          id: Date.now() + Math.random(),
-          text: r.text,
-          zoneId: r.zoneId,
-          done: false,
-          kind: 'recurring',
-          recurringId: r.id,
-          points: normalizeRecurringPointsForZoneKind(r.points, z.kind)
-        };
-
-
-    tasks.push(newTask);
+    tasks.push({
+      id: Date.now() + Math.random(),
+      text: r.text,
+      zoneId: r.zoneId,
+      done: false,
+      kind: 'recurring',
+      recurringId: r.id,
+      points: normalizeRecurringPointsForZoneKind(r.points, z.kind)
+    });
     existingRecurring.add(r.id);
     fallbackRecurringKeys.add(recKey);
+    spawned += 1;
   }
 
-  setTasks(tasks);
-  localStorage.setItem(LS.SPAWN, String(getDay()));
+  if(!force){
+    localStorage.setItem(LS.SPAWN, String(getDay()));
+  }
+
+  return { tasks, changed: spawned>0, spawned };
+}
+
+function spawnRecurringIfNeeded(){
+  const { tasks, changed } = spawnMissingRecurringForToday();
+  if(changed){
+    setTasks(tasks);
+  }
 }
 
 /* ==============================
@@ -4161,6 +4180,8 @@ function viewSettings(){
     const zoneKind = zone ? zone.kind : 'regular';
     const points = normalizeRecurringPointsForZoneKind(pointsInput.value, zoneKind);
     await addRecurring({text, zoneId, type, days, points});
+    const { tasks } = spawnMissingRecurringForToday({ force: true });
+    setTasks(tasks);
     document.getElementById('rText').value = '';
     zoneSel.selectedIndex = 0;
     typeSel.value = 'daily';
