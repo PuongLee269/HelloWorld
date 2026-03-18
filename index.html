@@ -2173,10 +2173,6 @@ function getZoneActiveTasks(tasks, zoneId){
   return tasks.filter(t=>t.zoneId==zoneId && doesTaskOccupyCapacity(t));
 }
 
-function countZoneTasks(tasks, zoneId){
-  return tasks.filter(t=>t.zoneId==zoneId).length;
-}
-
 function describeTaskKind(task, zone){
   if(task.kind==='recurring'){
     return zone && zone.kind==='noise' ? 'Hằng ngày (-)' : 'Hằng ngày';
@@ -3468,26 +3464,6 @@ async function viewTasks(){
     if(!z) return false;
 
     const currentTasks = getTasks();
-
-    // Limit for Zone E
-    if (z.kind === 'e') {
-      const { level } = getLevelInfo();
-      const zoneELimit = 5 + Math.max(0, level - 1);
-      const totalInE = countZoneTasks(currentTasks, z.id);
-      if (totalInE >= zoneELimit) {
-        alert(`Zone E hiện giới hạn ${zoneELimit} task (5 + Level - 1), tính cả nhiệm vụ đã hoàn thành. Mỗi cấp độ tăng thêm 1 task, hãy dọn bớt trước khi thêm mới nhé!`);
-        return false;
-      }
-    }
-
-    // Limit for Priority Zone
-    if (z.kind === 'priority') {
-      const totalPriorityTasks = countZoneTasks(currentTasks, z.id);
-      if (totalPriorityTasks >= 3) {
-        alert('Zone Quan trọng chỉ có thể có tối đa 3 nhiệm vụ tổng cộng (kể cả đã hoàn thành). Hãy dọn bớt trước khi thêm mới nhé!');
-        return false;
-      }
-    }
 
     const overridePoints = Number(pointsOverride);
     const basePoints = Number.isFinite(overridePoints) ? overridePoints : getDefaultPointsForZoneKind(z.kind);
