@@ -2810,6 +2810,9 @@ function handleEndDay(){
 }
 
 function syncDayWithCalendar(){
+  if(isRolloverRunning){
+    return false;
+  }
   const today = todayDM();
   const lastReal = getLastRealDate();
   if(!lastReal){
@@ -4242,14 +4245,10 @@ function render(tab){
   buildTabsBar(tab);
 
   if(tab==='tasks'){
-    stopDaySyncMonitoring();
     syncDayWithCalendar();
     viewTasks();
-    startDaySyncMonitoring();
     return;
   }
-
-  stopDaySyncMonitoring();
 
   if(tab==='archive'){
     viewArchive();
@@ -4276,6 +4275,7 @@ function render(tab){
 ============================== */
 ensureName();
 render('tasks');
+startDaySyncMonitoring();
 fetchLeaderboardAndCache().catch(()=>{});
 backgroundBoardRefresh();
 if(lbTimer===null){
