@@ -210,6 +210,46 @@ h1 .app-version{
   box-shadow:none;
   transform:none;
 }
+
+.modal-backdrop{
+  position:fixed;
+  inset:0;
+  background:rgba(15,23,42,.45);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  z-index:1000;
+}
+.modal-backdrop[hidden]{display:none}
+.modal-card{
+  width:min(100%,420px);
+  background:rgba(255,255,255,.96);
+  border:1px solid var(--panel-border);
+  border-radius:20px;
+  box-shadow:var(--panel-shadow);
+  padding:20px;
+}
+.modal-card h3{margin:0 0 14px;font-size:20px}
+.modal-form{display:grid;gap:12px}
+.modal-form label{display:grid;gap:6px;font-weight:600;font-size:14px}
+.modal-form input,
+.modal-form select{
+  width:100%;
+  min-height:var(--tap);
+  border:1px solid rgba(125,130,168,.35);
+  border-radius:12px;
+  padding:10px 12px;
+  font:inherit;
+  color:var(--ink);
+  background:#fff;
+}
+.modal-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  margin-top:4px;
+}
 .btn-danger{
   min-height:var(--tap);
   background:linear-gradient(135deg,#ff5f48 0%,#ff3425 100%);
@@ -3403,6 +3443,37 @@ async function viewTasks(){
       <button class="btn-primary" id="btnAdd">Thêm</button>
     </div>
 
+    <div class="modal-backdrop" id="taskCreateModal" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="taskCreateTitle">
+        <h3 id="taskCreateTitle">Thêm nhiệm vụ</h3>
+        <form class="modal-form" id="taskCreateForm">
+          <label>
+            Mô tả task
+            <input id="taskModalText" required>
+          </label>
+          <label>
+            Zone
+            <select id="taskModalZone">${zones.map(z=>`<option value="${z.id}">${z.name}</option>`).join('')}</select>
+          </label>
+          <label>
+            Điểm task
+            <input id="taskModalPoints" type="number" step="1">
+          </label>
+          <label>
+            Loại task
+            <select id="taskModalType">
+              <option value="daily">daily</option>
+              <option value="single">single</option>
+            </select>
+          </label>
+          <div class="modal-actions">
+            <button type="button" class="btn-ghost" id="taskModalCancel">Hủy</button>
+            <button type="submit" class="btn-primary">Lưu task</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     ${groups.map(g=>{
       const z=g.z;
       const headerClass = z.bg ? 'imgHead' : '';
@@ -3457,19 +3528,51 @@ async function viewTasks(){
 
   const inp = document.getElementById('taskText');
   const sel = document.getElementById('taskZone');
+  const taskModal = document.getElementById('taskCreateModal');
+  const taskModalForm = document.getElementById('taskCreateForm');
+  const taskModalText = document.getElementById('taskModalText');
+  const taskModalZone = document.getElementById('taskModalZone');
+  const taskModalPoints = document.getElementById('taskModalPoints');
+  const taskModalType = document.getElementById('taskModalType');
+  const taskModalCancel = document.getElementById('taskModalCancel');
 
-  async function createTaskForZone(textInput, zoneId, pointsOverride){
+  const getNormalizedPointsForZone = (zoneKind, pointsOverride)=>{
+    const fallback = getDefaultPointsForZoneKind(zoneKind);
+    const overridePoints = Number(pointsOverride);
+    const basePoints = Number.isFinite(overridePoints) ? overridePoints : fallback;
+    return normalizeRecurringPointsForZoneKind(basePoints, zoneKind);
+  };
+
+  const syncTaskModalPoints = ()=>{
+    const zone = zones.find(z=>z.id==Number(taskModalZone.value));
+    const zoneKind = zone ? zone.kind : 'regular';
+    taskModalPoints.value = String(getNormalizedPointsForZone(zoneKind, taskModalPoints.value));
+  };
+
+  const closeTaskModal = ()=>{
+    taskModal.hidden = true;
+  };
+
+  const openTaskModal = ()=>{
+    taskModalText.value = inp.value.trim();
+    taskModalZone.value = sel.value;
+    taskModalType.value = DAILY_ZONE_KINDS.has(zones.find(z=>z.id==Number(sel.value))?.kind) ? 'daily' : 'single';
+    syncTaskModalPoints();
+    taskModal.hidden = false;
+    requestAnimationFrame(()=>taskModalText.focus());
+  };
+
+  async function createTaskForZone(textInput, zoneId, taskType, pointsOverride){
     const text=(textInput||'').trim(); if(!text) return false;
     const z = zones.find(z=>z.id==zoneId);
     if(!z) return false;
 
+    const normalizedTaskType = taskType === 'daily' ? 'daily' : 'single';
     const currentTasks = getTasks();
-
-    const overridePoints = Number(pointsOverride);
-    const basePoints = Number.isFinite(overridePoints) ? overridePoints : getDefaultPointsForZoneKind(z.kind);
+    const basePoints = getNormalizedPointsForZone(z.kind, pointsOverride);
     const newTasks = [...currentTasks];
 
-    if(DAILY_ZONE_KINDS.has(z.kind)){
+    if(normalizedTaskType === 'daily'){
       const recs = getRecurring();
       const existingRec = recs.find(r=>r.zoneId==z.id && r.type==='daily' && (r.text||'')===text);
       let rec = existingRec;
@@ -3511,41 +3614,55 @@ async function viewTasks(){
       const duplicate = newTasks.some(t=>t.zoneId==z.id && t.kind==='recurring' && t.recurringId===rec.id);
       if(!duplicate){
         newTasks.push({
-                  id: Date.now() + Math.random(),
-                  text,
-                  zoneId: z.id,
-                  done: false,
-                  kind: 'recurring',
-                  recurringId: rec.id,
-                  points: normalizeRecurringPointsForZoneKind(rec.points, z.kind)
-                });
-
+          id: Date.now() + Math.random(),
+          text,
+          zoneId: z.id,
+          done: false,
+          kind: 'recurring',
+          recurringId: rec.id,
+          points: normalizeRecurringPointsForZoneKind(rec.points, z.kind)
+        });
       }
     } else {
       newTasks.push({
-                  id: Date.now(),
-                  text,
-                  zoneId: z.id,
-                  done: false,
-                  kind: 'single',
-                  points: basePoints
-                });
+        id: Date.now(),
+        text,
+        zoneId: z.id,
+        done: false,
+        kind: 'single',
+        points: basePoints
+      });
     }
 
     setTasks(newTasks);
-    render('tasks');
     return true;
   }
 
   async function addNow(){
-    const success = await createTaskForZone(inp.value, Number(sel.value));
-    if(success){
-      inp.value='';
-    }
+    openTaskModal();
   }
 
+  taskModalZone.onchange = syncTaskModalPoints;
+  taskModalPoints.onchange = syncTaskModalPoints;
+  taskModalCancel.onclick = closeTaskModal;
+  taskModal.onclick = (e)=>{
+    if(e.target === taskModal){
+      closeTaskModal();
+    }
+  };
+  taskModalForm.onsubmit = async (e)=>{
+    e.preventDefault();
+    const success = await createTaskForZone(taskModalText.value, Number(taskModalZone.value), taskModalType.value, taskModalPoints.value);
+    if(success){
+      inp.value='';
+      sel.value = taskModalZone.value;
+      closeTaskModal();
+      render('tasks');
+    }
+  };
+
   document.getElementById('btnAdd').onclick = addNow;
-  inp.onkeydown=(e)=>{ if(e.key==='Enter') addNow(); };
+  inp.onkeydown=(e)=>{ if(e.key==='Enter'){ e.preventDefault(); addNow(); } };
 
   window.onkeydown=(e)=>{
     const tag=(document.activeElement?.tagName||'').toLowerCase();
