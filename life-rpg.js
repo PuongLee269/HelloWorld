@@ -220,23 +220,35 @@ function swapTasks(mode){
  let replacements=[];
  const plan=s.plans.find(p=>p.id===s.activePlanId&&p.status==="active");
  if(plan){
-  const excludedRules=new Set(group.map(t=>t.ruleId).filter(Boolean)),groupIds=new Set(group.map(t=>t.id)),recentCutoff=dateAdd(today(),-3),usedRecently=new Set(s.history.filter(e=>e.ruleId&&e.date>=recentCutoff&&["completed","skipped","task_swapped_in","task_deleted"].includes(e.action)).map(e=>e.ruleId));
-  const choices=s.taskRules.filter(r=>{
-   if(r.planId!==plan.id||r.status!=="active"||excludedRules.has(r.id)||usedRecently.has(r.id))return false;
-   if((phase==="evening"&&r.preferredTime!=="evening"&&r.preferredTime!=="any")||(phase!=="evening"&&r.preferredTime==="evening"))return false;
-   const existing=s.tasks.find(t=>t.taskDate===today()&&t.ruleId===r.id&&!groupIds.has(t.id)&&!t.hiddenFromQueue&&t.status==="pending");
-   return !!existing||ruleCompleted(s,r,today())<Math.max(1,Number(r.target)||1);
-  }).sort((a,b)=>{
-   const pref=r=>r.preferredTime===phase||r.preferredTime==="any"?0:1;
-   return pref(a)-pref(b)||String(a.createdAt).localeCompare(String(b.createdAt));
+  const excludedRules=new Set(group.map(t=>t.ruleId).filter(Boolean)),groupIds=new Set(group.map(t=>t.id)),recentCutoff=dateAdd(today(),-3),usedRecently=new Set(s.history.filter(e=>e.ruleId&&e.date>=recentCutoff&&["created","completed","skipped","task_swapped_in","task_deleted"].includes(e.action)).map(e=>e.ruleId));
+  const compatible=r=>phase==="evening"?(r.preferredTime==="evening"||r.preferredTime==="any"):r.preferredTime!=="evening";
+  const canUse=r=>{
+   const target=Math.max(1,Number(r.target)||1),done=ruleCompleted(s,r,today());
+   if(r.taskType==="daily")return s.tasks.filter(t=>t.ruleId===r.id&&t.taskDate===today()&&!["replaced","deferred","archived","deleted"].includes(t.status)).length<target;
+   const bounds=periodBounds(r,today(),s),pending=s.tasks.filter(t=>t.ruleId===r.id&&t.taskDate>=bounds.start&&t.taskDate<=bounds.end&&t.status==="pending").length;
+   return done+pending<target;
+  };
+  const baseRules=s.taskRules.filter(r=>r.planId===plan.id&&r.status==="active"&&compatible(r)&&!excludedRules.has(r.id)&&canUse(r));
+  const sort=(a,b)=>((a.preferredTime===phase?0:1)-(b.preferredTime===phase?0:1))||String(a.createdAt).localeCompare(String(b.createdAt));
+  const fresh=baseRules.filter(r=>!usedRecently.has(r.id)).sort(sort),relaxed=baseRules.filter(r=>usedRecently.has(r.id)).sort(sort);
+  const recycled=s.tasks.filter(t=>t.status==="replaced"&&t.ruleId&&t.taskDate<=today()&&!groupIds.has(t.id)&&!t.hiddenFromQueue).filter(t=>{
+   const r=s.taskRules.find(x=>x.id===t.ruleId&&x.planId===plan.id&&x.status==="active");return !!r&&compatible(r)&&!excludedRules.has(r.id)&&canUse(r);
+  }).sort((a,b)=>String(a.replacedAt||a.createdAt).localeCompare(String(b.replacedAt||b.createdAt)));
+  const planned=[],chosenRules=new Set(),chosenTasks=new Set();
+  function planRule(rule){if(chosenRules.has(rule.id)||planned.length>=targets.length)return;const existing=s.tasks.find(t=>t.taskDate===today()&&t.ruleId===rule.id&&!groupIds.has(t.id)&&!t.hiddenFromQueue&&t.status==="pending"&&!chosenTasks.has(t.id));planned.push({rule,task:existing||null});chosenRules.add(rule.id);if(existing)chosenTasks.add(existing.id);}
+  fresh.forEach(planRule);
+  recycled.forEach(t=>{if(planned.length>=targets.length||chosenRules.has(t.ruleId)||chosenTasks.has(t.id))return;const rule=s.taskRules.find(r=>r.id===t.ruleId);planned.push({rule,task:t,recycle:true});chosenRules.add(rule.id);chosenTasks.add(t.id);});
+  relaxed.forEach(planRule);
+  planned.slice(0,targets.length).forEach((item,index)=>{
+   let next=item.task;
+   if(item.recycle){next.originalTaskDate=next.originalTaskDate||next.taskDate;next.taskDate=today();next.timeOfDay=phase;next.rotatedAt=now();}
+   if(!next){
+    const order=s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay===phase).reduce((m,t)=>Math.max(m,Number(t.queueOrder)||0),-1)+1;
+    next=ruleOccurrence(s,item.rule,today(),index,phase,order);if(next){s.tasks.push(next);log(s,{action:"created",date:today(),taskId:next.id,ruleId:item.rule.id,title:next.title,timeOfDay:phase,xpDelta:0,statDelta:{},reason:"Task được lấy từ gói kế hoạch khi đổi bộ."});}
+   }
+   if(next)replacements.push(next);
   });
-  choices.slice(0,targets.length).forEach((rule,index)=>{
-   const existing=s.tasks.find(t=>t.taskDate===today()&&t.ruleId===rule.id&&!groupIds.has(t.id)&&!t.hiddenFromQueue&&t.status==="pending");
-   if(existing){replacements.push(existing);return;}
-   const order=s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay===phase).reduce((m,t)=>Math.max(m,Number(t.queueOrder)||0),-1)+1;
-   const next=ruleOccurrence(s,rule,today(),index,phase,order);if(next){s.tasks.push(next);log(s,{action:"created",date:today(),taskId:next.id,ruleId:rule.id,title:next.title,timeOfDay:phase,xpDelta:0,statDelta:{},reason:"Task được chọn từ rule của gói kế hoạch khi đổi Task."});replacements.push(next);}
-  }); }else{
-  const ids=new Set(group.map(t=>t.id));
+ }else{  const ids=new Set(group.map(t=>t.id));
   const candidates=s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay===phase&&!ids.has(t.id)&&!t.hiddenFromQueue&&(phase==="evening"?(t.status==="pending"||t.status==="inactive"):t.status==="pending")).sort((a,b)=>(Number(a.batchOrder)||0)-(Number(b.batchOrder)||0)||queueOrder(a,b));
   replacements=candidates.slice(0,targets.length);
  }
