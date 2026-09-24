@@ -43,7 +43,11 @@ Có thể dùng văn bản gắn thẻ thay JSON:
     Weekly Quest: Đăng 3 video
     Reason: Đưa mục tiêu tuần tiến lên
 
-Mỗi Task cần 1–3 tag Stat chính xác trong SI, STR, EN, VIT, EQ, Y; tag chủ đề có thể thêm tự do. App bỏ qua XP và statEffects do AI gửi, tự tính từ tag và Difficulty để đảm bảo kết quả nhất quán. Tag được nhận diện qua mã Stat và alias tiếng Anh/Việt được liệt kê trong life-rpg-engine.js. Nếu thiếu tag Stat hợp lệ, app mặc định EN +1 và báo số Task dùng mặc định. Mỗi ngày tối đa 20 Task; tiêu đề trùng trong ngày được bỏ qua.
+Mỗi Task cần 1–3 tag Stat chính xác trong SI, STR, EN, VIT, EQ, Y; tag chủ đề có thể thêm tự do. App bỏ qua XP và statEffects do AI gửi, tự tính từ tag và Difficulty để đảm bảo kết quả nhất quán. Tag được nhận diện qua mã Stat và alias tiếng Anh/Việt được liệt kê trong life-rpg-engine.js. Nếu thiếu tag Stat hợp lệ, app mặc định EN +1 và báo số Task dùng mặc định. Mỗi ngày tối đa 20 Task; tiêu đề trùng trong ngày được bỏ qua. AI được hướng dẫn tạo theo bội số của ba và xếp từng bộ ba bổ trợ nhau.
+
+## Hiển thị theo bộ ba Task
+
+Tab điều hướng chỉ hiện icon. Tab Task chỉ hiện nội dung Task cùng ô tick; tag, điểm và độ khó vẫn được lưu và chấm nhưng không chiếm chỗ trên danh sách. App hiển thị tối đa ba Task theo thứ tự nhập. Chỉ khi cả ba Task trong bộ hiện tại đã hoàn thành thì bộ ba tiếp theo mới mở. Prompt AI yêu cầu mỗi bộ phối hợp vai trò như focus, movement, recovery, connection, reflection, giới hạn tối đa một Task Hard/Epic, có ít nhất một hoạt động nhẹ/hồi phục và tránh dồn nhiều việc nặng cùng kiểu năng lượng. Task có energyRole được lưu cùng dữ liệu.
 
 ## Quy tắc điểm
 
