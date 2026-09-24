@@ -224,7 +224,8 @@ function swapTasks(mode){
   const compatible=r=>phase==="evening"?(r.preferredTime==="evening"||r.preferredTime==="any"):r.preferredTime!=="evening";
   const canUse=r=>{
    const target=Math.max(1,Number(r.target)||1),done=ruleCompleted(s,r,today());
-   if(s.tasks.some(t=>t.taskDate===today()&&t.ruleId===r.id&&!groupIds.has(t.id)&&!t.hiddenFromQueue&&t.status==="pending"))return true;\n   if(r.taskType==="daily")return s.tasks.filter(t=>t.ruleId===r.id&&t.taskDate===today()&&!["replaced","deferred","archived","deleted"].includes(t.status)).length<target;
+   if(s.tasks.some(t=>t.taskDate===today()&&t.ruleId===r.id&&!groupIds.has(t.id)&&!t.hiddenFromQueue&&t.status==="pending"))return true;
+   if(r.taskType==="daily")return s.tasks.filter(t=>t.ruleId===r.id&&t.taskDate===today()&&!["replaced","deferred","archived","deleted"].includes(t.status)).length<target;
    const bounds=periodBounds(r,today(),s),pending=s.tasks.filter(t=>t.ruleId===r.id&&t.taskDate>=bounds.start&&t.taskDate<=bounds.end&&t.status==="pending").length;
    return done+pending<target;
   };
