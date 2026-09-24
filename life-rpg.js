@@ -60,38 +60,99 @@ function makeTask(s,raw,index,date,forcedTime,sequence){
  const weekly=raw.weeklyQuestId?s.quests.find(q=>q.id===raw.weeklyQuestId):s.quests.find(q=>q.type==="weekly"&&q.status==="active"&&raw.weeklyQuest&&q.title.toLowerCase()===String(raw.weeklyQuest).toLowerCase());
  return{id:"task-"+Date.now()+"-"+index+"-"+Math.random().toString(36).slice(2,7),queueOrder:order,batchOrder:batchOrder,batchId:date+":"+shift+":"+batchOrder,title,description:String(raw.description||"").slice(0,300),category:String(raw.category||allTags.find(t=>KEYS.includes(t.toUpperCase()))||"Daily").slice(0,60),tags:allTags,difficulty:score.difficulty,timeOfDay:shift,replacesTask:String(raw.replacesTask||"").slice(0,140),energyRole:["focus","movement","recovery","connection","reflection"].includes(raw.energyRole)?raw.energyRole:"focus",xp:score.xp,statEffects:score.statEffects,status:"pending",createdAt:now(),taskDate:date,completedAt:null,mainQuestId:main?main.id:null,weeklyQuestId:weekly?weekly.id:null,reason:String(raw.reason||"Được phân loại theo tag và chấm điểm trong ứng dụng.").slice(0,300),usedDefaultTag:score.usedDefaultTag};
 }
+function dateAdd(value,days){const d=new Date(value+"T00:00:00");d.setDate(d.getDate()+days);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function dateDiff(from,to){return Math.round((new Date(to+"T00:00:00")-new Date(from+"T00:00:00"))/86400000);}
+function periodBounds(rule,date,s){
+ if(rule.taskType==="daily")return{start:date,end:date};
+ if(rule.taskType==="weekly"){const d=new Date(date+"T00:00:00"),day=(d.getDay()+6)%7;return{start:dateAdd(date,-day),end:dateAdd(date,6-day)};}
+ return{start:s.planStart||rule.planStartDate,end:s.planEnd||rule.planEndDate};
+}
+function ruleCompleted(s,rule,date){
+ const bounds=periodBounds(rule,date,s);
+ return s.history.filter(e=>e.action==="completed"&&e.ruleId===rule.id&&e.date>=bounds.start&&e.date<=bounds.end).length;
+}
+function rulePhase(rule){if(rule.preferredTime==="evening")return"evening";if(rule.preferredTime==="any")return timeOfDay()==="evening"?"evening":"day";return"day";}
+function ruleOccurrence(s,rule,date,index,phase,order){
+ const raw={title:rule.title,description:rule.description,category:rule.category,tags:rule.tags,difficulty:rule.difficulty,energyRole:rule.energyRole,mainQuestId:rule.mainQuestId,weeklyQuestId:rule.weeklyQuestId,reason:rule.reason};
+ const t=makeTask(s,raw,index,date,phase,order);if(!t)return null;
+ t.ruleId=rule.id;t.taskType=rule.taskType;t.target=rule.target;t.period=rule.period;t.preferredTime=rule.preferredTime;
+ t.batchId=date+":"+phase+":"+Math.floor(order/3);t.batchOrder=Math.floor(order/3);t.occurrenceIndex=index;
+ return t;
+}
+function ensurePlanTasks(s){
+ const plan=s.plans.find(p=>p.id===s.activePlanId&&p.status==="active");if(!plan)return false;
+ const date=today();if(date<plan.startDate||date>plan.endDate)return false;
+ const dayRules=s.taskRules.filter(r=>r.planId===plan.id&&r.status==="active");
+ const oneTime=dayRules.filter(r=>r.taskType==="one_time"),oneTimeIndex=new Map(oneTime.map((r,i)=>[r.id,i]));
+ let changed=false,created=0;
+ for(const rule of dayRules){
+  const bounds=periodBounds(rule,date,s),periodDays=Math.max(1,dateDiff(bounds.start,bounds.end)+1),dayIndex=Math.max(0,Math.min(periodDays-1,dateDiff(bounds.start,date)));
+  const done=ruleCompleted(s,rule,date),todayRows=s.tasks.filter(t=>t.taskDate===date&&t.ruleId===rule.id&&t.status!=="replaced"&&t.status!=="deferred");
+  const outstanding=s.tasks.filter(t=>t.ruleId===rule.id&&t.taskDate<date&&t.status==="pending");
+  outstanding.forEach(t=>{t.status="deferred";t.deferredAt=now();log(s,{action:"rescheduled",date,taskId:t.id,ruleId:rule.id,title:t.title,xpDelta:0,statDelta:{},reason:"Task chưa hoàn thành được giữ trong lịch sử và xét lại theo hạn mức của chu kỳ."});changed=true;});
+  let count=0;
+  if(rule.taskType==="daily"){
+   count=Math.max(0,Math.max(1,Number(rule.target)||1)-todayRows.length);
+  }else if(done<Math.max(1,Number(rule.target)||1)&&!todayRows.length){
+   let due=false;
+   if(rule.taskType==="one_time"){
+    const total=oneTime.length,ordinal=oneTimeIndex.get(rule.id)||0,idealDay=Math.floor((ordinal+1)*periodDays/(total+1));
+    due=dayIndex>=idealDay;
+   }else{
+    const target=Math.max(1,Number(rule.target)||1),dueByToday=Math.floor((dayIndex+1)*target/periodDays),daysLeft=periodDays-dayIndex;
+    due=done<dueByToday||(target-done)>=daysLeft;
+   }
+   if(due)count=1;
+  }
+  while(count>0&&s.tasks.filter(t=>t.taskDate===date&&t.status!=="replaced"&&t.status!=="deferred").length<20){
+   const phase=rulePhase(rule),order=s.tasks.filter(t=>t.taskDate===date&&t.timeOfDay===phase).reduce((m,t)=>Math.max(m,Number(t.queueOrder)||0),-1)+1;
+   const t=ruleOccurrence(s,rule,date,todayRows.length+created,phase,order);if(!t)break;
+   s.tasks.push(t);todayRows.push(t);log(s,{action:"created",date,taskId:t.id,ruleId:rule.id,title:t.title,category:t.category,tags:t.tags,difficulty:t.difficulty,taskType:t.taskType,target:t.target,period:t.period,preferredTime:t.preferredTime,timeOfDay:phase,xpDelta:0,statDelta:{},reason:t.reason});
+   changed=true;created++;count--;
+  }
+ }
+ return changed;
+}
+function importPlan(s,parsed){
+ const rules=parsed.tasks.map(raw=>{
+  const title=String(raw.title||raw.text||raw.name||"").trim();if(!title)return null;
+  const taskType=["daily","weekly","recurring","one_time"].includes(raw.taskType)?raw.taskType:"one_time";
+  const period=taskType==="daily"?"day":taskType==="weekly"?"week":"month";
+  const target=taskType==="one_time"?1:Math.max(1,Math.min(taskType==="daily"?5:taskType==="weekly"?14:30,Math.round(Number(raw.target)||1)));
+  const rawTags=Array.isArray(raw.tags)?raw.tags:String(raw.tags||"").split(/[,;|]/).filter(Boolean);
+  const stats=window.LifeRpgTaskEngine.statTags(rawTags),score=window.LifeRpgTaskEngine.score(stats,raw.difficulty);
+  const tags=rawTags.map(x=>String(x).trim()).filter(Boolean).slice(0,12);
+  const main=s.quests.find(q=>q.type==="main"&&q.status==="active"&&q.title.toLowerCase()===String(raw.mainQuest||"").toLowerCase());
+  const weekly=s.quests.find(q=>q.type==="weekly"&&q.status==="active"&&q.title.toLowerCase()===String(raw.weeklyQuest||"").toLowerCase());
+  return{id:"rule-"+Date.now()+"-"+Math.random().toString(36).slice(2,8),title,description:String(raw.description||"").slice(0,300),category:String(raw.category||tags[0]||"").slice(0,60),taskType,target,period,preferredTime:["morning","daytime","evening","any"].includes(raw.preferredTime)?raw.preferredTime:"any",tags,difficulty:score.difficulty,energyRole:["focus","movement","recovery","connection","reflection"].includes(raw.energyRole)?raw.energyRole:"focus",mainQuestId:main?main.id:null,weeklyQuestId:weekly?weekly.id:null,mainQuest:String(raw.mainQuest||"").slice(0,140),weeklyQuest:String(raw.weeklyQuest||"").slice(0,140),reason:String(raw.reason||"").slice(0,300),xp:score.xp,statEffects:score.statEffects,usedDefaultTag:score.usedDefaultTag,status:"active",createdAt:now()};
+ }).filter(Boolean);
+ const unique=[],seen=new Set();rules.forEach(r=>{const key=r.title.toLowerCase();if(!seen.has(key)){seen.add(key);unique.push(r);}});
+ if(!unique.length)throw new Error("Gói kế hoạch chưa có Task hợp lệ.");
+ s.taskRules.forEach(r=>{if(r.status==="active")r.status="archived";});
+ s.plans.forEach(p=>{if(p.status==="active")p.status="archived";});
+ const start=today(),end=dateAdd(start,29),planId="plan-"+Date.now()+"-"+Math.random().toString(36).slice(2,7);
+ const main=parsed.mainQuest;if(main)addQuest(s,"main",main);
+ (parsed.weeklyQuests||[]).forEach(q=>addQuest(s,"weekly",q));
+ const plan={id:planId,startDate:start,endDate:end,status:"active",createdAt:now(),taskRuleIds:unique.map(r=>r.id)};
+ s.plans.push(plan);s.activePlanId=planId;s.planStart=start;s.planEnd=end;
+ unique.forEach(r=>{r.planId=planId;r.planStartDate=start;r.planEndDate=end;s.taskRules.push(r);});
+ s.aiConversation={status:"PLAN_READY",questions:[],answers:[]};
+ s.feedback="Đã nạp gói kế hoạch 30 ngày với "+unique.length+" Task rule.";
+ ensurePlanTasks(s);
+ log(s,{action:"plan_imported",date:start,planId,count:unique.length,xpDelta:0,statDelta:{},reason:"Đã lưu Task dưới dạng rule/template; các lần xuất hiện được phân phối theo lịch."});
+ save(s);render("tasks");return unique.length;
+}
 function importPaste(text){
  const s=rollover(state()),parsed=window.LifeRpgTaskEngine.parse(text);
- if(!parsed||!Array.isArray(parsed.tasks)||!parsed.tasks.length)throw new Error("Không đọc thấy Task ban ngày. Hãy dán JSON hoặc danh sách có tag theo mẫu.");
- const date=today(),existing=s.tasks.filter(t=>t.taskDate===date).length,remaining=Math.max(0,20-existing);
- if(!remaining)throw new Error("Đã đạt giới hạn 20 Task hôm nay.");
- const main=parsed.mainQuest||parsed.quests&&parsed.quests.find(q=>q.type==="main");
- if(main)addQuest(s,"main",main);
- (parsed.weeklyQuests||[]).forEach(q=>addQuest(s,"weekly",q));
- (parsed.quests||[]).forEach(q=>{const type=String(q.type||"").toLowerCase();if(type==="main"||type==="weekly")addQuest(s,type,q);});
- const dayQueue=s.tasks.filter(t=>t.taskDate===date&&t.timeOfDay!=="evening"),dayBase=dayQueue.reduce((m,t)=>Math.max(m,Number(t.queueOrder)||0),-1)+1;
- const dayItems=parsed.tasks.slice(0,remaining).map((raw,index)=>({raw:raw,time:"day",order:dayBase+index}));
- const dayNames=new Set(dayItems.map(x=>String(x.raw.title||x.raw.text||"").toLowerCase()));
- const alternatives=(parsed.eveningTasks||[]).filter(raw=>!raw.replacesTask||dayNames.has(String(raw.replacesTask).toLowerCase())).slice(0,Math.max(0,remaining-dayItems.length)).map((raw,index)=>{
-  const match=dayItems.find(x=>String(x.raw.title||x.raw.text||"").toLowerCase()===String(raw.replacesTask||"").toLowerCase());
-  return{raw:raw,time:"evening",order:match?match.order:dayBase+dayItems.length+index};
- });
- const accepted=[],duplicates=[];
- dayItems.concat(alternatives).forEach((item,index)=>{
-  const raw=item.raw,title=String(raw.title||raw.text||"").trim();if(!title)return;
-  const exists=s.tasks.some(t=>t.taskDate===date&&t.title.toLowerCase()===title.toLowerCase());
-  if(exists){duplicates.push(title);return;}
-  const task=makeTask(s,raw,index,date,item.time,item.order);if(task){if(item.time==="evening"){const linked=dayItems.find(x=>String(x.raw.title||x.raw.text||"").toLowerCase()===String(raw.replacesTask||"").toLowerCase());task.batchOrder=Math.floor(item.order/3);task.batchId=date+":evening:"+task.batchOrder;if(linked)task.batchId=date+":evening:"+Math.floor(linked.order/3);}accepted.push(task);}
- });
- if(!accepted.length)throw new Error(duplicates.length?"Các Task này đã có trong hôm nay.":"Không có Task hợp lệ.");
- s.tasks=s.tasks.concat(accepted);
- const fallback=accepted.filter(t=>t.usedDefaultTag).length;
- s.feedback="Đã nạp "+accepted.length+" Task"+(duplicates.length?" · bỏ qua "+duplicates.length+" mục trùng":"")+(fallback?" · "+fallback+" Task thiếu tag Stats được mặc định EN":"")+".";
- log(s,{action:"imported",date,count:accepted.length,taskIds:accepted.map(t=>t.id),xpDelta:0,statDelta:{},reason:"Nhập kế hoạch ban ngày và phương án thay thế buổi tối."});
- accepted.forEach(t=>log(s,{action:"created",date,taskId:t.id,title:t.title,category:t.category,tags:t.tags,difficulty:t.difficulty,timeOfDay:t.timeOfDay,replacesTask:t.replacesTask,xpDelta:0,statDelta:{},mainQuestId:t.mainQuestId,weeklyQuestId:t.weeklyQuestId,reason:t.reason}));
- save(s);
- if(timeOfDay()==="evening")applyEveningSwitch(s,true);
- render("tasks");return accepted.length;
+ if(!parsed)throw new Error("Không đọc được JSON. Hãy dán nguyên phản hồi JSON của AI.");
+ if(parsed.status==="NEED_INFO"){
+  if(!parsed.questions||parsed.questions.length<3)throw new Error("AI cần trả 3–6 câu hỏi trong JSON NEED_INFO.");
+  s.aiConversation={status:"NEED_INFO",questions:parsed.questions.slice(0,6),answers:[]};
+  s.feedback="AI cần thêm thông tin trước khi lập kế hoạch tháng.";
+  save(s);render("import");return -1;
+ }
+ if(parsed.status!=="PLAN_READY"||!Array.isArray(parsed.tasks)||!parsed.tasks.length)throw new Error("Không thấy gói PLAN_READY có danh sách tasks.");
+ return importPlan(s,parsed);
 }
 function timeOfDay(){return new Date().getHours()>=18?"evening":"day";}
 function applyEveningSwitch(s,force){
