@@ -1,35 +1,62 @@
 # Mori Quest — Life RPG MVP
 
-MVP biến task hằng ngày thành vòng lặp RPG: Profile/Goals → Daily Tasks → Complete/Skip → Stats + XP → Level và history.
+Mori Quest biến Task hằng ngày thành vòng lặp RPG: AI tạo nội dung → người dùng dán vào → app phân loại theo tag → Complete → XP/6 Stats/Level và lịch sử.
 
 ## Chạy
 
-Đây là app tĩnh, không cần build. Mở `index.html` qua GitHub Pages hoặc một static web server. Trên Dashboard, cập nhật Main Quest/Weekly Quest và Goals trong tab Profile & Quests; task sẽ được tạo tự động. Có thể tạo thêm tối đa 20 task/ngày hoặc tự thêm một Daily Task.
+App tĩnh, mở index.html qua GitHub Pages hoặc static web server. Có ba tab:
 
-## Các module mới
+1. **Task** — chỉ hiển thị các Task hôm nay, tag, độ khó, XP/Stats dự kiến, nút Hoàn thành/Bỏ qua.
+2. **Chỉ số** — Level, XP tới Level kế tiếp, radar 6 Stats, Growth 7/30 ngày và history.
+3. **Nạp Quest & Task** — prompt ngữ cảnh để sao chép vào ChatGPT và ô dán JSON hoặc danh sách Task có gắn thẻ.
 
-- `life-rpg.js`: dashboard, hồ sơ/quest, complete/skip, XP/Level, radar, history, backup và lưu trữ.
-- `life-rpg-engine.js`: schema task, context builder boundary và bộ tạo task local thích ứng. Thay `generateWithProvider()` để nối model/API khác.
-- `index.html`: giữ giao diện Mori Quest hiện có, chuyển dashboard/task rendering sang MVP và nạp hai module mới.
+## Luồng tạo nội dung AI
 
-## Lưu dữ liệu
+Không có kết nối model/API trực tiếp trong MVP. Chọn **Sao chép prompt AI**, gửi prompt trong ChatGPT, rồi dán JSON trả về vào tab Nạp Quest & Task. Prompt mang theo tên, mục tiêu, Quest hiện tại, Stats, completion rate, Task đã bỏ qua, Growth và lịch sử gần đây.
 
-Nguồn dữ liệu MVP nằm trong Local Storage tại `tq_liferpg_state_v1`; mọi task, Stat, XP, quest và event history được ghi chung trong một state để thao tác Complete không cộng XP hai lần. Level/XP/tên được mirror sang `tq_profile` để tương thích với hero và đồng bộ hồ sơ cũ.
+AI cần trả về JSON theo dạng:
 
-Dữ liệu hiện lưu trên thiết bị/trình duyệt. Dùng nút **Tải backup** trong Profile & Quests để xuất JSON; **Phục hồi backup** nạp lại bản xuất. Xóa browser storage sẽ xóa tiến trình nếu chưa có backup.
+    {
+      "mainQuest": {"title": "Xây kênh cá nhân", "description": "Mục tiêu dài hạn"},
+      "weeklyQuests": [{"title": "Đăng 3 video", "target": 3, "mainQuest": "Xây kênh cá nhân"}],
+      "tasks": [{
+        "title": "Hoàn thiện một Short",
+        "description": "Chỉnh sửa và xuất bản video",
+        "category": "YouTube",
+        "tags": ["SI", "EN", "YouTube"],
+        "difficulty": "Normal",
+        "mainQuest": "Xây kênh cá nhân",
+        "weeklyQuest": "Đăng 3 video",
+        "reason": "Đưa mục tiêu tuần tiến lên"
+      }]
+    }
 
-## Daily Task AI
+Có thể dùng văn bản gắn thẻ thay JSON:
 
-Không cần API để dùng MVP. Engine local đề xuất tối đa 8 task mỗi lần, cho phép tối đa 20 task/ngày, ưu tiên Stats yếu hơn, goals, Main/Weekly Quest và lịch sử hoàn thành/bỏ qua. Danh sách mẫu lặp lại được sau một tuần.
+    [MAIN QUEST] Xây kênh cá nhân
+    [WEEKLY QUEST] Đăng 3 video
+    [TASK] Hoàn thiện một Short
+    Tags: SI, EN, YouTube
+    Difficulty: Normal
+    Description: Chỉnh sửa và xuất bản video
+    Main Quest: Xây kênh cá nhân
+    Weekly Quest: Đăng 3 video
+    Reason: Đưa mục tiêu tuần tiến lên
 
-Có thể điền **AI Task endpoint** trong Profile & Goals. Endpoint nhận POST JSON gồm `schema: life-rpg-daily-tasks.v1`, `requestedCount`, `taskDate`, `context`, `responseFormat`, và trả về mảng task hoặc object `{ "tasks": [...] }`. Endpoint cần hỗ trợ CORS khi app chạy trên domain khác. Nếu endpoint lỗi, app tự dùng generator local. Không gửi khóa API từ trình duyệt; endpoint thật nên chạy qua backend.
+Mỗi Task cần 1–3 tag Stat chính xác trong SI, STR, EN, VIT, EQ, Y; tag chủ đề có thể thêm tự do. App bỏ qua XP và statEffects do AI gửi, tự tính từ tag và Difficulty để đảm bảo kết quả nhất quán. Tag được nhận diện qua mã Stat và alias tiếng Anh/Việt được liệt kê trong life-rpg-engine.js. Nếu thiếu tag Stat hợp lệ, app mặc định EN +1 và báo số Task dùng mặc định. Mỗi ngày tối đa 20 Task; tiêu đề trùng trong ngày được bỏ qua.
 
-Task có schema gồm id, title, description, category/tags, difficulty, XP, statEffects (tối đa 3 Stats), status, createdAt/taskDate/completedAt, mainQuestId/weeklyQuestId và reason. VIT chỉ là chỉ số mô phỏng trong game, không phải chẩn đoán sức khỏe.
+## Quy tắc điểm
 
-## Cách tính
+- Easy: 15 XP; Stat tag thứ nhất +1, thứ hai +1.
+- Normal: 30 XP; +2, +1.
+- Hard: 55 XP; +3, +2, +1.
+- Epic: 85 XP; +4, +3, +2.
+- Chỉ áp điểm cho tối đa ba Stat tag đầu tiên.
+- Hoàn thành Task chỉ áp dụng một lần; lần hoàn thành thứ 6 trong ngày cộng thêm 3 XP.
+- Qua ngày mà không hoàn thành Task nào: trừ 6 XP khi app hoạt động trở lại.
+- Level tách khỏi Stats; XP cần cho Level kế tiếp là 100 + 50 × (Level - 1).
+- VIT chỉ là chỉ số game hóa, không phải chẩn đoán sức khỏe hay đo tuổi sinh học.
 
-- XP theo độ khó: Easy 15, Normal 30, Hard 55, Epic 85; công thức XP lên Level: `100 + 50 × (Level - 1)`.
-- Complete cộng XP và Stat theo task; complete lặp lại không được thưởng lần nữa.
-- Đạt 6 task hoàn thành trong ngày nhận thêm 3 XP.
-- Ngày không hoàn thành task nào bị trừ 6 XP khi app mở lại qua ngày.
-- Radar hiển thị Stats hiện tại và Growth 7/30 ngày từ event history.
+## Dữ liệu
+
+life-rpg.js quản lý ba tab, nhập Quest/Task, tính thưởng, Level, history và lưu cục bộ. life-rpg-engine.js chứa parser, alias tag, bảng điểm và quy tắc/prompt AI. Dữ liệu nằm trong Local Storage (tq_liferpg_state_v1); tên/Level/XP được mirror sang tq_profile cho hero Mori Quest. Sao lưu/truyền dữ liệu có thể bổ sung trong phiên bản tiếp theo.
