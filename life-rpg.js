@@ -75,6 +75,7 @@ function applyEveningSwitch(s,force){
  const pending=s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay!=="evening"&&t.status==="pending");
  if(!pending.length){if(!already){s.bonuses[flag]=true;s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay==="evening"&&t.status==="pending").forEach(t=>t.status="inactive");log(s,{action:"evening_check",date:today(),title:"Không còn Task ban ngày cần thay thế",xpDelta:0,statDelta:{}});save(s);}return false;}
  const alts=s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay==="evening"&&(t.status==="pending"||t.status==="inactive"));
+ if(!alts.length)return false;
  const selected=alts.filter(e=>pending.some(d=>e.replacesTask&&e.replacesTask.toLowerCase()===d.title.toLowerCase()));
  const replacements=selected.length?selected:alts;
  pending.forEach(d=>{d.status="deferred";d.deferredAt=now();const alt=replacements.find(e=>!e.replacesTask||e.replacesTask.toLowerCase()===d.title.toLowerCase());log(s,{action:"evening_replaced",date:today(),taskId:d.id,title:d.title,replacedBy:alt?alt.title:null,timeOfDay:"day",xpDelta:0,statDelta:{},reason:"Task ban ngày chưa hoàn thành được thay bằng kế hoạch buổi tối."});});
@@ -101,7 +102,7 @@ function style(){return"<style>"+CSS+"</style>";}
 function taskCard(t){const checked=t.status==="completed"?" checked disabled":"";return'<label class="rpg-taskrow"><input type="checkbox" data-do="complete" data-id="'+esc(t.id)+'"'+checked+'><span>'+esc(t.title)+'</span></label>';}
 function bindTaskButtons(){document.querySelectorAll("[data-do=complete]").forEach(b=>b.onchange=()=>{if(b.checked)complete(b.dataset.id);});}
 function queueOrder(a,b){if(Number.isFinite(a.queueOrder)&&Number.isFinite(b.queueOrder))return a.queueOrder-b.queueOrder;return String(a.createdAt||"").localeCompare(String(b.createdAt||""))||String(a.id).localeCompare(String(b.id));}
-function currentBatch(s){const evening=timeOfDay()==="evening";if(evening&&s.eveningActivatedDate!==today())return[];const queue=s.tasks.filter(t=>t.taskDate===today()&&(evening?t.timeOfDay==="evening"&&(t.status==="pending"||t.status==="completed"):t.timeOfDay!=="evening"&&(t.status==="pending"||t.status==="completed"))).sort(queueOrder);for(let i=0;i<queue.length;i+=3){const batch=queue.slice(i,i+3);if(batch.length<3||batch.some(t=>t.status!=="completed"))return batch;}return[];}
+function currentBatch(s){const evening=timeOfDay()==="evening";let queue=s.tasks.filter(t=>t.taskDate===today()&&(evening&&s.eveningActivatedDate===today()?t.timeOfDay==="evening"&&(t.status==="pending"||t.status==="completed"):!evening&&t.timeOfDay!=="evening"&&(t.status==="pending"||t.status==="completed"))).sort(queueOrder);if(evening&&!queue.length)queue=s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay!=="evening"&&(t.status==="pending"||t.status==="completed")).sort(queueOrder);for(let i=0;i<queue.length;i+=3){const batch=queue.slice(i,i+3);if(batch.length<3||batch.some(t=>t.status!=="completed"))return batch;}return[];}
 function renderTasks(s){
  const batch=currentBatch(s);
  view.innerHTML=style()+'<div class="rpg-wrap"><section class="rpg-panel"><div class="rpg-task-list">'+(batch.length?batch.map(t=>taskCard(t)).join(""):'<div class="rpg-empty">Đã hoàn thành toàn bộ Task hiện có. Nạp nhóm Task tiếp theo khi sẵn sàng.</div>')+'</div></section></div>';
