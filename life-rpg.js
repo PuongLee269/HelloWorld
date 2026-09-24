@@ -281,22 +281,27 @@
     try {
       const context=contextFor(s);
       let generated=[];
+      let usedLocalFallback=false;
       const endpoint=s.preferences.aiEndpoint;
       try {
         generated=await window.LifeRpgTaskEngine.generate(context,requested,today,endpoint);
       } catch(error) {
         generated=window.LifeRpgTaskEngine.generateLocal(context,requested,today);
-        s=state();
-        s.feedback="AI endpoint chưa khả dụng; đã dùng bộ tạo task local.";
+        usedLocalFallback=true;
       }
       s=rollover(state());
       const freshCount=s.tasks.filter(function (task) { return task.taskDate===today; }).length;
       const accepted=generated.slice(0,Math.max(0,20-freshCount));
+      const usedIds=new Set(s.tasks.map(function(task){return String(task.id);}));
+      accepted.forEach(function(task){
+        if(!task.id||usedIds.has(String(task.id)))task.id="task-"+Date.now()+"-"+Math.random().toString(36).slice(2,9);
+        usedIds.add(String(task.id));
+      });
       s.tasks=s.tasks.concat(accepted);
-      if(!s.tasks.some(function(task){return task.taskDate===today&&task.status==="pending";})&&accepted.length===0){
+      if(!accepted.length){
         s.feedback="Chưa tìm được task phù hợp mới. Hãy cập nhật mục tiêu hoặc thử lại sau.";
-      } else if (!s.feedback) {
-        s.feedback="Đã tạo "+accepted.length+" task dựa trên hồ sơ và lịch sử gần đây.";
+      } else {
+        s.feedback=(usedLocalFallback?"AI endpoint lỗi; đã dùng bộ tạo task local. ":"")+"Đã tạo "+accepted.length+" task dựa trên hồ sơ và lịch sử gần đây.";
       }
       addHistory(s,{action:"generated",date:today,taskIds:accepted.map(function(task){return task.id;}),count:accepted.length,reason:"Tạo task từ profile, mục tiêu, chỉ số và lịch sử."});
       saveState(s);
