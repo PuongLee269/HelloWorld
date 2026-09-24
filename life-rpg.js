@@ -16,7 +16,7 @@ function state(){
  s.user=Object.assign(base.user,raw.user||{});s.stats=Object.assign(base.stats,raw.stats||{});s.preferences=Object.assign(base.preferences,raw.preferences||{});
  ["tasks","taskRules","plans","quests","history"].forEach(k=>s[k]=Array.isArray(raw[k])?raw[k]:[]);
  s.tasks.forEach(t=>{
-  if(t.status==="skipped")t.status="pending";
+  if(t.status==="skipped"&&!t.ruleId)t.status="pending";
   if(!t.taskType)t.taskType="one_time";
   if(!Number.isFinite(Number(t.target)))t.target=1;
   if(!t.period)t.period="month";
@@ -241,8 +241,9 @@ function addManualTask(form){
 }
 function removeTask(id){
  const s=rollover(state()),index=s.tasks.findIndex(t=>t.id===id&&t.taskDate===today());if(index<0)return false;
- const task=s.tasks[index];log(s,{action:"task_deleted",date:today(),taskId:task.id,title:task.title,timeOfDay:task.timeOfDay,xpDelta:0,statDelta:{},reason:"Task bị xóa khỏi hàng chờ; history thưởng trước đó vẫn được giữ."});
- s.tasks.splice(index,1);s.feedback="Đã xóa Task khỏi danh sách hôm nay.";save(s);render("import");return true;
+ const task=s.tasks[index];log(s,{action:"task_deleted",date:today(),taskId:task.id,ruleId:task.ruleId||null,title:task.title,timeOfDay:task.timeOfDay,xpDelta:0,statDelta:{},reason:"Task bị xóa khỏi hàng chờ; history thưởng trước đó vẫn được giữ."});
+ if(task.ruleId){task.status="deleted";task.deletedAt=now();}else s.tasks.splice(index,1);
+ s.feedback="Đã xóa Task khỏi danh sách hôm nay.";save(s);render("import");return true;
 }
 function radar(values,max,title){const cx=120,cy=105,r=72,n=KEYS.length,p=(i,k)=>{const a=-Math.PI/2+i*2*Math.PI/n;return(cx+Math.cos(a)*r*k).toFixed(1)+","+(cy+Math.sin(a)*r*k).toFixed(1);};let x='<svg viewBox="0 0 240 210" role="img" aria-label="'+esc(title)+'">';[.25,.5,.75,1].forEach(k=>x+='<polygon points="'+KEYS.map((_,i)=>p(i,k)).join(" ")+'" fill="none" stroke="#dfe2ed"/>');KEYS.forEach((k,i)=>x+='<line x1="'+cx+'" y1="'+cy+'" x2="'+p(i,1)+'" stroke="#dfe2ed"/>');x+='<polygon points="'+KEYS.map((k,i)=>p(i,Math.min(1,Math.max(0,Number(values[k])||0)/Math.max(1,max)))).join(" ")+'" fill="rgba(124,102,238,.24)" stroke="#7866ee" stroke-width="2"/>';KEYS.forEach((k,i)=>{const a=-Math.PI/2+i*2*Math.PI/n;x+='<text x="'+(cx+Math.cos(a)*99).toFixed(1)+'" y="'+(cy+Math.sin(a)*99+4).toFixed(1)+'" text-anchor="middle" font-size="10" fill="#41445a">'+k+'</text>';});return x+"</svg>";}
 function growth(s,days){const cutoff=new Date();cutoff.setDate(cutoff.getDate()-days+1);const key=cutoff.getFullYear()+"-"+String(cutoff.getMonth()+1).padStart(2,"0")+"-"+String(cutoff.getDate()).padStart(2,"0"),out={};KEYS.forEach(k=>out[k]=0);s.history.forEach(e=>{if(e.action==="completed"&&e.date>=key&&e.date<=today())KEYS.forEach(k=>out[k]+=Number((e.statDelta||{})[k])||0);});return out;}
@@ -282,7 +283,7 @@ function renderStats(s){
 }
 function buildPrompt(){const s=state(),actions=s.history.filter(e=>e.action==="completed"||e.action==="skipped"),den=actions.length,done=actions.filter(e=>e.action==="completed").length,skipped=actions.filter(e=>e.action==="skipped"||e.action==="task_deleted").slice(-20).map(e=>({title:e.title,action:e.action,date:e.date,reason:e.reason}));return window.LifeRpgTaskEngine.makePrompt({userData:{profile:{name:s.user.name,level:s.level,xp:s.xp},goals:s.user.goals,mainQuest:activeQuest(s,"main"),weeklyQuest:activeQuest(s,"weekly"),currentStats:s.stats,completionRate:den?done/den:0,taskHistory:s.history.slice(-60),skippedOrDeleted:skipped,activePlan:s.plans.find(p=>p.id===s.activePlanId)||null,activeTaskRules:s.taskRules.filter(r=>r.planId===s.activePlanId&&r.status==="active").map(r=>({title:r.title,taskType:r.taskType,target:r.target,period:r.period,preferredTime:r.preferredTime,tags:r.tags})),statGrowth:growth(s,30)},answers:s.aiConversation&&s.aiConversation.answers||[]});}
 function taskManagerMarkup(s){
- const tasks=s.tasks.filter(t=>t.taskDate===today()).sort((a,b)=>(a.timeOfDay==="evening"?1:0)-(b.timeOfDay==="evening"?1:0)||(Number(a.batchOrder)||0)-(Number(b.batchOrder)||0)||queueOrder(a,b));
+ const tasks=s.tasks.filter(t=>t.taskDate===today()&&t.status!=="deleted").sort((a,b)=>(a.timeOfDay==="evening"?1:0)-(b.timeOfDay==="evening"?1:0)||(Number(a.batchOrder)||0)-(Number(b.batchOrder)||0)||queueOrder(a,b));
  const status={pending:"Chờ",completed:"Đã xong",deferred:"Đã chuyển",inactive:"Phương án dự phòng",replaced:"Đã đổi",skipped:"Bỏ qua"};
  return '<section class="rpg-panel"><h2>Danh sách Task hôm nay</h2><form id="manual-task-form" class="rpg-manage-form"><input name="title" maxlength="140" placeholder="Nội dung Task" required><input name="tags" maxlength="180" placeholder="Tag chỉ số hoặc chủ đề (tùy chọn)"><select name="difficulty"><option>Easy</option><option selected>Normal</option><option>Hard</option><option>Epic</option></select><select name="timeOfDay"><option value="day">Ban ngày</option><option value="evening">Buổi tối</option></select><button class="btn-primary">Thêm Task thủ công</button></form><div class="rpg-manage-list">'+(tasks.length?tasks.map(t=>'<div class="rpg-manage-row"><span>'+esc(t.title)+' <small>· '+(t.timeOfDay==="evening"?"Buổi tối":"Ban ngày")+' · '+esc(status[t.status]||t.status)+'</small></span><button class="btn-ghost" data-remove-task="'+esc(t.id)+'" aria-label="Xóa '+esc(t.title)+'">Xóa</button></div>').join(""):'<div class="rpg-empty">Chưa có Task.</div>')+'</div></section>';
 }
