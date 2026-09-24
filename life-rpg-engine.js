@@ -31,16 +31,32 @@
     return {difficulty:level,xp:DIFFICULTY[level].xp,statEffects:effects,statTags:selected,usedDefaultTag:keys.length===0};
   }
   function stripFence(text){
-    const tick=String.fromCharCode(96).repeat(3), pattern=new RegExp("^"+tick+"(?:json)?\\s*|\\s*"+tick+"$","gi");
-    return String(text||"").trim().replace(pattern,"").trim();
+    return String(text||"").replace(/^\\uFEFF/,"").replace(/[\\u200B-\\u200D\\u2060]/g,"").trim()
+      .replace(/^```[a-zA-Z0-9_-]*\\s*/,"").replace(/\\s*```$/,"").trim();
+  }
+  function balancedJsonCandidates(source){
+    const out=[];
+    for(let start=0;start<source.length;start++){
+      const first=source[start];if(first!=="{"&&first!=="[")continue;
+      const stack=[];let quoted=false,escape=false;
+      for(let i=start;i<source.length;i++){
+        const c=source[i];
+        if(quoted){if(escape)escape=false;else if(c==="\\\\")escape=true;else if(c==='"')quoted=false;continue;}
+        if(c==='"'){quoted=true;continue;}
+        if(c==="{"||c==="[")stack.push(c);
+        else if(c==="}"||c==="]"){
+          const open=stack.pop();if((open==="{"&&c!=="}")||(open==="["&&c!=="]"))break;
+          if(!stack.length){out.push(source.slice(start,i+1));break;}
+        }
+      }
+    }
+    return out.sort(function(a,b){return b.length-a.length;});
   }
   function parseJson(text){
     const source=stripFence(text);
     try{return JSON.parse(source);}catch(_){}
-    const start=source.indexOf("{"),end=source.lastIndexOf("}");
-    if(start>=0&&end>start)return JSON.parse(source.slice(start,end+1));
-    const a=source.indexOf("["),b=source.lastIndexOf("]");
-    if(a>=0&&b>a){try{return JSON.parse(source.slice(a,b+1));}catch(_){}}
+    const candidates=balancedJsonCandidates(source);
+    for(let i=0;i<candidates.length;i++){try{return JSON.parse(candidates[i]);}catch(_){}}
     return null;
   }
   function splitTags(value){return(Array.isArray(value)?value.map(String):String(value||"").split(/[,;|]/)).map(function(tag){return tag.replace(/^#/,"").trim();}).filter(Boolean);}
@@ -74,11 +90,31 @@
     });
     return result;
   }
+  function firstValue(object,keys,fallback){
+    for(let i=0;i<keys.length;i++){const value=object&&object[keys[i]];if(value!==undefined&&value!==null)return value;}
+    return fallback;
+  }
+  function normalizeTask(raw){
+    if(typeof raw==="string")return{title:raw};
+    if(!raw||typeof raw!=="object"||Array.isArray(raw))return null;
+    const task=Object.assign({},raw);
+    task.title=firstValue(raw,["title","text","name","content","task"],"");
+    task.tags=firstValue(raw,["tags","tag","stats","statTags","stat_tags"],[]);
+    task.difficulty=firstValue(raw,["difficulty","level"],"Normal");
+    return task;
+  }
   function parse(text){
     const payload=parseJson(text);
     if(payload){
-      if(Array.isArray(payload))return{tasks:payload};
-      return{mainQuest:payload.mainQuest||payload.main_quest||null,weeklyQuests:payload.weeklyQuests||payload.weekly_quests||[],quests:payload.quests||[],tasks:payload.tasks||payload.dailyTasks||payload.daily_tasks||[],eveningTasks:payload.eveningTasks||payload.evening_tasks||[]};
+      if(Array.isArray(payload))return{tasks:payload.map(normalizeTask).filter(Boolean)};
+      if(typeof payload!=="object")return null;
+      const rawTasks=firstValue(payload,["tasks","dailyTasks","daily_tasks","taskList","task_list","dailyQuest","daily_quests","items"],[]);
+      const tasks=Array.isArray(rawTasks)?rawTasks.map(normalizeTask).filter(Boolean):(rawTasks&&typeof rawTasks==="object"?[normalizeTask(rawTasks)].filter(Boolean):[]);
+      const rawEvening=firstValue(payload,["eveningTasks","evening_tasks","nightTasks","night_tasks","replacementTasks","replacement_tasks"],[]);
+      const eveningTasks=Array.isArray(rawEvening)?rawEvening.map(normalizeTask).filter(Boolean):(rawEvening&&typeof rawEvening==="object"?[normalizeTask(rawEvening)].filter(Boolean):[]);
+      const weekly=firstValue(payload,["weeklyQuests","weekly_quests","weeklyQuest","weekly_quest"],[]);
+      const quests=firstValue(payload,["quests"],[]);
+      return{mainQuest:firstValue(payload,["mainQuest","main_quest","mainGoal","main_goal"],null),weeklyQuests:Array.isArray(weekly)?weekly:(weekly?[weekly]:[]),quests:Array.isArray(quests)?quests:[],tasks:tasks,eveningTasks:eveningTasks};
     }
     return parseTaggedText(text);
   }
@@ -86,16 +122,24 @@
     const ctx=context||{},stats=ctx.currentStats||{};
     const statsLine=STAT_KEYS.map(function(key){return key+":"+(Number(stats[key])||0);}).join(", ");
     return[
-      "Bạn là AI lập kế hoạch Daily Task cho ứng dụng Life RPG. Dựa trên hồ sơ bên dưới, hãy tạo 3, 6 hoặc 9 Task ban ngày cùng đúng số Task tối thay thế tương ứng (tổng tối đa 18 Task/ngày). Mỗi nhóm ban ngày gồm 3 Task; mỗi Task tối thay thế một Task ban ngày tương ứng.",
-      "Chỉ trả JSON hợp lệ, không markdown, theo schema:",
-      '{"mainQuest":{"title":"...","description":"..."},"weeklyQuests":[{"title":"...","description":"...","target":4,"mainQuest":"..."}],"tasks":[{"title":"...","description":"...","category":"...","tags":["SI","EN","YouTube"],"difficulty":"Normal","energyRole":"focus|movement|recovery|connection|reflection","mainQuest":"...","weeklyQuest":"...","reason":"..."}],"eveningTasks":[{"title":"...","replacesTask":"exact daytime task title","tags":["EQ","VIT"],"difficulty":"Easy","energyRole":"recovery","reason":"..."}]}',
-      "Quy tắc: mỗi task có 1–3 tag chỉ số chính xác trong SI, STR, EN, VIT, EQ, Y; có thể thêm tag chủ đề. Difficulty chỉ dùng Easy, Normal, Hard, Epic. Không gửi XP hay điểm Stats; ứng dụng tự tính theo tag và độ khó. Không chẩn đoán sức khỏe. VIT chỉ là chỉ số game hóa, không phải đánh giá y khoa. Đề xuất hành động cụ thể, an toàn, gắn mục tiêu và lịch sử. Không lặp lại Task gần đây; ưu tiên cách người dùng thường hoàn thành. Xếp các Task thành từng bộ ba liên tiếp có bổ trợ nhau: không quá một Task Hard/Epic trong mỗi bộ; có ít nhất một việc nhẹ hoặc hồi phục; phối hợp vai trò focus, movement, recovery, connection, reflection; tránh dồn ba việc tiêu hao cùng một kiểu năng lượng. Ưu tiên nhịp làm vừa sức, có khoảng thở, không đặt nhiều việc nặng liên tiếp. Mỗi Task ghi energyRole phù hợp. Mỗi eveningTask phải là phương án cụ thể, nhẹ nhàng, phù hợp buổi tối và có replacesTask trùng chính xác tiêu đề Task ban ngày. Chỉ thay các Task ban ngày chưa hoàn thành lúc 18:00 giờ địa phương; nếu ban ngày đã xong thì không cần mở Task tối. Task tối không được chỉ là đổi tên Task cũ.",
-      "Tên: "+String((ctx.userProfile||{}).name||"Player"),"Mục tiêu: "+(ctx.goals||[]).join("; "),
-      "Main Quest hiện tại: "+String((ctx.mainQuest||{}).title||"chưa có"),"Weekly Quest: "+String((ctx.weeklyQuest||{}).title||"chưa có"),
-      "Stats hiện tại: "+statsLine,"Tỷ lệ hoàn thành gần đây: "+Math.round((Number(ctx.completionRate)||0)*100)+"%",
-      "Task đã bỏ qua gần đây: "+(ctx.skippedTasks||[]).slice(-10).map(function(item){return item.title;}).join("; "),
-      "Growth 7 ngày: "+JSON.stringify(ctx.statGrowth||{}),"Lịch sử Task gần đây: "+JSON.stringify((ctx.recentTaskHistory||[]).slice(-20))
-    ].join("\n");
+      "Bạn là AI lập kế hoạch cá nhân cho ứng dụng Life RPG. Hãy tự phân tích dữ liệu người dùng và tự sáng tạo Quest/Task phù hợp riêng với họ. Không dùng danh sách gợi ý có sẵn, không lặp ví dụ hoặc mẫu Task.",
+      "Đầu ra phải là đúng một JSON object hợp lệ. Không markdown, không code fence, không lời dẫn/kết luận. Dùng dấu ngoặc kép ASCII cho chuỗi, không dấu phẩy thừa. Mọi danh sách phải là JSON array; nếu không có dữ liệu thì dùng array rỗng.",
+      "Schema: object gồm mainQuest (object có title, description hoặc null); weeklyQuests (array object có title, description, target, mainQuest); tasks (array object, mỗi phần tử có title, tags, difficulty, energyRole và có thể có description, category, mainQuest, weeklyQuest, reason); eveningTasks (array object, mỗi phần tử có title, replacesTask, tags, difficulty, energyRole và có thể có description, reason).",
+      "Tạo 3, 6 hoặc 9 Task ban ngày, luôn theo nhóm đủ 3; không bắt buộc chọn số lượng lớn. Với mỗi Task ban ngày tạo đúng một phương án buổi tối tương ứng trong eveningTasks. replacesTask phải khớp chính xác title của Task ban ngày. Tổng số phần tử hai danh sách không vượt quá 20.",
+      "Tự chọn nội dung dựa trên mục tiêu, hồ sơ, lịch sử và hoàn cảnh người dùng; ưu tiên Task cụ thể, khả thi, đa dạng, tránh trùng lặp. Không đưa Task chung chung hoặc nhiệm vụ không liên quan. Ghép mỗi nhóm 3 Task để bổ trợ nhau và giữ nhịp năng lượng vừa sức; tối đa một Task Hard/Epic trong nhóm, có việc nhẹ/hồi phục, không dồn các việc tiêu hao cùng kiểu năng lượng. Task buổi tối ngắn, nhẹ và phù hợp thời gian tối.",
+      "Mỗi Task có 1–3 tag chỉ số trong đúng các mã SI, STR, EN, VIT, EQ, Y; có thể thêm tag chủ đề liên quan. Difficulty chỉ dùng Easy, Normal, Hard, Epic. energyRole chỉ dùng focus, movement, recovery, connection, reflection. Không xuất XP hoặc điểm Stats vì ứng dụng tự tính theo tag và độ khó. Không đưa ra chẩn đoán y tế; VIT chỉ là chỉ số game hóa, không phải đánh giá y khoa.",
+      "Chọn Quest và Task cá nhân hóa, không mặc định mục tiêu hay lĩnh vực nào nếu dữ liệu người dùng không nêu. Nếu thiếu thông tin, tạo số Task ít hơn và an toàn thay vì tự bịa hồ sơ.",
+      "DỮ LIỆU NGƯỜI DÙNG:",
+      "Tên và tiến độ: "+JSON.stringify({name:(ctx.userProfile||{}).name||"Player",level:(ctx.userProfile||{}).level||1,xp:(ctx.userProfile||{}).xp||0}),
+      "Mục tiêu dài hạn: "+JSON.stringify(ctx.goals||[]),
+      "Main Quest hiện tại: "+JSON.stringify(ctx.mainQuest||null),
+      "Weekly Quest hiện tại: "+JSON.stringify(ctx.weeklyQuest||null),
+      "Stats hiện tại: "+statsLine,
+      "Tỷ lệ hoàn thành gần đây: "+Math.round((Number(ctx.completionRate)||0)*100)+"%",
+      "Task đã bỏ qua gần đây: "+JSON.stringify((ctx.skippedTasks||[]).slice(-10)),
+      "Tăng trưởng Stats 7 ngày: "+JSON.stringify(ctx.statGrowth||{}),
+      "Lịch sử Task gần đây: "+JSON.stringify((ctx.recentTaskHistory||[]).slice(-20))
+    ].join("\\n");
   }
   root.LifeRpgTaskEngine={statKeys:STAT_KEYS.slice(),difficulty:Object.assign({},DIFFICULTY),statTags:statTags,score:score,parse:parse,makePrompt:makePrompt,schema:{version:"life-rpg-tagged-import.v1",maxDailyTasks:20,statuses:["pending","completed","skipped"]}};
 })(window);
