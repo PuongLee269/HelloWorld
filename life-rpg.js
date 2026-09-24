@@ -10,7 +10,10 @@ const now=()=>new Date().toISOString();
 const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))||fallback;}catch(_){return fallback;}};
 function fresh(){const old=read(PROFILE,{}),stats={};KEYS.forEach(k=>stats[k]=10);return{schemaVersion:1,currentDate:today(),user:{name:old.name||"Player",goals:[]},level:Math.max(1,Number(old.level)||1),xp:Math.max(0,Number(old.xp)||0),stats,tasks:[],quests:[],history:[],preferences:{growthDays:7},bonuses:{},feedback:""};}
-function state(){const raw=read(STORE,null);if(!raw||raw.schemaVersion!==1)return fresh();const base=fresh(),s=Object.assign(base,raw);s.user=Object.assign(base.user,raw.user||{});s.stats=Object.assign(base.stats,raw.stats||{});s.preferences=Object.assign(base.preferences,raw.preferences||{});["tasks","quests","history"].forEach(k=>s[k]=Array.isArray(raw[k])?raw[k]:[]);s.tasks.forEach(t=>{if(t.status==="skipped")t.status="pending";});s.bonuses=raw.bonuses||{};return s;}
+function state(){const raw=read(STORE,null);if(!raw||raw.schemaVersion!==1)return fresh();const base=fresh(),s=Object.assign(base,raw);s.user=Object.assign(base.user,raw.user||{});s.stats=Object.assign(base.stats,raw.stats||{});s.preferences=Object.assign(base.preferences,raw.preferences||{});["tasks","quests","history"].forEach(k=>s[k]=Array.isArray(raw[k])?raw[k]:[]);s.tasks.forEach(t=>{if(t.status==="skipped")t.status="pending";});
+ const legacy=s.tasks.filter(t=>!t.batchId).sort((a,b)=>String(a.createdAt||"").localeCompare(String(b.createdAt||"")));
+ const legacyGroups={};legacy.forEach(t=>{const phase=t.timeOfDay==="evening"?"evening":"day",key=t.taskDate+":"+phase;let linked=null;if(phase==="evening"&&t.replacesTask)linked=legacy.find(x=>x.taskDate===t.taskDate&&x.timeOfDay!=="evening"&&x.title.toLowerCase()===t.replacesTask.toLowerCase());const order=linked?linked.batchOrder:(legacyGroups[key]||0);t.queueOrder=Number.isFinite(t.queueOrder)?t.queueOrder:order;t.batchOrder=Number.isFinite(t.batchOrder)?t.batchOrder:Math.floor(order/3);t.batchId=linked?linked.batchId:(t.taskDate+":"+phase+":"+t.batchOrder);if(!linked)legacyGroups[key]=order+1;});
+ s.bonuses=raw.bonuses||{};return s;}
 function save(s){s.updatedAt=now();localStorage.setItem(STORE,JSON.stringify(s));const p=read(PROFILE,{});p.name=s.user.name||p.name||"Player";p.level=s.level;p.xp=s.xp;try{localStorage.setItem(PROFILE,JSON.stringify(p));}catch(_){}try{if(window.renderHero)window.renderHero();if(window.scheduleAutoSync)window.scheduleAutoSync();}catch(_){}}
 function log(s,event){s.history.push(Object.assign({id:"event-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),at:now()},event));if(s.history.length>5000)s.history=s.history.slice(-5000);}
 function needed(level){return 100+Math.max(0,(Number(level)||1)-1)*50;}
@@ -29,14 +32,16 @@ function addQuest(s,type,raw){
  const parent=raw.mainQuest||raw.main_quest;if(type==="weekly"&&parent){const m=addQuest(s,"main",parent);quest.mainQuestId=m&&m.id;}
  s.quests.push(quest);log(s,{action:"quest_created",date:today(),questType:type,title,xpDelta:0,statDelta:{},reason:"Được nhập từ gói Quest AI."});return quest;
 }
-function makeTask(s,raw,index,date,forcedTime){
+function makeTask(s,raw,index,date,forcedTime,sequence){
  const title=String(raw.title||raw.text||"").trim();if(!title)return null;
  const tags=window.LifeRpgTaskEngine.statTags(raw.tags||raw.category||"");
  const score=window.LifeRpgTaskEngine.score(tags,raw.difficulty);
  const allTags=(Array.isArray(raw.tags)?raw.tags:String(raw.tags||"").split(/[,;|]/)).map(x=>String(x).trim()).filter(Boolean).slice(0,12);
+ const shift=forcedTime||(["day","evening"].includes(raw.timeOfDay)?raw.timeOfDay:"day");
+ const order=Number.isFinite(sequence)?sequence:(s.tasks.filter(t=>t.taskDate===date&&t.timeOfDay===shift).length+index),batchOrder=Math.floor(order/3);
  const main=raw.mainQuestId?s.quests.find(q=>q.id===raw.mainQuestId):s.quests.find(q=>q.type==="main"&&q.status==="active"&&raw.mainQuest&&q.title.toLowerCase()===String(raw.mainQuest).toLowerCase());
  const weekly=raw.weeklyQuestId?s.quests.find(q=>q.id===raw.weeklyQuestId):s.quests.find(q=>q.type==="weekly"&&q.status==="active"&&raw.weeklyQuest&&q.title.toLowerCase()===String(raw.weeklyQuest).toLowerCase());
- return{id:"task-"+Date.now()+"-"+index+"-"+Math.random().toString(36).slice(2,7),queueOrder:s.tasks.filter(t=>t.taskDate===date).length+index,title,description:String(raw.description||"").slice(0,300),category:String(raw.category||allTags.find(t=>KEYS.includes(t.toUpperCase()))||"Daily").slice(0,60),tags:allTags,difficulty:score.difficulty,timeOfDay:forcedTime||(["day","evening"].includes(raw.timeOfDay)?raw.timeOfDay:"day"),replacesTask:String(raw.replacesTask||"").slice(0,140),energyRole:["focus","movement","recovery","connection","reflection"].includes(raw.energyRole)?raw.energyRole:"focus",xp:score.xp,statEffects:score.statEffects,status:"pending",createdAt:now(),taskDate:date,completedAt:null,mainQuestId:main?main.id:null,weeklyQuestId:weekly?weekly.id:null,reason:String(raw.reason||"Được phân loại theo tag và chấm điểm trong ứng dụng.").slice(0,300),usedDefaultTag:score.usedDefaultTag};
+ return{id:"task-"+Date.now()+"-"+index+"-"+Math.random().toString(36).slice(2,7),queueOrder:order,batchOrder:batchOrder,batchId:date+":"+shift+":"+batchOrder,title,description:String(raw.description||"").slice(0,300),category:String(raw.category||allTags.find(t=>KEYS.includes(t.toUpperCase()))||"Daily").slice(0,60),tags:allTags,difficulty:score.difficulty,timeOfDay:shift,replacesTask:String(raw.replacesTask||"").slice(0,140),energyRole:["focus","movement","recovery","connection","reflection"].includes(raw.energyRole)?raw.energyRole:"focus",xp:score.xp,statEffects:score.statEffects,status:"pending",createdAt:now(),taskDate:date,completedAt:null,mainQuestId:main?main.id:null,weeklyQuestId:weekly?weekly.id:null,reason:String(raw.reason||"Được phân loại theo tag và chấm điểm trong ứng dụng.").slice(0,300),usedDefaultTag:score.usedDefaultTag};
 }
 function importPaste(text){
  const s=rollover(state()),parsed=window.LifeRpgTaskEngine.parse(text);
@@ -47,15 +52,19 @@ function importPaste(text){
  if(main)addQuest(s,"main",main);
  (parsed.weeklyQuests||[]).forEach(q=>addQuest(s,"weekly",q));
  (parsed.quests||[]).forEach(q=>{const type=String(q.type||"").toLowerCase();if(type==="main"||type==="weekly")addQuest(s,type,q);});
- const dayItems=parsed.tasks.slice(0,remaining).map(raw=>({raw:raw,time:"day"}));
+ const dayQueue=s.tasks.filter(t=>t.taskDate===date&&t.timeOfDay!=="evening"),dayBase=dayQueue.reduce((m,t)=>Math.max(m,Number(t.queueOrder)||0),-1)+1;
+ const dayItems=parsed.tasks.slice(0,remaining).map((raw,index)=>({raw:raw,time:"day",order:dayBase+index}));
  const dayNames=new Set(dayItems.map(x=>String(x.raw.title||x.raw.text||"").toLowerCase()));
- const alternatives=(parsed.eveningTasks||[]).filter(raw=>!raw.replacesTask||dayNames.has(String(raw.replacesTask).toLowerCase())).slice(0,Math.max(0,remaining-dayItems.length)).map(raw=>({raw:raw,time:"evening"}));
+ const alternatives=(parsed.eveningTasks||[]).filter(raw=>!raw.replacesTask||dayNames.has(String(raw.replacesTask).toLowerCase())).slice(0,Math.max(0,remaining-dayItems.length)).map((raw,index)=>{
+  const match=dayItems.find(x=>String(x.raw.title||x.raw.text||"").toLowerCase()===String(raw.replacesTask||"").toLowerCase());
+  return{raw:raw,time:"evening",order:match?match.order:dayBase+dayItems.length+index};
+ });
  const accepted=[],duplicates=[];
  dayItems.concat(alternatives).forEach((item,index)=>{
   const raw=item.raw,title=String(raw.title||raw.text||"").trim();if(!title)return;
   const exists=s.tasks.some(t=>t.taskDate===date&&t.title.toLowerCase()===title.toLowerCase());
   if(exists){duplicates.push(title);return;}
-  const task=makeTask(s,raw,index,date,item.time);if(task)accepted.push(task);
+  const task=makeTask(s,raw,index,date,item.time,item.order);if(task){if(item.time==="evening"){const linked=dayItems.find(x=>String(x.raw.title||x.raw.text||"").toLowerCase()===String(raw.replacesTask||"").toLowerCase());task.batchOrder=Math.floor(item.order/3);task.batchId=date+":evening:"+task.batchOrder;if(linked)task.batchId=date+":evening:"+Math.floor(linked.order/3);}accepted.push(task);}
  });
  if(!accepted.length)throw new Error(duplicates.length?"Các Task này đã có trong hôm nay.":"Không có Task hợp lệ.");
  s.tasks=s.tasks.concat(accepted);
@@ -103,7 +112,22 @@ function style(){return"<style>"+CSS+"</style>";}
 function taskCard(t){const checked=t.status==="completed"?" checked disabled":"";return'<label class="rpg-taskrow"><input type="checkbox" data-do="complete" data-id="'+esc(t.id)+'"'+checked+'><span>'+esc(t.title)+'</span></label>';}
 function bindTaskButtons(){document.querySelectorAll("[data-do=complete]").forEach(b=>b.onchange=()=>{if(b.checked)complete(b.dataset.id);});}
 function queueOrder(a,b){if(Number.isFinite(a.queueOrder)&&Number.isFinite(b.queueOrder))return a.queueOrder-b.queueOrder;return String(a.createdAt||"").localeCompare(String(b.createdAt||""))||String(a.id).localeCompare(String(b.id));}
-function currentBatch(s){const evening=timeOfDay()==="evening";let queue;if(evening&&s.eveningActivatedDate===today()){const night=s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay==="evening"&&(t.status==="pending"||t.status==="completed")).sort(queueOrder),leftovers=s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay!=="evening"&&t.status==="pending").sort(queueOrder);queue=night.concat(leftovers);}else queue=s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay!=="evening"&&(t.status==="pending"||t.status==="completed")).sort(queueOrder);for(let i=0;i<queue.length;i+=3){const batch=queue.slice(i,i+3);if(batch.length<3||batch.some(t=>t.status!=="completed"))return batch;}return[];}
+function firstPendingGroup(tasks){
+ const visible=tasks.filter(t=>!t.hiddenFromQueue&&(t.status==="pending"||t.status==="completed")),groups={};
+ visible.forEach(t=>{const key=t.batchId||t.taskDate+":"+t.timeOfDay+":"+Math.floor((Number(t.queueOrder)||0)/3);(groups[key]||(groups[key]=[])).push(t);});
+ const ordered=Object.keys(groups).map(key=>({key,items:groups[key],order:Math.min(...groups[key].map(t=>Number(t.batchOrder)||0))})).sort((a,b)=>a.order-b.order||a.key.localeCompare(b.key));
+ for(const group of ordered){if(group.items.some(t=>t.status==="pending"))return group.items.sort(queueOrder);}
+ return[];
+}
+function currentBatch(s){
+ const evening=timeOfDay()==="evening";
+ if(evening&&s.eveningActivatedDate===today()){
+  const night=firstPendingGroup(s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay==="evening"));
+  if(night.length)return night;
+  return firstPendingGroup(s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay!=="evening"&&t.status==="pending"));
+ }
+ return firstPendingGroup(s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay!=="evening"));
+}
 function renderTasks(s){
  const batch=currentBatch(s);
  view.innerHTML=style()+'<div class="rpg-wrap"><section class="rpg-panel"><div class="rpg-task-list">'+(batch.length?batch.map(t=>taskCard(t)).join(""):'<div class="rpg-empty">Đã hoàn thành toàn bộ Task hiện có. Nạp nhóm Task tiếp theo khi sẵn sàng.</div>')+'</div></section></div>';
