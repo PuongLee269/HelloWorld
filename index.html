@@ -2615,10 +2615,11 @@ function performDayRollover(opts={}){
         addXP(zoneEBonus);
       }
 
-      // Daily penalty
-      const { level: currentLevel } = getLevelInfo();
-      const dailyPenalty = getDailyPenalty(currentLevel);
-      addXP(dailyPenalty);
+      // Zone E rule: lose 6 E only when no task was completed today.
+      const zoneEDaily = zoneEDayStats();
+      if(zoneEDaily.completed === 0){
+        addXP(-6);
+      }
 
       const recsRaw = getRecurring();
       const recs = Array.isArray(recsRaw) ? recsRaw : [];
@@ -3365,6 +3366,7 @@ function ensureSettingsAuth(){
 function buildTabsBar(active){
   tabsBar.innerHTML = [
     {id:'tasks', label:'Nhiệm vụ', icon:'✅'},
+    {id:'import', label:'Nạp Task', icon:'📥'},
     {id:'stats', label:'Biểu đồ', icon:'📈'},
     {id:'notes', label:'Ghi chú', icon:'📝'},
     {id:'settings', label:'Settings', icon:'⚙️'}
@@ -3382,327 +3384,133 @@ function buildTabsBar(active){
 }
 
 /* TASKS */
+function zoneEDayStats(){
+  const key = "tq_zone_e_daily_stats_v1";
+  let value = load(key, null);
+  if(!value || value.day !== getDay()){
+    value = {day:getDay(), completed:0, bonus:false};
+    save(key, value);
+  }
+  return value;
+}
+function activeZoneETasks(queue){
+  const key = "tq_zone_e_active_v1";
+  let ids = load(key, []);
+  ids = Array.isArray(ids) ? ids : [];
+  let selected = ids.map(id=>queue.find(t=>String(t.id)===String(id))).filter(Boolean);
+  if(!selected.length){
+    selected = queue.filter(t=>!t.done).sort((a,b)=>(a.zoneEOrder||0)-(b.zoneEOrder||0)).slice(0,3);
+    ids = selected.map(t=>t.id);
+    save(key, ids);
+  }
+  return {ids, selected};
+}
+function safeText(value){
+  return String(value||"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
 async function viewTasks(){
-  spawnRecurringIfNeeded();
-
-  let zones=getZones();
-  const tasks=getTasks();
-  const noiseStore = getNoiseStreakStore();
-  const zoneEStore = getZoneEStreakStore();
-  const pointExtraStores = { noise: noiseStore, zoneE: zoneEStore };
-  const dateNowDM = todayDM();
-  let priorityZone = zones.find(z => z.kind === 'priority');
-
-  if (!priorityZone) {
-    const fallback = DEFAULT_ZONES.find(z=>z.kind==='priority') || {name: 'Zone Quan trọng', kind: 'priority', bg: ''};
-    const restored = {
-      id: Date.now(),
-      name: fallback.name,
-      kind: fallback.kind,
-      bg: fallback.bg
-    };
-    zones = [...zones, restored];
-    setZones(zones);
-    priorityZone = restored;
-    alert('Không tìm thấy Zone Quan trọng, hệ thống đã tạo mới để bạn tiếp tục.');
-  }
-
-  const groups = zones.map(z=>{
-    const zoneTasks = tasks
-      .filter(t=>t.zoneId==z.id)
-      .sort((a,b)=>{
-        if(a.kind===b.kind) return Number(a.done)-Number(b.done);
-        return a.kind==='recurring' ? -1 : 1;
-      });
-
-    const list = zoneTasks;
-    const activeList = list.filter(isTaskActiveToday);
-    const capacityList = list.filter(doesTaskOccupyCapacity);
-    const completedCount = list.filter(t=>t.done).length;
-    const totalCount = list.length;
-    return {
-      z,
-      list,
-      activeList,
-      capacityList,
-      activeDone: completedCount,
-      activeTotal: totalCount,
-      kindLabel: ZONE_KIND_LABELS[z.kind] || 'Zone',
-      progressText: totalCount ? `${completedCount}/${totalCount}` : '0'
-    };
+  const zones = getZones();
+  const zone = zones.find(z=>z.kind==="e") || zones[0];
+  if(!zone){ view.innerHTML="<p>Không tìm thấy Zone E.</p>"; return; }
+  const all = getTasks();
+  const tasks = all.filter(t=>Number(t.zoneId)===Number(zone.id));
+  tasks.forEach((task,index)=>{
+    task.points=1;
+    if(typeof task.zoneEOrder!=="number") task.zoneEOrder=index;
   });
+  setTasks(all);
+  const active = activeZoneETasks(tasks);
+  const stats = zoneEDayStats();
+  const {xp} = getLevelInfo();
+  const date = todayDM();
+  view.innerHTML =
+    '<div class="top"><span class="pill">Ngày: <b>'+safeText(date)+'</b></span>'+
+    '<span class="pill">Điểm: <b>'+xp+'</b></span>'+
+    '<span class="pill">Đã hoàn thành hôm nay: <b>'+stats.completed+'</b>/6</span>'+
+    (stats.bonus?'<span class="pill">Thưởng +3 E đã nhận</span>':'')+'</div>'+
+    '<div class="actions" style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap">'+
+    '<button class="btn-ghost" id="changeZoneETasks">Đổi 3 Task</button></div>'+
+    '<section class="zone"><header><div><b>Zone E</b> <span class="badge">Zone E</span></div>'+
+    '<div class="badge">'+tasks.filter(t=>active.ids.some(id=>String(id)===String(t.id))&&t.done).length+'/'+active.ids.length+'</div></header><ul>'+
+    (active.selected.length ? active.selected.map(task=>
+      '<li class="task '+(task.done?'done':'')+'" data-id="'+safeText(task.id)+'"><div class="task-inner"><div class="left">'+
+      '<input type="checkbox" data-id="'+safeText(task.id)+'" '+(task.done?'checked':'')+'>'+
+      '<span class="txt">'+safeText(task.text)+'</span><span class="task-points positive">+1 E</span>'+
+      '</div></div></li>').join('') :
+      '<li class="task"><div class="task-inner"><span class="muted">Chưa có task. Mở tab Nạp Task để dán danh sách.</span></div></li>')+
+    '</ul></section>';
 
-  view.innerHTML = `
-    <div class="top">
-      <span class="pill">Ngày: <b>${dateNowDM}</b></span>
-    </div>
-
-    <div class="creator">
-      <input id="taskText" placeholder="Thêm nhiệm vụ… (Enter)">
-      <select id="taskZone">${zones.map(z=>`<option value="${z.id}">${z.name}</option>`).join('')}</select>
-      <button class="btn-primary" id="btnAdd">Thêm</button>
-    </div>
-
-    <div class="modal-backdrop" id="taskCreateModal" hidden>
-      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="taskCreateTitle">
-        <h3 id="taskCreateTitle">Thêm nhiệm vụ</h3>
-        <form class="modal-form" id="taskCreateForm">
-          <label>
-            Mô tả task
-            <input id="taskModalText" required>
-          </label>
-          <label>
-            Zone
-            <select id="taskModalZone">${zones.map(z=>`<option value="${z.id}">${z.name}</option>`).join('')}</select>
-          </label>
-          <label>
-            Điểm task
-            <input id="taskModalPoints" type="number" step="1">
-          </label>
-          <label>
-            Loại task
-            <select id="taskModalType">
-              <option value="daily">daily</option>
-              <option value="single">single</option>
-            </select>
-          </label>
-          <div class="modal-actions">
-            <button type="button" class="btn-ghost" id="taskModalCancel">Hủy</button>
-            <button type="submit" class="btn-primary">Lưu task</button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    ${groups.map(g=>{
-      const z=g.z;
-      const headerClass = z.bg ? 'imgHead' : '';
-      const headerStyle = z.bg
-        ? `background-image:linear-gradient(0deg,rgba(0,0,0,.5),rgba(0,0,0,.15)),url('${z.bg}');`
-        : '';
-      const emptyStateHtml = `
-        <li class="task">
-          <div class="task-inner">
-            <span class="muted">Chưa có task trong Zone này.</span>
-          </div>
-        </li>`;
-
-      const listHtml = g.list.length
-        ? g.list.map(t=>{
-            const zoneEProgressHtml = z.kind === 'e'
-              ? renderZoneETaskProgress(t, zoneEStore)
-              : '';
-            const zoneNoiseProgressHtml = z.kind === 'noise'
-              ? renderZoneNoiseTaskProgress(t, noiseStore)
-              : '';
-            const progressHtml = zoneEProgressHtml || zoneNoiseProgressHtml;
-            return `
-              <li class="task ${t.done?'done':''}" data-id="${t.id}" data-kind="${t.kind||'single'}">
-                <div class="task-inner">
-                  <div class="left">
-                    <input type="checkbox" data-id="${t.id}" ${t.done?'checked':''}>
-                    <span class="txt">${t.text}</span>
-                    ${renderTaskKindBadge(t, z)}
-                    ${renderTaskPoints(t.points, t.aiReason, getTaskPointExtras(t, z.kind, pointExtraStores))}
-                  </div>
-                  ${progressHtml}
-                </div>
-                <button class="del-btn" data-id="${t.id}">×</button>
-              </li>
-            `;
-          }).join('')
-        : emptyStateHtml;
-
-      return `
-      <section class="zone">
-        <header class="${headerClass}" style="${headerStyle}">
-          <div><b>${z.name}</b> <span class="badge">${g.kindLabel}</span></div>
-          <div class="badge">${g.progressText}</div>
-        </header>
-        <ul>
-          ${listHtml}
-        </ul>
-      </section>`;
-    }).join('')}
-  `;
-
-  const inp = document.getElementById('taskText');
-  const sel = document.getElementById('taskZone');
-  const taskModal = document.getElementById('taskCreateModal');
-  const taskModalForm = document.getElementById('taskCreateForm');
-  const taskModalText = document.getElementById('taskModalText');
-  const taskModalZone = document.getElementById('taskModalZone');
-  const taskModalPoints = document.getElementById('taskModalPoints');
-  const taskModalType = document.getElementById('taskModalType');
-  const taskModalCancel = document.getElementById('taskModalCancel');
-
-  const getNormalizedPointsForZone = (zoneKind, pointsOverride)=>{
-    const fallback = getDefaultPointsForZoneKind(zoneKind);
-    const overridePoints = Number(pointsOverride);
-    const basePoints = Number.isFinite(overridePoints) ? overridePoints : fallback;
-    return normalizeRecurringPointsForZoneKind(basePoints, zoneKind);
-  };
-
-  const syncTaskModalPoints = ()=>{
-    const zone = zones.find(z=>z.id==Number(taskModalZone.value));
-    const zoneKind = zone ? zone.kind : 'regular';
-    taskModalPoints.value = String(getNormalizedPointsForZone(zoneKind, taskModalPoints.value));
-  };
-
-  const closeTaskModal = ()=>{
-    taskModal.hidden = true;
-  };
-
-  const openTaskModal = ()=>{
-    taskModalText.value = inp.value.trim();
-    taskModalZone.value = sel.value;
-    taskModalType.value = DAILY_ZONE_KINDS.has(zones.find(z=>z.id==Number(sel.value))?.kind) ? 'daily' : 'single';
-    syncTaskModalPoints();
-    taskModal.hidden = false;
-    requestAnimationFrame(()=>taskModalText.focus());
-  };
-
-  async function createTaskForZone(textInput, zoneId, taskType, pointsOverride){
-    const text=(textInput||'').trim(); if(!text) return false;
-    const z = zones.find(z=>z.id==zoneId);
-    if(!z) return false;
-
-    const normalizedTaskType = taskType === 'daily' ? 'daily' : 'single';
-    const currentTasks = getTasks();
-    const basePoints = getNormalizedPointsForZone(z.kind, pointsOverride);
-    const newTasks = [...currentTasks];
-
-    if(normalizedTaskType === 'daily'){
-      const recs = getRecurring();
-      const existingRec = recs.find(r=>r.zoneId==z.id && r.type==='daily' && (r.text||'')===text);
-      let rec = existingRec;
-      if(!rec){
-        rec = await addRecurring({
-          text,
-          zoneId:z.id,
-          type:'daily',
-          autoKind:z.kind,
-          points: basePoints
-        });
-      }else{
-        let recChanged = false;
-        const nextRec = { ...rec };
-        if(Number(nextRec.points) !== basePoints){
-          nextRec.points = basePoints;
-          recChanged = true;
-        }
-        if('reason' in nextRec){
-          delete nextRec.reason;
-          recChanged = true;
-        }
-        if(z.kind === 'noise'){
-          const noiseBase = clampNoiseBasePoints(basePoints);
-          if(nextRec.noiseBasePoints !== noiseBase){
-            nextRec.noiseBasePoints = noiseBase;
-            recChanged = true;
-          }
-        }else if('noiseBasePoints' in nextRec){
-          delete nextRec.noiseBasePoints;
-          recChanged = true;
-        }
-        if(recChanged){
-          const updatedRecs = recs.map(r=>r.id===rec.id?nextRec:r);
-          save(LS.RECUR, updatedRecs);
-          rec = nextRec;
-        }
-      }
-      const duplicate = newTasks.some(t=>t.zoneId==z.id && t.kind==='recurring' && t.recurringId===rec.id);
-      if(!duplicate){
-        newTasks.push({
-          id: Date.now() + Math.random(),
-          text,
-          zoneId: z.id,
-          done: false,
-          kind: 'recurring',
-          recurringId: rec.id,
-          points: normalizeRecurringPointsForZoneKind(rec.points, z.kind)
-        });
-      }
-    } else {
-      newTasks.push({
-        id: Date.now(),
-        text,
-        zoneId: z.id,
-        done: false,
-        kind: 'single',
-        points: basePoints
-      });
-    }
-
-    setTasks(newTasks);
-    return true;
-  }
-
-  async function addNow(){
-    openTaskModal();
-  }
-
-  taskModalZone.onchange = syncTaskModalPoints;
-  taskModalPoints.onchange = syncTaskModalPoints;
-  taskModalCancel.onclick = closeTaskModal;
-  taskModal.onclick = (e)=>{
-    if(e.target === taskModal){
-      closeTaskModal();
-    }
-  };
-  taskModalForm.onsubmit = async (e)=>{
-    e.preventDefault();
-    const success = await createTaskForZone(taskModalText.value, Number(taskModalZone.value), taskModalType.value, taskModalPoints.value);
-    if(success){
-      inp.value='';
-      sel.value = taskModalZone.value;
-      closeTaskModal();
-      render('tasks');
-    }
-  };
-
-  document.getElementById('btnAdd').onclick = addNow;
-  inp.onkeydown=(e)=>{ if(e.key==='Enter'){ e.preventDefault(); addNow(); } };
-
-  window.onkeydown=(e)=>{
-    const tag=(document.activeElement?.tagName||'').toLowerCase();
-    if(e.key==='Tab' && !['input','select','textarea','button'].includes(tag)){
-      e.preventDefault();
-      inp.focus();
-    }
-  };
-
-  // tick task
-  view.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
+  view.querySelectorAll('input[type="checkbox"][data-id]').forEach(cb=>{
     cb.onchange=()=>{
-      const id = Number(cb.dataset.id);
-      const list = getTasks();
-      const index = list.findIndex(task=>task.id===id);
-      if(index<0) return;
-
-      const original = list[index];
-      const updated = { ...original, done: cb.checked };
-      const delta = cb.checked ? (Number(original.points) || 0) : -(Number(original.points) || 0);
-      const zone = zones.find(z=>z.id==updated.zoneId);
-      const zoneKind = zone ? zone.kind : '';
-
-      const nextTasks = list.map(task=>task.id===id?updated:task);
-      addXP(delta);
-      setTasks(nextTasks);
-
-      if(cb.checked){
-        if(isArchiveEligibleKind(zoneKind)){
-          archiveTaskCompletion(updated, zone);
+      const id=String(cb.dataset.id);
+      const list=getTasks();
+      const index=list.findIndex(t=>String(t.id)===id);
+      if(index<0)return;
+      if(cb.checked && !list[index].done){
+        list[index]={...list[index],done:true,points:1};
+        setTasks(list);
+        addXP(1);
+        const daily=zoneEDayStats();
+        daily.completed+=1;
+        if(daily.completed>=6&&!daily.bonus){
+          daily.bonus=true;
+          addXP(3);
         }
-      }else{
-        removeTaskFromArchive(updated.text);
+        save("tq_zone_e_daily_stats_v1",daily);
+        const group=load("tq_zone_e_active_v1",[]);
+        if(group.length&&group.every(taskId=>list.some(t=>String(t.id)===String(taskId)&&t.done))){
+          save("tq_zone_e_active_v1",[]);
+        }
       }
-
-      render('tasks');
+      render("tasks");
     };
   });
+  const change=document.getElementById("changeZoneETasks");
+  change.onclick=()=>{
+    const pending=tasks.filter(t=>!t.done).sort((a,b)=>(a.zoneEOrder||0)-(b.zoneEOrder||0));
+    if(!pending.length){alert("Không còn task chưa hoàn thành.");return;}
+    const current=load("tq_zone_e_active_v1",[]);
+    const currentSet=new Set(current.map(String));
+    const start=pending.findIndex(t=>!currentSet.has(String(t.id)));
+    const rotated=start<0?pending:pending.slice(start).concat(pending.slice(0,start));
+    const next=rotated.slice(0,3).map(t=>t.id);
+    save("tq_zone_e_active_v1",next);
+    render("tasks");
+  };
+}
 
-  attachSwipeHandlersForTasks();
+function viewTaskImport(){
+  const zones=getZones();
+  const zone=zones.find(z=>z.kind==="e")||zones[0];
+  const tasks=zone?getTasks().filter(t=>Number(t.zoneId)===Number(zone.id)):[];
+  view.innerHTML='<section class="card" style="margin-top:0"><h3>Nạp Task từ ChatGPT</h3>'+
+    '<p class="muted">Dán danh sách bên dưới. Mỗi dòng bắt đầu bằng dấu - sẽ thành một task trong Zone E.</p>'+
+    '<textarea id="zoneETaskPaste" rows="9" placeholder="- Chuẩn bị bài\\n- Tập thể dục\\n- Đọc sách"></textarea>'+
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px">'+
+    '<button class="btn-primary" id="importZoneETasks">Nạp Task</button><span class="muted">Task đang có: '+tasks.length+'</span></div>'+
+    '<p class="muted" id="zoneEImportMessage" aria-live="polite"></p></section>';
+  document.getElementById("importZoneETasks").onclick=()=>{
+    const input=document.getElementById("zoneETaskPaste");
+    const lines=input.value.split(/\r?\n/);
+    const parsed=lines.map(line=>line.match(/^\s*-\s*(.+?)\s*$/)).filter(Boolean).map(match=>match[1]);
+    const message=document.getElementById("zoneEImportMessage");
+    if(!parsed.length){message.textContent="Không tìm thấy dòng nào bắt đầu bằng dấu -.";return;}
+    const zonesNow=getZones();
+    const zoneNow=zonesNow.find(z=>z.kind==="e")||zonesNow[0];
+    const all=getTasks();
+    const existing=all.filter(t=>Number(t.zoneId)===Number(zoneNow.id));
+    let order=existing.reduce((max,t)=>Math.max(max,Number(t.zoneEOrder)||0),-1)+1;
+    parsed.forEach((text,index)=>all.push({
+      id:Date.now()+index+Math.random(),
+      text,zoneId:zoneNow.id,done:false,kind:"single",points:1,zoneEOrder:order+index
+    }));
+    setTasks(all);
+    if(!load("tq_zone_e_active_v1",[]).length){
+      const queue=all.filter(t=>Number(t.zoneId)===Number(zoneNow.id)&&!t.done).sort((a,b)=>a.zoneEOrder-b.zoneEOrder);
+      save("tq_zone_e_active_v1",queue.slice(0,3).map(t=>t.id));
+    }
+    render("import");
+  };
 }
 
 function formatArchiveDisplayTime(iso){
@@ -4340,6 +4148,10 @@ function render(tab){
   if(tab==='tasks'){
     syncDayWithCalendar();
     viewTasks();
+    return;
+  }
+  if(tab==='import'){
+    viewTaskImport();
     return;
   }
 
