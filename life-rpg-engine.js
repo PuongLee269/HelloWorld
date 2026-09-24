@@ -1,208 +1,99 @@
-/* Life RPG daily-task engine.
- * Provider boundary: generateWithProvider() is the only function that needs
- * replacing when a hosted model/API is introduced. The local provider is usable offline.
- */
+/* Life RPG tagged-task importer and deterministic scoring rules. */
 (function (root) {
   "use strict";
-
   const STAT_KEYS = ["SI", "STR", "EN", "VIT", "EQ", "Y"];
-  const DIFFICULTY_XP = { Easy: 15, Normal: 30, Hard: 55, Epic: 85 };
-  const DIFFICULTY_XP_RANGES = { Easy:[10,20], Normal:[25,40], Hard:[45,65], Epic:[70,100] };
-  const DIFFICULTY_STAT_BUDGET = { Easy:3, Normal:4, Hard:6, Epic:9 };
-  const STAT_COPY = {
-    SI: "Tư duy, học tập và sáng tạo",
-    STR: "Sức khỏe và thể lực",
-    EN: "Sức bền và khả năng duy trì",
-    VIT: "Vitality trong trò chơi",
-    EQ: "Cân bằng cảm xúc",
-    Y: "Nội tâm và sự tĩnh tâm"
+  const DIFFICULTY = { Easy:{xp:15,stats:[1,1,0]}, Normal:{xp:30,stats:[2,1,0]}, Hard:{xp:55,stats:[3,2,1]}, Epic:{xp:85,stats:[4,3,2]} };
+  const ALIASES = {
+    SI:["si","intelligence","learning","learn","study","education","knowledge","research","writing","reading","creativity","creative","planning","strategy","problem solving","analysis","language","critical thinking","tu duy","hoc tap","sang tao","nghien cuu","doc sach","lap ke hoach"],
+    STR:["str","strength","fitness","exercise","workout","movement","sport","sports","training","physical","running","walking","mobility","the luc","van dong","tap luyen","chay bo","di bo","suc khoe"],
+    EN:["en","endurance","consistency","discipline","focus","persistence","execution","habit","deep work","deepwork","follow through","resilience","suc ben","ki luat","tap trung","thoi quen","kien tri","thuc thi"],
+    VIT:["vit","vitality","recovery","rest","sleep routine","routine","energy care","wellbeing routine","phuc hoi","nghi ngoi","ngu","duong suc","nang luong"],
+    EQ:["eq","emotional","emotion","empathy","mindfulness","journaling","relationship","balance","stress management","self awareness","communication","cam xuc","dong cam","can bang","quan he","giao tiep","viet nhat ky"],
+    Y:["y","spirituality","spiritual","meditation","prayer","gratitude","values","purpose","reflection","inner growth","noi tam","tinh tam","thien","cau nguyen","biet on","gia tri","muc dich","suy ngam"]
   };
-  const CATALOG = [
-    { title:"Đọc hoặc học tập trung 20 phút", description:"Chọn một chủ đề đang phục vụ mục tiêu của bạn.", category:"Learning", tags:["learning","focus"], effects:{SI:2,EN:1}, difficulty:"Easy" },
-    { title:"Viết lại một ý tưởng thành ghi chú ngắn", description:"Tóm tắt điều bạn vừa học bằng lời của mình.", category:"Learning", tags:["learning","writing"], effects:{SI:2,EQ:1}, difficulty:"Easy" },
-    { title:"Hoàn thành một phiên làm việc tập trung 25 phút", description:"Chọn một việc quan trọng và tắt các xao nhãng.", category:"Work", tags:["focus","work"], effects:{EN:2,SI:1}, difficulty:"Normal" },
-    { title:"Đi bộ nhẹ ngoài trời 15 phút", description:"Đi theo nhịp thoải mái, dừng lại nếu thấy không ổn.", category:"Movement", tags:["movement","recovery"], effects:{STR:2,VIT:1}, difficulty:"Easy" },
-    { title:"Vận động có chủ đích trong 25 phút", description:"Chọn hoạt động phù hợp với thể trạng và không gian của bạn.", category:"Movement", tags:["movement","fitness"], effects:{STR:3,EN:1}, difficulty:"Normal" },
-    { title:"Chuẩn bị một khoảng nghỉ không màn hình", description:"Để điện thoại sang bên và nghỉ ngơi có chủ đích.", category:"Recovery", tags:["recovery","routine"], effects:{VIT:2,EQ:1}, difficulty:"Easy" },
-    { title:"Hoàn tất việc nhỏ bạn đã trì hoãn", description:"Chọn một việc có thể hoàn tất trong 15 phút.", category:"Consistency", tags:["consistency","focus"], effects:{EN:2,EQ:1}, difficulty:"Normal" },
-    { title:"Viết vài dòng về cảm xúc hôm nay", description:"Ghi nhận điều đang diễn ra mà không cần phán xét.", category:"Reflection", tags:["reflection","wellbeing"], effects:{EQ:2,Y:1}, difficulty:"Easy" },
-    { title:"Dành 10 phút tĩnh tâm hoặc cầu nguyện", description:"Chọn cách thực hành phù hợp với niềm tin của bạn.", category:"Reflection", tags:["reflection","mindfulness"], effects:{Y:2,EQ:1}, difficulty:"Easy" },
-    { title:"Lên kế hoạch cho ba bước tiếp theo của mục tiêu", description:"Chuyển mục tiêu dài hạn thành các hành động nhỏ.", category:"Planning", tags:["planning","goals"], effects:{SI:2,EN:1}, difficulty:"Normal" },
-    { title:"Hoàn thành một đầu việc quan trọng trong ngày", description:"Tập trung vào một kết quả cụ thể có thể kiểm tra.", category:"Work", tags:["work","consistency"], effects:{EN:2,SI:1}, difficulty:"Hard" },
-    { title:"Chia sẻ hoặc hoàn thiện một sản phẩm sáng tạo", description:"Đưa một phần công việc sáng tạo đến trạng thái có thể xem được.", category:"Creativity", tags:["creativity","publishing"], effects:{SI:2,EN:2}, difficulty:"Hard" },
-    { title:"Dành 30 phút làm bước tiếp theo của Main Quest", description:"Chọn một kết quả nhỏ có thể hoàn tất trong phiên này.", category:"Main Quest", tags:["goals","focus"], effects:{SI:2,EN:2}, difficulty:"Normal", questRelated:true },
-    { title:"Thực hiện một phiên tập trung sâu 45 phút", description:"Chia phiên làm việc thành các phần nghỉ ngắn nếu cần.", category:"Focus", tags:["focus","consistency"], effects:{EN:3,SI:2}, difficulty:"Epic" }
-  ];
-
-  function clampNumber(value, min, max, fallback) {
-    const number = Number(value);
-    return Number.isFinite(number) ? Math.max(min, Math.min(max, number)) : fallback;
+  function normalizeText(value) {
+    const text=String(value||"");
+    return text.normalize ? text.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/đ/g,"d").toLowerCase().replace(/[_-]+/g," ").trim() : text.toLowerCase().trim();
   }
-
-  function cleanEffects(value, difficulty) {
-    const source = value && typeof value === "object" ? value : {};
-    const result = {};
-    let remaining = DIFFICULTY_STAT_BUDGET[difficulty] || DIFFICULTY_STAT_BUDGET.Normal;
-    STAT_KEYS.forEach(function (key) {
-      if (Object.keys(result).length >= 3 || remaining <= 0) return;
-      const requested = Math.round(clampNumber(source[key], 0, 5, 0));
-      const delta = Math.min(requested, remaining);
-      if (delta > 0) {
-        result[key] = delta;
-        remaining -= delta;
+  function unique(values){return values.filter(function(value,index){return values.indexOf(value)===index;});}
+  function statTags(tags){
+    const found=[];
+    (Array.isArray(tags)?tags:String(tags||"").split(/[,;|]/)).forEach(function(tag){
+      const value=normalizeText(tag).replace(/^#/,"");
+      STAT_KEYS.forEach(function(key){if(ALIASES[key].indexOf(value)>=0||value===key.toLowerCase())found.push(key);});
+    });
+    return unique(found).slice(0,3);
+  }
+  function score(tags,difficulty){
+    const level=DIFFICULTY[difficulty]?difficulty:"Normal";
+    const keys=statTags(tags), selected=keys.length?keys:["EN"], amounts=DIFFICULTY[level].stats, effects={};
+    selected.forEach(function(key,index){if(amounts[index]>0)effects[key]=amounts[index];});
+    return {difficulty:level,xp:DIFFICULTY[level].xp,statEffects:effects,statTags:selected,usedDefaultTag:keys.length===0};
+  }
+  function stripFence(text){
+    const tick=String.fromCharCode(96).repeat(3), pattern=new RegExp("^"+tick+"(?:json)?\\s*|\\s*"+tick+"$","gi");
+    return String(text||"").trim().replace(pattern,"").trim();
+  }
+  function parseJson(text){
+    const source=stripFence(text);
+    try{return JSON.parse(source);}catch(_){}
+    const start=source.indexOf("{"),end=source.lastIndexOf("}");
+    if(start>=0&&end>start)return JSON.parse(source.slice(start,end+1));
+    const a=source.indexOf("["),b=source.lastIndexOf("]");
+    if(a>=0&&b>a)return JSON.parse(source.slice(a,b+1));
+    return null;
+  }
+  function splitTags(value){return(Array.isArray(value)?value.map(String):String(value||"").split(/[,;|]/)).map(function(tag){return tag.replace(/^#/,"").trim();}).filter(Boolean);}
+  function parseTaggedText(text){
+    const result={mainQuest:null,weeklyQuests:[],tasks:[]};let current=null;
+    String(text||"").split(/\r?\n/).forEach(function(line){
+      const trimmed=line.trim();if(!trimmed)return;
+      let match=trimmed.match(/^\[(MAIN QUEST|WEEKLY QUEST|TASK)\]\s*(.*)$/i);
+      if(match){
+        const kind=match[1].toUpperCase(),title=match[2].replace(/^[-*]\s*/,"").trim();
+        if(kind==="MAIN QUEST")result.mainQuest={title:title};
+        else if(kind==="WEEKLY QUEST"){current={title:title,target:4};result.weeklyQuests.push(current);}
+        else{current={title:title,tags:[]};result.tasks.push(current);}
+        return;
       }
+      match=trimmed.match(/^[-*]\s+(.+)$/);
+      if(match){current={title:match[1].trim(),tags:[]};result.tasks.push(current);return;}
+      if(!current)return;
+      match=trimmed.match(/^(tags?|difficulty|description|main quest|weekly quest|reason|category)\s*:\s*(.*)$/i);
+      if(!match)return;
+      const key=normalizeText(match[1]),value=match[2].trim();
+      if(key==="tag"||key==="tags")current.tags=splitTags(value);
+      else if(key==="difficulty")current.difficulty=value;
+      else if(key==="description")current.description=value;
+      else if(key==="main quest")current.mainQuest=value;
+      else if(key==="weekly quest")current.weeklyQuest=value;
+      else if(key==="reason")current.reason=value;
+      else if(key==="category")current.category=value;
     });
     return result;
   }
-
-  function normalizeTask(raw, index, context, date) {
-    const item = raw && typeof raw === "object" ? raw : {};
-    const difficulty = DIFFICULTY_XP[item.difficulty] ? item.difficulty : "Normal";
-    const effects = cleanEffects(item.statEffects || item.effects, difficulty);
-    if (!Object.keys(effects).length) effects.EN = 1;
-    const tags = Array.isArray(item.tags) ? item.tags.map(String).map(function (tag) { return tag.trim().slice(0, 40); }).filter(Boolean).slice(0, 8) : [];
-    const mainQuest = context && context.mainQuest;
-    return {
-      id: String(item.id || ("task-" + Date.now() + "-" + index + "-" + Math.random().toString(36).slice(2, 8))),
-      title: String(item.title || item.text || "Nhiệm vụ mới").trim().slice(0, 140),
-      description: String(item.description || "").trim().slice(0, 240),
-      category: String(item.category || "Daily").trim().slice(0, 48),
-      tags: tags,
-      difficulty: difficulty,
-      xp: Math.round(clampNumber(item.xp, DIFFICULTY_XP_RANGES[difficulty][0], DIFFICULTY_XP_RANGES[difficulty][1], DIFFICULTY_XP[difficulty])),
-      statEffects: effects,
-      status: "pending",
-      createdAt: item.createdAt || new Date().toISOString(),
-      taskDate: date,
-      completedAt: null,
-      mainQuestId: item.mainQuestId || (mainQuest && mainQuest.id) || null,
-      weeklyQuestId: item.weeklyQuestId || (context && context.weeklyQuest && context.weeklyQuest.id) || null,
-      reason: String(item.reason || "Được chọn từ mục tiêu và thói quen của bạn.").trim().slice(0, 240)
-    };
-  }
-
-  function preferenceScore(context, item) {
-    const behavior = context && context.behavior || {};
-    const category = behavior.categoryRates && behavior.categoryRates[item.category];
-    const difficulty = behavior.difficultyRates && behavior.difficultyRates[item.difficulty];
-    return (category ? category.rate * 2 : 0) + (difficulty ? difficulty.rate : 0);
-  }
-
-  function statFocus(context, item) {
-    const stats = context && context.currentStats || {};
-    const allValues = STAT_KEYS.map(function (key) { return Number(stats[key]) || 0; });
-    const average = allValues.reduce(function (sum, value) { return sum + value; }, 0) / Math.max(1, allValues.length);
-    const effects = item.effects;
-    return Object.keys(effects).reduce(function (sum, key) {
-      return sum + Math.max(-5, Math.min(10, average - (Number(stats[key]) || 0))) * effects[key];
-    }, 0);
-  }
-
-  function goalScore(context, item) {
-    const mainQuest = context && context.mainQuest;
-    const goalText = [mainQuest && mainQuest.title, ...(context && context.goals || [])].join(" ").toLowerCase();
-    const words = goalText.split(/[^a-z0-9\u00C0-\u024F]+/i).filter(function (word) { return word.length > 3; });
-    const haystack = (item.title + " " + item.description + " " + item.tags.join(" ")).toLowerCase();
-    return words.reduce(function (score, word) { return score + (haystack.includes(word) ? 4 : 0); }, item.questRelated ? 2 : 0);
-  }
-
-  function contextSummary(context) {
-    const stats = context && context.currentStats || {};
-    const weak = STAT_KEYS.slice().sort(function (a, b) { return (Number(stats[a]) || 0) - (Number(stats[b]) || 0); }).slice(0, 2);
-    return weak;
-  }
-
-  function parseDate(value) {
-    const parts = String(value || "").split("-").map(Number);
-    if (parts.length !== 3) return new Date();
-    return new Date(parts[0], parts[1]-1, parts[2]);
-  }
-
-  function generateLocal(context, count, date) {
-    const history = Array.isArray(context && context.recentTaskHistory) ? context.recentTaskHistory : [];
-    const currentDate = parseDate(date);
-    currentDate.setDate(currentDate.getDate() - 7);
-    const cutoffDate = currentDate.getFullYear() + "-" + String(currentDate.getMonth()+1).padStart(2,"0") + "-" + String(currentDate.getDate()).padStart(2,"0");
-    const recentTitles = new Set(history.filter(function (event) {
-      return (event.action === "completed" || event.action === "skipped") && String(event.date || "") >= cutoffDate;
-    }).map(function (event) { return String(event.title || "").toLowerCase(); }));
-    const available = CATALOG.filter(function (item) {
-      return !recentTitles.has(item.title.toLowerCase());
-    });
-    const focus = contextSummary(context);
-    available.sort(function (a, b) {
-      return (statFocus(context, b) - statFocus(context, a)) +
-        (goalScore(context, b) - goalScore(context, a)) +
-        (preferenceScore(context, b) - preferenceScore(context, a)) +
-        (focus.some(function (key) { return b.effects[key]; }) ? 0.5 : 0) -
-        (focus.some(function (key) { return a.effects[key]; }) ? 0.5 : 0);
-    });
-    const chosen = available.slice(0, Math.max(0, count));
-    const mainQuest = context && context.mainQuest;
-    return chosen.map(function (item, index) {
-      let title = item.title;
-      let description = item.description;
-      let reason = "Phù hợp với hồ sơ, chỉ số hiện tại và lịch sử hoạt động.";
-      if (item.questRelated && mainQuest) {
-        description = "Dành một phiên ngắn để làm bước tiếp theo: " + mainQuest.title + ".";
-        reason = "Task này gắn trực tiếp với Main Quest hiện tại của bạn.";
-      }
-      return normalizeTask({
-        title: title,
-        description: description,
-        category: item.category,
-        tags: item.tags,
-        difficulty: item.difficulty,
-        xp: DIFFICULTY_XP[item.difficulty],
-        statEffects: item.effects,
-        reason: reason
-      }, index, context, date);
-    });
-  }
-
-  async function generateWithProvider(context, count, date, endpoint) {
-    const url = String(endpoint || "").trim();
-    if (!url) return generateLocal(context, count, date);
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        schema: "life-rpg-daily-tasks.v1",
-        requestedCount: count,
-        taskDate: date,
-        context: context,
-        responseFormat: {
-          type: "array",
-          maxItems: 20,
-          fields: ["id", "title", "description", "category", "tags", "difficulty", "xp", "statEffects", "status", "createdAt", "taskDate", "completedAt", "mainQuestId", "reason"]
-        },
-        safety: "VIT is a game statistic, never a medical diagnosis. Do not create diagnostic or treatment advice."
-      })
-    });
-    if (!response.ok) throw new Error("Task AI endpoint returned " + response.status);
-    const payload = await response.json();
-    const items = Array.isArray(payload) ? payload : (Array.isArray(payload.tasks) ? payload.tasks : null);
-    if (!items) throw new Error("Task AI response must contain a tasks array");
-    return items.slice(0, count).map(function (task, index) { return normalizeTask(task, index, context, date); }).filter(function (task) { return task.title; });
-  }
-
-  function generate(context, count, date, endpoint) {
-    const requested = Math.max(0, Math.min(20, Math.floor(Number(count) || 0)));
-    return generateWithProvider(context || {}, requested, date || new Date().toISOString().slice(0, 10), endpoint);
-  }
-
-  root.LifeRpgTaskEngine = {
-    statKeys: STAT_KEYS.slice(),
-    statCopy: Object.assign({}, STAT_COPY),
-    difficultyXp: Object.assign({}, DIFFICULTY_XP),
-    difficultyXpRanges: Object.assign({}, DIFFICULTY_XP_RANGES),
-    normalizeTask: normalizeTask,
-    generate: generate,
-    generateLocal: generateLocal,
-    schema: {
-      version: "life-rpg-daily-tasks.v1",
-      statuses: ["pending", "completed", "skipped"],
-      maxDailyTasks: 20
+  function parse(text){
+    const payload=parseJson(text);
+    if(payload){
+      if(Array.isArray(payload))return{tasks:payload};
+      return{mainQuest:payload.mainQuest||payload.main_quest||null,weeklyQuests:payload.weeklyQuests||payload.weekly_quests||[],quests:payload.quests||[],tasks:payload.tasks||payload.dailyTasks||payload.daily_tasks||[]};
     }
-  };
+    return parseTaggedText(text);
+  }
+  function makePrompt(context){
+    const ctx=context||{},stats=ctx.currentStats||{};
+    const statsLine=STAT_KEYS.map(function(key){return key+":"+(Number(stats[key])||0);}).join(", ");
+    return[
+      "Bạn là AI lập kế hoạch Daily Task cho ứng dụng Life RPG. Dựa trên hồ sơ bên dưới, hãy tạo 3–8 task phù hợp (tối đa 20 task/ngày), ưu tiên ít nhưng có thể hoàn thành.",
+      "Chỉ trả JSON hợp lệ, không markdown, theo schema:",
+      '{"mainQuest":{"title":"...","description":"..."},"weeklyQuests":[{"title":"...","description":"...","target":4,"mainQuest":"..."}],"tasks":[{"title":"...","description":"...","category":"...","tags":["SI","EN","YouTube"],"difficulty":"Normal","mainQuest":"...","weeklyQuest":"...","reason":"..."}]}',
+      "Quy tắc: mỗi task có 1–3 tag chỉ số chính xác trong SI, STR, EN, VIT, EQ, Y; có thể thêm tag chủ đề. Difficulty chỉ dùng Easy, Normal, Hard, Epic. Không gửi XP hay điểm Stats; ứng dụng tự tính theo tag và độ khó. Không chẩn đoán sức khỏe. VIT chỉ là chỉ số game hóa, không phải đánh giá y khoa. Đề xuất hành động cụ thể, an toàn, gắn mục tiêu và lịch sử. Không lặp lại task gần đây; ưu tiên cách làm người dùng thường hoàn thành và hỗ trợ Stats yếu có liên quan mục tiêu.",
+      "Tên: "+String((ctx.userProfile||{}).name||"Player"),"Mục tiêu: "+(ctx.goals||[]).join("; "),
+      "Main Quest hiện tại: "+String((ctx.mainQuest||{}).title||"chưa có"),"Weekly Quest: "+String((ctx.weeklyQuest||{}).title||"chưa có"),
+      "Stats hiện tại: "+statsLine,"Tỷ lệ hoàn thành gần đây: "+Math.round((Number(ctx.completionRate)||0)*100)+"%",
+      "Task đã bỏ qua gần đây: "+(ctx.skippedTasks||[]).slice(-10).map(function(item){return item.title;}).join("; "),
+      "Growth 7 ngày: "+JSON.stringify(ctx.statGrowth||{}),"Lịch sử Task gần đây: "+JSON.stringify((ctx.recentTaskHistory||[]).slice(-20))
+    ].join("\n");
+  }
+  root.LifeRpgTaskEngine={statKeys:STAT_KEYS.slice(),difficulty:Object.assign({},DIFFICULTY),statTags:statTags,score:score,parse:parse,makePrompt:makePrompt,schema:{version:"life-rpg-tagged-import.v1",maxDailyTasks:20,statuses:["pending","completed","skipped"]}};
 })(window);
