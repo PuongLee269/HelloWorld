@@ -254,12 +254,14 @@
     if(count>=20){alert("Đã đạt giới hạn 20 task hôm nay.");return;}
     const main=s.quests.find(function (quest) { return quest.id===mainId; });
     const weekly=s.quests.find(function (quest) { return quest.id===weeklyId; });
-    s.tasks.push({
+    const task={
       id:"task-"+Date.now()+"-"+Math.random().toString(36).slice(2,8),
       title:text,description:"Task do bạn tự thêm.",category:"Daily",tags:["custom"],difficulty:"Normal",xp:30,
       statEffects:{EN:1},status:"pending",createdAt:isoNow(),taskDate:date,completedAt:null,
       mainQuestId:main?main.id:null,weeklyQuestId:weekly?weekly.id:null,reason:"Bạn chủ động thêm task này."
-    });
+    };
+    s.tasks.push(task);
+    addHistory(s,{action:"created",date:date,taskId:task.id,title:task.title,category:task.category,tags:task.tags,difficulty:task.difficulty,xpDelta:0,statDelta:{},mainQuestId:task.mainQuestId,weeklyQuestId:task.weeklyQuestId,reason:task.reason});
     s.feedback="";
     saveState(s);
     render("dashboard");
@@ -436,7 +438,7 @@
       '<section class="rpg-panel"><div class="rpg-stats-top"><h2>Growth · '+growthDays+' ngày</h2><div class="rpg-toggle"><button class="btn-ghost" data-growth="7">7 ngày</button><button class="btn-ghost" data-growth="30">30 ngày</button></div></div>'+radarValuesHtml(s,growth,true)+'</section></div>'+
       '<section class="rpg-panel"><div class="rpg-stats-top"><div><h2>Task hôm nay</h2><div class="rpg-muted">'+generatedLine+' · '+pending+' đang chờ</div></div><div class="rpg-actions"><button class="btn-primary" id="rpg-generate" '+(allTaskCount>=20||busy?"disabled":"")+'>Tạo Daily Task</button></div></div>'+
       (s.feedback?'<p class="rpg-feedback">'+esc(s.feedback)+'</p>':'')+
-      '<form id="rpg-add-task" class="rpg-main-form"><input name="title" maxlength="140" placeholder="Thêm hành động của tôi..." required><select name="mainQuest"><option value="">Không gắn Main Quest</option>'+s.quests.filter(function(q){return q.type==="main"&&q.status==="active";}).map(function(q){return '<option value="'+esc(q.id)+'">'+esc(q.title)+'</option>';}).join("")+'</select><button class="btn-ghost">Thêm Daily Task (+30 XP)</button></form>'+
+      '<form id="rpg-add-task" class="rpg-main-form"><input name="title" maxlength="140" placeholder="Thêm hành động của tôi..." required><select name="mainQuest"><option value="">Không gắn Main Quest</option>'+s.quests.filter(function(q){return q.type==="main"&&q.status==="active";}).map(function(q){return '<option value="'+esc(q.id)+'">'+esc(q.title)+'</option>';}).join("")+'</select><select name="weeklyQuest"><option value="">Không gắn Weekly Quest</option>'+s.quests.filter(function(q){return q.type==="weekly"&&q.status==="active";}).map(function(q){return '<option value="'+esc(q.id)+'">'+esc(q.title)+'</option>';}).join("")+'</select><button class="btn-ghost">Thêm Daily Task (+30 XP)</button></form>'+
       '<div class="rpg-task-list">'+(tasks.length?tasks.map(taskCard).join(""):'<div class="rpg-empty">Chưa có task. Tạo task hôm nay để bắt đầu vòng lặp RPG.</div>')+'</div></section>'+
       '<section class="rpg-panel"><div class="rpg-stats-top"><div><h2>Quest Board</h2><div class="rpg-muted">Daily task → Weekly Quest → Main Quest</div></div></div>'+mainQuestMarkup(s)+'</section>'+
       '<section class="rpg-panel"><div class="rpg-stats-top"><h2>Lịch sử tiến trình</h2><span class="rpg-muted">Các thay đổi XP và Stats đã lưu</span></div><div class="rpg-history">'+
@@ -453,13 +455,15 @@
       const next=state();next.preferences.growthDays=Number(button.dataset.growth)||7;saveState(next);render("dashboard");
     };});
     const addForm=document.getElementById("rpg-add-task");
-    if(addForm)addForm.onsubmit=function(event){event.preventDefault();createManualTask(addForm.elements.title.value,addForm.elements.mainQuest.value,"");};
+    if(addForm)addForm.onsubmit=function(event){event.preventDefault();createManualTask(addForm.elements.title.value,addForm.elements.mainQuest.value,addForm.elements.weeklyQuest.value);};
     const mainForm=document.getElementById("rpg-main-form");
     if(mainForm)mainForm.onsubmit=function(event){
       event.preventDefault();const title=mainForm.elements.title.value.trim();if(!title)return;
       const next=state();next.quests.forEach(function(q){if(q.type==="main"&&q.status==="active")q.status="completed";});
       const quest={id:"quest-"+Date.now(),type:"main",title:title,description:mainForm.elements.description.value.trim(),status:"active",createdAt:isoNow()};
-      next.quests.push(quest);next.feedback="Đã cập nhật Main Quest. Task tiếp theo sẽ cân nhắc mục tiêu này.";
+      next.quests.push(quest);
+      addHistory(next,{action:"quest_created",date:dateKey(),title:quest.title,questType:"main",xpDelta:0,statDelta:{},reason:"Đặt Main Quest."});
+      next.feedback="Đã cập nhật Main Quest. Task tiếp theo sẽ cân nhắc mục tiêu này.";
       saveState(next);render("dashboard");
     };
     const weeklyForm=document.getElementById("rpg-weekly-form");
@@ -467,7 +471,9 @@
       event.preventDefault();const title=weeklyForm.elements.title.value.trim();if(!title)return;
       const next=state();next.quests.forEach(function(q){if(q.type==="weekly"&&q.status==="active")q.status="completed";});
       const quest={id:"quest-"+Date.now(),type:"weekly",title:title,target:Math.max(1,number(weeklyForm.elements.target.value)||4),status:"active",createdAt:isoNow(),mainQuestId:(currentQuest(next,"main")||{}).id||null};
-      next.quests.push(quest);next.feedback="Đã tạo Weekly Quest.";
+      next.quests.push(quest);
+      addHistory(next,{action:"quest_created",date:dateKey(),title:quest.title,questType:"weekly",xpDelta:0,statDelta:{},reason:"Đặt Weekly Quest."});
+      next.feedback="Đã tạo Weekly Quest.";
       saveState(next);render("dashboard");
     };
   }
@@ -515,7 +521,7 @@
     saveState(first);
   }
   try { if(typeof window.stopDaySyncMonitoring==="function")window.stopDaySyncMonitoring(); } catch (_) {}
-  window.LifeRpg={render:render,rollover:rolloverForLegacy,state:state,completeTask:completeTask,generateTasks:generateTasks,contextFor:contextFor};
+  window.LifeRpg={render:render,rollover:rolloverForLegacy,state:state,completeTask:completeTask,skipTask:skipTask,generateTasks:generateTasks,contextFor:contextFor};
   window.render=function(tab){render(tab);};
   render("dashboard");
   if(!state().tasks.some(function(task){return task.taskDate===dateKey();}))generateTasks();
