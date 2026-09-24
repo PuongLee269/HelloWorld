@@ -106,8 +106,11 @@
 
   function generateLocal(context, count, date) {
     const history = Array.isArray(context && context.recentTaskHistory) ? context.recentTaskHistory : [];
+    const currentDate = parseDate(date);
+    currentDate.setDate(currentDate.getDate() - 7);
+    const cutoffDate = currentDate.getFullYear() + "-" + String(currentDate.getMonth()+1).padStart(2,"0") + "-" + String(currentDate.getDate()).padStart(2,"0");
     const recentTitles = new Set(history.filter(function (event) {
-      return event.action === "completed" || event.action === "skipped";
+      return (event.action === "completed" || event.action === "skipped") && String(event.date || "") >= cutoffDate;
     }).map(function (event) { return String(event.title || "").toLowerCase(); }));
     const available = CATALOG.filter(function (item) {
       return !recentTitles.has(item.title.toLowerCase());
