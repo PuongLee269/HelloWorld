@@ -7,6 +7,8 @@
 
   const STAT_KEYS = ["SI", "STR", "EN", "VIT", "EQ", "Y"];
   const DIFFICULTY_XP = { Easy: 15, Normal: 30, Hard: 55, Epic: 85 };
+  const DIFFICULTY_XP_RANGES = { Easy:[10,20], Normal:[25,40], Hard:[45,65], Epic:[70,100] };
+  const DIFFICULTY_STAT_BUDGET = { Easy:3, Normal:4, Hard:6, Epic:9 };
   const STAT_COPY = {
     SI: "Tư duy, học tập và sáng tạo",
     STR: "Sức khỏe và thể lực",
@@ -37,20 +39,26 @@
     return Number.isFinite(number) ? Math.max(min, Math.min(max, number)) : fallback;
   }
 
-  function cleanEffects(value) {
+  function cleanEffects(value, difficulty) {
     const source = value && typeof value === "object" ? value : {};
     const result = {};
+    let remaining = DIFFICULTY_STAT_BUDGET[difficulty] || DIFFICULTY_STAT_BUDGET.Normal;
     STAT_KEYS.forEach(function (key) {
-      const delta = Math.round(clampNumber(source[key], 0, 5, 0));
-      if (delta > 0) result[key] = delta;
+      if (Object.keys(result).length >= 3 || remaining <= 0) return;
+      const requested = Math.round(clampNumber(source[key], 0, 5, 0));
+      const delta = Math.min(requested, remaining);
+      if (delta > 0) {
+        result[key] = delta;
+        remaining -= delta;
+      }
     });
-    return Object.keys(result).length <= 3 ? result : Object.fromEntries(Object.entries(result).slice(0, 3));
+    return result;
   }
 
   function normalizeTask(raw, index, context, date) {
     const item = raw && typeof raw === "object" ? raw : {};
     const difficulty = DIFFICULTY_XP[item.difficulty] ? item.difficulty : "Normal";
-    const effects = cleanEffects(item.statEffects || item.effects);
+    const effects = cleanEffects(item.statEffects || item.effects, difficulty);
     if (!Object.keys(effects).length) effects.EN = 1;
     const tags = Array.isArray(item.tags) ? item.tags.map(String).map(function (tag) { return tag.trim().slice(0, 40); }).filter(Boolean).slice(0, 8) : [];
     const mainQuest = context && context.mainQuest;
@@ -61,7 +69,7 @@
       category: String(item.category || "Daily").trim().slice(0, 48),
       tags: tags,
       difficulty: difficulty,
-      xp: Math.round(clampNumber(item.xp, 1, 200, DIFFICULTY_XP[difficulty])),
+      xp: Math.round(clampNumber(item.xp, DIFFICULTY_XP_RANGES[difficulty][0], DIFFICULTY_XP_RANGES[difficulty][1], DIFFICULTY_XP[difficulty])),
       statEffects: effects,
       status: "pending",
       createdAt: item.createdAt || new Date().toISOString(),
@@ -187,6 +195,7 @@
     statKeys: STAT_KEYS.slice(),
     statCopy: Object.assign({}, STAT_COPY),
     difficultyXp: Object.assign({}, DIFFICULTY_XP),
+    difficultyXpRanges: Object.assign({}, DIFFICULTY_XP_RANGES),
     normalizeTask: normalizeTask,
     generate: generate,
     generateLocal: generateLocal,
