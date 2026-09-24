@@ -89,7 +89,7 @@ function ensurePlanTasks(s){
   const bounds=periodBounds(rule,date,s),periodDays=Math.max(1,dateDiff(bounds.start,bounds.end)+1),dayIndex=Math.max(0,Math.min(periodDays-1,dateDiff(bounds.start,date)));
   const done=ruleCompleted(s,rule,date),todayRows=s.tasks.filter(t=>t.taskDate===date&&t.ruleId===rule.id);
   const outstanding=s.tasks.filter(t=>t.ruleId===rule.id&&t.taskDate<date&&t.status==="pending");
-  outstanding.forEach(t=>{t.status="deferred";t.deferredAt=now();log(s,{action:"rescheduled",date,taskId:t.id,ruleId:rule.id,title:t.title,xpDelta:0,statDelta:{},reason:"Task chưa hoàn thành được giữ trong lịch sử và xét lại theo hạn mức của chu kỳ."});changed=true;});
+  outstanding.forEach(t=>{const oldDate=t.taskDate,phase=rulePhase(rule),order=s.tasks.filter(x=>x.taskDate===date&&x.timeOfDay===phase).reduce((m,x)=>Math.max(m,Number(x.queueOrder)||0),-1)+1;t.originalTaskDate=t.originalTaskDate||oldDate;t.taskDate=date;t.timeOfDay=phase;t.queueOrder=order;t.batchOrder=Math.floor(order/3);t.batchId=date+":"+phase+":"+t.batchOrder;t.rescheduledAt=now();todayRows.push(t);log(s,{action:"rescheduled",date,taskId:t.id,ruleId:rule.id,title:t.title,fromDate:oldDate,xpDelta:0,statDelta:{},reason:"Task chưa hoàn thành được chuyển sang ngày phù hợp tiếp theo."});changed=true;});
   let count=0;
   if(rule.taskType==="daily"){
    count=Math.max(0,Math.max(1,Number(rule.target)||1)-todayRows.length);
@@ -99,8 +99,8 @@ function ensurePlanTasks(s){
     const total=oneTime.length,ordinal=oneTimeIndex.get(rule.id)||0,idealDay=Math.floor((ordinal+1)*periodDays/(total+1));
     due=dayIndex>=idealDay;
    }else{
-    const target=Math.max(1,Number(rule.target)||1),dueByToday=Math.floor((dayIndex+1)*target/periodDays),daysLeft=periodDays-dayIndex,pending=s.tasks.filter(t=>t.ruleId===rule.id&&t.taskDate>=bounds.start&&t.taskDate<=bounds.end&&t.status==="pending").length,committed=done+pending;
-    due=committed<dueByToday||(target-committed)>=daysLeft;
+    const target=Math.max(1,Number(rule.target)||1),dueByToday=Math.floor((dayIndex+1)*target/periodDays),daysLeft=periodDays-dayIndex,attempted=s.tasks.filter(t=>t.ruleId===rule.id&&t.taskDate>=bounds.start&&t.taskDate<=bounds.end&&t.status!=="replaced"&&t.status!=="deferred").length;
+    due=attempted<dueByToday||(target-done)>=daysLeft;
    }
    if(due)count=1;
   }
@@ -180,7 +180,7 @@ function complete(id){
  t.status="completed";t.completedAt=now();const effects={};
  Object.keys(t.statEffects||{}).forEach(k=>{if(KEYS.includes(k)){const amount=Math.max(0,Math.min(5,Math.round(Number(t.statEffects[k])||0)));if(amount){s.stats[k]=(Number(s.stats[k])||0)+amount;effects[k]=amount;}}});
  addXp(s,t.xp);
- log(s,{action:"completed",date:today(),taskId:t.id,ruleId:t.ruleId||null,title:t.title,category:t.category,tags:t.tags,difficulty:t.difficulty,xpDelta:t.xp,statDelta:effects,mainQuestId:t.mainQuestId,weeklyQuestId:t.weeklyQuestId,reason:t.reason,createdAt:t.createdAt,completedAt:t.completedAt});
+ log(s,{action:"completed",date:today(),taskId:t.id,ruleId:t.ruleId||null,title:t.title,category:t.category,tags:t.tags,difficulty:t.difficulty,xpDelta:t.xp,statDelta:effects,mainQuestId:t.mainQuestId,weeklyQuestId:t.weeklyQuestId,reason:t.reason,createdAt:t.createdAt,completedAt:t.completedAt,originalTaskDate:t.originalTaskDate||t.taskDate});
  let bonus=0;if(completedToday(s,today())>=6&&!s.bonuses["six-tasks:"+today()]){s.bonuses["six-tasks:"+today()]=true;bonus=3;addXp(s,bonus);log(s,{action:"daily_bonus",date:today(),title:"Thưởng hoàn thành 6 Task",xpDelta:bonus,statDelta:{}});}
  s.feedback="+"+t.xp+" XP · "+taskEffectsLine(effects)+(bonus?" · Thưởng +3 XP":"");save(s);render("tasks");
 }
