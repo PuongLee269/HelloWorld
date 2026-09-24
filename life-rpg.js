@@ -194,21 +194,22 @@ function swapTasks(mode){
  let replacements=[];
  const plan=s.plans.find(p=>p.id===s.activePlanId&&p.status==="active");
  if(plan){
-  const excludedRules=new Set(group.map(t=>t.ruleId).filter(Boolean)),recentCutoff=dateAdd(today(),-3),usedRecently=new Set(s.history.filter(e=>e.ruleId&&e.date>=recentCutoff&&["created","completed","skipped","task_swapped_in"].includes(e.action)).map(e=>e.ruleId));
-  const rules=s.taskRules.filter(r=>{
+  const excludedRules=new Set(group.map(t=>t.ruleId).filter(Boolean)),groupIds=new Set(group.map(t=>t.id)),recentCutoff=dateAdd(today(),-3),usedRecently=new Set(s.history.filter(e=>e.ruleId&&e.date>=recentCutoff&&["completed","skipped","task_swapped_in","task_deleted"].includes(e.action)).map(e=>e.ruleId));
+  const choices=s.taskRules.filter(r=>{
    if(r.planId!==plan.id||r.status!=="active"||excludedRules.has(r.id)||usedRecently.has(r.id))return false;
    if((phase==="evening"&&r.preferredTime!=="evening"&&r.preferredTime!=="any")||(phase!=="evening"&&r.preferredTime==="evening"))return false;
-   if(s.tasks.some(t=>t.taskDate===today()&&t.ruleId===r.id&&t.status!=="replaced"&&t.status!=="deferred"))return false;
-   return ruleCompleted(s,r,today())<Math.max(1,Number(r.target)||1);
+   const existing=s.tasks.find(t=>t.taskDate===today()&&t.ruleId===r.id&&!groupIds.has(t.id)&&!t.hiddenFromQueue&&t.status==="pending");
+   return !!existing||ruleCompleted(s,r,today())<Math.max(1,Number(r.target)||1);
   }).sort((a,b)=>{
    const pref=r=>r.preferredTime===phase||r.preferredTime==="any"?0:1;
    return pref(a)-pref(b)||String(a.createdAt).localeCompare(String(b.createdAt));
   });
-  rules.slice(0,targets.length).forEach((rule,index)=>{
+  choices.slice(0,targets.length).forEach((rule,index)=>{
+   const existing=s.tasks.find(t=>t.taskDate===today()&&t.ruleId===rule.id&&!groupIds.has(t.id)&&!t.hiddenFromQueue&&t.status==="pending");
+   if(existing){replacements.push(existing);return;}
    const order=s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay===phase).reduce((m,t)=>Math.max(m,Number(t.queueOrder)||0),-1)+1;
    const next=ruleOccurrence(s,rule,today(),index,phase,order);if(next){s.tasks.push(next);log(s,{action:"created",date:today(),taskId:next.id,ruleId:rule.id,title:next.title,timeOfDay:phase,xpDelta:0,statDelta:{},reason:"Task được chọn từ rule của gói kế hoạch khi đổi Task."});replacements.push(next);}
-  });
- }else{
+  }); }else{
   const ids=new Set(group.map(t=>t.id));
   const candidates=s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay===phase&&!ids.has(t.id)&&!t.hiddenFromQueue&&(phase==="evening"?(t.status==="pending"||t.status==="inactive"):t.status==="pending")).sort((a,b)=>(Number(a.batchOrder)||0)-(Number(b.batchOrder)||0)||queueOrder(a,b));
   replacements=candidates.slice(0,targets.length);
