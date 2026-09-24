@@ -2587,6 +2587,7 @@ function handleResetPoints(){
 }
 
 function performDayRollover(opts={}){
+  if(window.LifeRpg){ return window.LifeRpg.rollover(opts); }
   const auto=!!opts.auto;
   if(isRolloverRunning) return false;
   isRolloverRunning=true;
@@ -4121,6 +4122,7 @@ function viewSettings(){
 let currentTab='tasks';
 
 function render(tab){
+  if(window.LifeRpg){ window.LifeRpg.render(tab); return; }
   currentTab = tab;
   renderHero();
   buildTabsBar(tab);
@@ -4170,5 +4172,7 @@ if(lbTimer===null){
   }, 60000);
 }
 </script>
+<script src="./life-rpg-engine.js"></script>
+<script src="./life-rpg.js"></script>
 </body>
 </html>
