@@ -9,11 +9,28 @@ const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth
 const now=()=>new Date().toISOString();
 const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))||fallback;}catch(_){return fallback;}};
-function fresh(){const old=read(PROFILE,{}),stats={};KEYS.forEach(k=>stats[k]=10);return{schemaVersion:1,currentDate:today(),user:{name:old.name||"Player",goals:[]},level:Math.max(1,Number(old.level)||1),xp:Math.max(0,Number(old.xp)||0),stats,tasks:[],quests:[],history:[],preferences:{growthDays:7},bonuses:{},feedback:""};}
-function state(){const raw=read(STORE,null);if(!raw||raw.schemaVersion!==1)return fresh();const base=fresh(),s=Object.assign(base,raw);s.user=Object.assign(base.user,raw.user||{});s.stats=Object.assign(base.stats,raw.stats||{});s.preferences=Object.assign(base.preferences,raw.preferences||{});["tasks","quests","history"].forEach(k=>s[k]=Array.isArray(raw[k])?raw[k]:[]);s.tasks.forEach(t=>{if(t.status==="skipped")t.status="pending";});
+function fresh(){const old=read(PROFILE,{}),stats={};KEYS.forEach(k=>stats[k]=10);return{schemaVersion:2,currentDate:today(),user:{name:old.name||"Player",goals:[]},level:Math.max(1,Number(old.level)||1),xp:Math.max(0,Number(old.xp)||0),stats,tasks:[],taskRules:[],plans:[],activePlanId:null,planStart:null,planEnd:null,aiConversation:null,quests:[],history:[],preferences:{growthDays:7},bonuses:{},feedback:""};}
+function state(){
+ const raw=read(STORE,null);if(!raw||![1,2].includes(raw.schemaVersion))return fresh();
+ const base=fresh(),s=Object.assign(base,raw);s.schemaVersion=2;
+ s.user=Object.assign(base.user,raw.user||{});s.stats=Object.assign(base.stats,raw.stats||{});s.preferences=Object.assign(base.preferences,raw.preferences||{});
+ ["tasks","taskRules","plans","quests","history"].forEach(k=>s[k]=Array.isArray(raw[k])?raw[k]:[]);
+ s.tasks.forEach(t=>{
+  if(t.status==="skipped")t.status="pending";
+  if(!t.taskType)t.taskType="one_time";
+  if(!Number.isFinite(Number(t.target)))t.target=1;
+  if(!t.period)t.period="month";
+  if(!t.preferredTime)t.preferredTime=t.timeOfDay==="evening"?"evening":"any";
+ });
+ s.taskRules.forEach(r=>{
+  if(!r.taskType)r.taskType="one_time";if(!Number.isFinite(Number(r.target)))r.target=1;
+  if(!r.period)r.period=r.taskType==="daily"?"day":r.taskType==="weekly"?"week":"month";
+  if(!r.preferredTime)r.preferredTime="any";if(!r.status)r.status="active";
+ });
  const legacy=s.tasks.filter(t=>!t.batchId).sort((a,b)=>String(a.createdAt||"").localeCompare(String(b.createdAt||"")));
  const legacyGroups={};legacy.forEach(t=>{const phase=t.timeOfDay==="evening"?"evening":"day",key=t.taskDate+":"+phase;let linked=null;if(phase==="evening"&&t.replacesTask)linked=legacy.find(x=>x.taskDate===t.taskDate&&x.timeOfDay!=="evening"&&x.title.toLowerCase()===t.replacesTask.toLowerCase());const order=linked?linked.batchOrder:(legacyGroups[key]||0);t.queueOrder=Number.isFinite(t.queueOrder)?t.queueOrder:order;t.batchOrder=Number.isFinite(t.batchOrder)?t.batchOrder:Math.floor(order/3);t.batchId=linked?linked.batchId:(t.taskDate+":"+phase+":"+t.batchOrder);if(!linked)legacyGroups[key]=order+1;});
- s.bonuses=raw.bonuses||{};return s;}
+ s.bonuses=raw.bonuses||{};s.plans=s.plans||[];s.aiConversation=s.aiConversation||null;return s;
+}
 function save(s){s.updatedAt=now();localStorage.setItem(STORE,JSON.stringify(s));const p=read(PROFILE,{});p.name=s.user.name||p.name||"Player";p.level=s.level;p.xp=s.xp;try{localStorage.setItem(PROFILE,JSON.stringify(p));}catch(_){}try{if(window.renderHero)window.renderHero();if(window.scheduleAutoSync)window.scheduleAutoSync();}catch(_){}}
 function log(s,event){s.history.push(Object.assign({id:"event-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),at:now()},event));if(s.history.length>5000)s.history=s.history.slice(-5000);}
 function needed(level){return 100+Math.max(0,(Number(level)||1)-1)*50;}
