@@ -274,6 +274,8 @@
     const remaining=Math.max(0,20-todayTasks.length);
     if(!remaining){alert("Hôm nay đã có đủ 20 task.");return;}
     const requested=Math.min(8,remaining);
+    s.generationAttemptDate=today;
+    saveState(s);
     busy=true;
     render("dashboard");
     try {
@@ -509,6 +511,12 @@
       tabsBar.querySelectorAll("[data-rpg-tab]").forEach(function(button){button.onclick=function(){render(button.dataset.rpgTab);};});
     }
     if(activeTab==="profile")renderProfile();else renderDashboard();
+    const latest=state();
+    if(activeTab==="dashboard"&&!busy&&latest.generationAttemptDate!==dateKey()&&!latest.tasks.some(function(task){return task.taskDate===dateKey();})){
+      latest.generationAttemptDate=dateKey();
+      saveState(latest);
+      Promise.resolve().then(generateTasks);
+    }
   }
   function rolloverForLegacy(opts) {
     const s=rollover(state());
@@ -524,6 +532,8 @@
   window.LifeRpg={render:render,rollover:rolloverForLegacy,state:state,completeTask:completeTask,skipTask:skipTask,generateTasks:generateTasks,contextFor:contextFor};
   window.render=function(tab){render(tab);};
   render("dashboard");
-  if(!state().tasks.some(function(task){return task.taskDate===dateKey();}))generateTasks();
+  window.setInterval(function(){
+    if(state().currentDate!==dateKey())render(activeTab);
+  },60000);
   window.addEventListener("storage",function(event){if(event.key===STORE)render(activeTab);});
 })();
