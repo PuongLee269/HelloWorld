@@ -99,8 +99,8 @@ function ensurePlanTasks(s){
     const total=oneTime.length,ordinal=oneTimeIndex.get(rule.id)||0,idealDay=Math.floor((ordinal+1)*periodDays/(total+1));
     due=dayIndex>=idealDay;
    }else{
-    const target=Math.max(1,Number(rule.target)||1),dueBeforeToday=Math.floor(dayIndex*target/periodDays),dueByToday=Math.floor((dayIndex+1)*target/periodDays),daysLeft=periodDays-dayIndex;
-    const scheduledToday=dueByToday>dueBeforeToday;due=scheduledToday||done<dueBeforeToday||(target-done)>=daysLeft;
+    const target=Math.max(1,Number(rule.target)||1),dueByToday=Math.floor((dayIndex+1)*target/periodDays),daysLeft=periodDays-dayIndex,pending=s.tasks.filter(t=>t.ruleId===rule.id&&t.taskDate>=bounds.start&&t.taskDate<=bounds.end&&t.status==="pending").length,committed=done+pending;
+    due=committed<dueByToday||(target-committed)>=daysLeft;
    }
    if(due)count=1;
   }
