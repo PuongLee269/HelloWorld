@@ -6,7 +6,7 @@ Mori Quest biến Task hằng ngày thành vòng lặp RPG: AI tạo nội dung 
 
 App tĩnh, mở index.html qua GitHub Pages hoặc static web server. Có ba tab:
 
-1. **Task** — chỉ hiển thị tối đa ba nội dung Task cùng ô tick.
+1. **Task** — chỉ hiển thị tối đa ba nội dung Task cùng ô tick; có thao tác đổi bộ hoặc chỉ đổi Task chưa hoàn thành.
 2. **Chỉ số** — Level, XP tới Level kế tiếp, radar 6 Stats, Growth 7/30 ngày và history.
 3. **Nạp Quest & Task** — prompt ngữ cảnh để sao chép vào ChatGPT và ô dán JSON hoặc danh sách Task có gắn thẻ.
 
@@ -64,6 +64,13 @@ Mỗi Task cần 1–3 tag Stat chính xác trong SI, STR, EN, VIT, EQ, Y; tag c
 
 Tab điều hướng chỉ hiện icon. Tab Task chỉ hiện nội dung Task cùng ô tick; tag, điểm và độ khó vẫn được lưu và chấm nhưng không chiếm chỗ trên danh sách. App hiển thị tối đa ba Task theo thứ tự nhập. Chỉ khi cả ba Task trong bộ hiện tại đã hoàn thành thì bộ ba tiếp theo mới mở. Từ 18:00, những Task ban ngày chưa xong chuyển sang các phương án buổi tối AI đã tạo; các phương án phải liên kết chính xác bằng replacesTask. Prompt AI yêu cầu mỗi bộ phối hợp vai trò như focus, movement, recovery, connection, reflection, giới hạn tối đa một Task Hard/Epic, có ít nhất một hoạt động nhẹ/hồi phục và tránh dồn nhiều việc nặng cùng kiểu năng lượng. Task có energyRole được lưu cùng dữ liệu.
 
+## Đổi và quản lý Task
+
+- **Đổi bộ 3 mới** thay các Task đang mở bằng Task khác đã nạp trong cùng khung giờ; Task đã hoàn thành không mất XP/Stats, chỉ được ẩn khỏi bộ hiện tại.
+- **Đổi Task chưa xong** chỉ thay các Task đang chờ; Task hoàn thành vẫn giữ nguyên trong bộ hiện tại.
+- Task thay thế được lấy từ hàng chờ đã nạp. Nếu không đủ Task cùng khung giờ, app báo cần nạp thêm hoặc thêm thủ công; thao tác đổi không tự gọi AI/API và không cộng điểm.
+- Danh sách quản lý ở tab Nạp cho phép thêm Task thủ công với tag, độ khó, khung giờ ban ngày/buổi tối và xóa Task thừa. History của Task bị xóa được giữ lại.
+
 ## Quy tắc điểm
 
 - Easy: 15 XP; Stat tag thứ nhất +1, thứ hai +1.
@@ -78,4 +85,4 @@ Tab điều hướng chỉ hiện icon. Tab Task chỉ hiện nội dung Task c�
 
 ## Dữ liệu
 
-life-rpg.js quản lý ba tab, nhập Quest/Task, tính thưởng, Level, history và lưu cục bộ. life-rpg-engine.js chứa parser, alias tag, bảng điểm và quy tắc/prompt AI. Dữ liệu nằm trong Local Storage (tq_liferpg_state_v1); tên/Level/XP được mirror sang tq_profile cho hero Mori Quest. Tab Nạp hỗ trợ tải và phục hồi backup JSON.
+life-rpg.js quản lý ba tab, nhập Quest/Task, tính thưởng, Level, history và lưu cục bộ. life-rpg-engine.js chứa parser, alias tag, bảng điểm và quy tắc/prompt AI. Dữ liệu nằm trong Local Storage (tq_liferpg_state_v1); tên/Level/XP được mirror sang tq_profile cho hero Mori Quest. Tab Nạp hỗ trợ tải và phục hồi backup JSON; quản lý danh sách Task hôm nay, thêm Task thủ công theo tag/độ khó/khung giờ, hoặc xóa Task dư. Xóa khỏi hàng chờ ghi event riêng và không xóa history XP/Stats đã phát sinh.
