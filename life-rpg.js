@@ -188,9 +188,10 @@ function advancePlanBatch(s,phase,batch){
   const bounds=periodBounds(r,date,s),pending=s.tasks.filter(t=>t.ruleId===r.id&&t.taskDate>=bounds.start&&t.taskDate<=bounds.end&&t.status==="pending").length;
   return Math.max(0,target-done-pending);
  };
- const active=s.taskRules.filter(r=>r.planId===plan.id&&r.status==="active"&&compatible(r)&&!batchRules.has(r.id)&&remaining(r)>0&&!s.tasks.some(t=>t.ruleId===r.id&&t.taskDate===date&&t.status==="pending"));
+ if(s.tasks.some(t=>t.taskDate===date&&t.timeOfDay===phase&&t.status==="pending"&&!t.hiddenFromQueue&&!batch.some(done=>done.batchId===t.batchId)))return 0;
+ const active=s.taskRules.filter(r=>r.planId===plan.id&&r.status==="active"&&compatible(r)&&remaining(r)>0&&!s.tasks.some(t=>t.ruleId===r.id&&t.taskDate===date&&t.status==="pending"));
  const sort=(a,b)=>((a.preferredTime===phase?0:1)-(b.preferredTime===phase?0:1))||String(a.createdAt).localeCompare(String(b.createdAt));
- const preferred=active.filter(r=>!recent.has(r.id)).sort(sort),rotation=active.filter(r=>recent.has(r.id)).sort(sort),choices=preferred.concat(rotation);
+ const preferred=active.filter(r=>!recent.has(r.id)&&!batchRules.has(r.id)).sort(sort),rotation=active.filter(r=>recent.has(r.id)&&!batchRules.has(r.id)).sort(sort),sameRuleRotation=active.filter(r=>batchRules.has(r.id)&&r.taskType!=="daily").sort(sort),choices=preferred.concat(rotation,sameRuleRotation);
  let created=0;
  for(const rule of choices){
   if(created>=3||s.tasks.filter(t=>t.taskDate===date&&!["replaced","deferred","archived","deleted"].includes(t.status)).length>=20)break;
@@ -206,7 +207,7 @@ function complete(id){
  Object.keys(t.statEffects||{}).forEach(k=>{if(KEYS.includes(k)){const amount=Math.max(0,Math.min(5,Math.round(Number(t.statEffects[k])||0)));if(amount){s.stats[k]=(Number(s.stats[k])||0)+amount;effects[k]=amount;}}});
  addXp(s,t.xp);
  log(s,{action:"completed",date:today(),taskId:t.id,ruleId:t.ruleId||null,title:t.title,category:t.category,tags:t.tags,difficulty:t.difficulty,xpDelta:t.xp,statDelta:effects,mainQuestId:t.mainQuestId,weeklyQuestId:t.weeklyQuestId,reason:t.reason,createdAt:t.createdAt,completedAt:t.completedAt,originalTaskDate:t.originalTaskDate||t.taskDate});
- const finishedBatch=t.batchId?s.tasks.filter(x=>x.batchId===t.batchId&&!x.hiddenFromQueue&&["pending","completed"].includes(x.status)):[],advanced=finishedBatch.length>=3&&finishedBatch.every(x=>x.status==="completed")?advancePlanBatch(s,t.timeOfDay,finishedBatch):0;
+ const finishedBatch=t.batchId?s.tasks.filter(x=>x.batchId===t.batchId&&!x.hiddenFromQueue&&["pending","completed"].includes(x.status)):[],advanced=finishedBatch.length>0&&finishedBatch.every(x=>x.status==="completed")?advancePlanBatch(s,t.timeOfDay,finishedBatch):0;
  let bonus=0;if(completedToday(s,today())>=6&&!s.bonuses["six-tasks:"+today()]){s.bonuses["six-tasks:"+today()]=true;bonus=3;addXp(s,bonus);log(s,{action:"daily_bonus",date:today(),title:"Thưởng hoàn thành 6 Task",xpDelta:bonus,statDelta:{}});}
  s.feedback="+"+t.xp+" XP · "+taskEffectsLine(effects)+(bonus?" · Thưởng +3 XP":"")+(advanced?" · Đã mở "+advanced+" Task tiếp theo":"");save(s);render("tasks");
 }
@@ -311,7 +312,7 @@ function currentBatch(s){
 function renderTasks(s){
  if(ensurePlanTasks(s))save(s);
  const batch=currentBatch(s);
- view.innerHTML=style()+'<div class="rpg-wrap"><section class="rpg-panel"><div class="rpg-task-list">'+(batch.length?batch.map(t=>taskCard(t)).join(""):'<div class="rpg-empty">Đã hoàn thành toàn bộ Task hiện có. Nạp nhóm Task tiếp theo khi sẵn sàng.</div>')+'</div>'+(batch.length?'<div class="rpg-actions rpg-swap-actions"><button class="btn-ghost" id="swap-all">Đổi bộ 3 mới</button><button class="btn-ghost" id="swap-pending">Đổi Task chưa xong</button></div>':'')+'</section></div>';
+ view.innerHTML=style()+'<div class="rpg-wrap"><section class="rpg-panel"><div class="rpg-task-list">'+(batch.length?batch.map(t=>taskCard(t)).join(""):'<div class="rpg-empty">Đã xong Task đến hạn hôm nay. Task tiếp theo sẽ mở theo gói kế hoạch và chu kỳ phù hợp.</div>')+'</div>'+(batch.length?'<div class="rpg-actions rpg-swap-actions"><button class="btn-ghost" id="swap-all">Đổi bộ 3 mới</button><button class="btn-ghost" id="swap-pending">Đổi Task chưa xong</button></div>':'')+'</section></div>';
  bindTaskButtons();
  const all=document.getElementById("swap-all"),pending=document.getElementById("swap-pending");
  if(all)all.onclick=()=>swapTasks("all");if(pending)pending.onclick=()=>swapTasks("pending");
