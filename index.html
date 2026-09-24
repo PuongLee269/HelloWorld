@@ -2595,27 +2595,7 @@ function performDayRollover(opts={}){
     const tasks=getTasks();
     const todaySim=getDay();
 
-    const zoneKindMap = new Map(zones.map(z => [Number(z.id), z.kind]));
-    const todayTasks = tasks.filter(t => isTaskActiveToday(t) && t.done);
-    const completedZoneECount = todayTasks.reduce((count, task) => {
-      const zoneKind = zoneKindMap.get(Number(task.zoneId));
-      return zoneKind === 'e' ? count + 1 : count;
-    }, 0);
-
-    const lastZoneEBonusDay = Number(localStorage.getItem(LS.ZONE_E_BONUS_DAY) || 0);
-    const isZoneEBonusEligible = completedZoneECount > 3;
-    const isZoneEBonusApplied = lastZoneEBonusDay === todaySim;
-    const shouldApplyZoneEBonus = isZoneEBonusEligible && !isZoneEBonusApplied;
-    const zoneEBonus = shouldApplyZoneEBonus
-      ? Math.min(5, Math.max(3, completedZoneECount))
-      : 0;
-
-      if (zoneEBonus > 0) {
-        localStorage.setItem(LS.ZONE_E_BONUS_DAY, String(todaySim));
-        addXP(zoneEBonus);
-      }
-
-      // Zone E rule: lose 6 E only when no task was completed today.
+    // Zone E daily rules replace the legacy task bonuses and penalties.
       const zoneEDaily = zoneEDayStats();
       if(zoneEDaily.completed === 0){
         addXP(-6);
