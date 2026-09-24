@@ -224,14 +224,14 @@ function swapTasks(mode){
   const compatible=r=>phase==="evening"?(r.preferredTime==="evening"||r.preferredTime==="any"):r.preferredTime!=="evening";
   const canUse=r=>{
    const target=Math.max(1,Number(r.target)||1),done=ruleCompleted(s,r,today());
-   if(r.taskType==="daily")return s.tasks.filter(t=>t.ruleId===r.id&&t.taskDate===today()&&!["replaced","deferred","archived","deleted"].includes(t.status)).length<target;
+   if(s.tasks.some(t=>t.taskDate===today()&&t.ruleId===r.id&&!groupIds.has(t.id)&&!t.hiddenFromQueue&&t.status==="pending"))return true;\n   if(r.taskType==="daily")return s.tasks.filter(t=>t.ruleId===r.id&&t.taskDate===today()&&!["replaced","deferred","archived","deleted"].includes(t.status)).length<target;
    const bounds=periodBounds(r,today(),s),pending=s.tasks.filter(t=>t.ruleId===r.id&&t.taskDate>=bounds.start&&t.taskDate<=bounds.end&&t.status==="pending").length;
    return done+pending<target;
   };
   const baseRules=s.taskRules.filter(r=>r.planId===plan.id&&r.status==="active"&&compatible(r)&&!excludedRules.has(r.id)&&canUse(r));
   const sort=(a,b)=>((a.preferredTime===phase?0:1)-(b.preferredTime===phase?0:1))||String(a.createdAt).localeCompare(String(b.createdAt));
   const fresh=baseRules.filter(r=>!usedRecently.has(r.id)).sort(sort),relaxed=baseRules.filter(r=>usedRecently.has(r.id)).sort(sort);
-  const recycled=s.tasks.filter(t=>t.status==="replaced"&&t.ruleId&&t.taskDate<=today()&&!groupIds.has(t.id)&&!t.hiddenFromQueue).filter(t=>{
+  const recycled=s.tasks.filter(t=>t.status==="replaced"&&t.ruleId&&t.taskDate<=today()&&!groupIds.has(t.id)).filter(t=>{
    const r=s.taskRules.find(x=>x.id===t.ruleId&&x.planId===plan.id&&x.status==="active");return !!r&&compatible(r)&&!excludedRules.has(r.id)&&canUse(r);
   }).sort((a,b)=>String(a.replacedAt||a.createdAt).localeCompare(String(b.replacedAt||b.createdAt)));
   const planned=[],chosenRules=new Set(),chosenTasks=new Set();
