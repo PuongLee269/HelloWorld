@@ -156,6 +156,7 @@ function importPaste(text){
 }
 function timeOfDay(){return new Date().getHours()>=18?"evening":"day";}
 function applyEveningSwitch(s,force){
+ if(s.activePlanId&&s.taskRules.some(r=>r.planId===s.activePlanId&&r.status==="active"))return false;
  if(timeOfDay()!=="evening")return false;
  const flag="evening-switch:"+today(),already=!!s.bonuses[flag];
  if(already&&!force)return false;
@@ -178,27 +179,48 @@ function complete(id){
  t.status="completed";t.completedAt=now();const effects={};
  Object.keys(t.statEffects||{}).forEach(k=>{if(KEYS.includes(k)){const amount=Math.max(0,Math.min(5,Math.round(Number(t.statEffects[k])||0)));if(amount){s.stats[k]=(Number(s.stats[k])||0)+amount;effects[k]=amount;}}});
  addXp(s,t.xp);
- log(s,{action:"completed",date:today(),taskId:t.id,title:t.title,category:t.category,tags:t.tags,difficulty:t.difficulty,xpDelta:t.xp,statDelta:effects,mainQuestId:t.mainQuestId,weeklyQuestId:t.weeklyQuestId,reason:t.reason,createdAt:t.createdAt,completedAt:t.completedAt});
+ log(s,{action:"completed",date:today(),taskId:t.id,ruleId:t.ruleId||null,title:t.title,category:t.category,tags:t.tags,difficulty:t.difficulty,xpDelta:t.xp,statDelta:effects,mainQuestId:t.mainQuestId,weeklyQuestId:t.weeklyQuestId,reason:t.reason,createdAt:t.createdAt,completedAt:t.completedAt});
  let bonus=0;if(completedToday(s,today())>=6&&!s.bonuses["six-tasks:"+today()]){s.bonuses["six-tasks:"+today()]=true;bonus=3;addXp(s,bonus);log(s,{action:"daily_bonus",date:today(),title:"Thưởng hoàn thành 6 Task",xpDelta:bonus,statDelta:{}});}
  s.feedback="+"+t.xp+" XP · "+taskEffectsLine(effects)+(bonus?" · Thưởng +3 XP":"");save(s);render("tasks");
 }
 function skip(id){const s=rollover(state()),t=s.tasks.find(x=>x.id===id);if(!t||t.status!=="pending")return;t.status="skipped";log(s,{action:"skipped",date:today(),taskId:t.id,title:t.title,category:t.category,tags:t.tags,difficulty:t.difficulty,xpDelta:0,statDelta:{},reason:"Người dùng bỏ qua Task."});s.feedback="Đã bỏ qua Task; không thay đổi XP/Stats.";save(s);render("tasks");}
 function swapTasks(mode){
  const s=rollover(state());applyEveningSwitch(s,false);
+ if(s.activePlanId)ensurePlanTasks(s);
  const group=currentBatch(s);if(!group.length){alert("Không có bộ Task đang mở để đổi.");return false;}
  const phase=timeOfDay(),targets=mode==="all"?group.slice():group.filter(t=>t.status==="pending");
  if(!targets.length){alert("Không có Task chưa hoàn thành trong bộ hiện tại.");return false;}
- const ids=new Set(group.map(t=>t.id));
- const candidates=s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay===phase&&!ids.has(t.id)&&!t.hiddenFromQueue&&(phase==="evening"?(t.status==="pending"||t.status==="inactive"):t.status==="pending")).sort((a,b)=>(Number(a.batchOrder)||0)-(Number(b.batchOrder)||0)||queueOrder(a,b));
- if(candidates.length<targets.length){alert("Chưa đủ Task mới cùng khung giờ để đổi. Hãy nạp thêm hoặc thêm Task ở tab Nạp Quest & Task.");return false;}
- const replacements=candidates.slice(0,targets.length),batchId=group[0].batchId,batchOrder=Number(group[0].batchOrder)||0;
+ let replacements=[];
+ const plan=s.plans.find(p=>p.id===s.activePlanId&&p.status==="active");
+ if(plan){
+  const excludedRules=new Set(group.map(t=>t.ruleId).filter(Boolean)),recentCutoff=dateAdd(today(),-3),usedRecently=new Set(s.history.filter(e=>e.ruleId&&e.date>=recentCutoff&&["created","completed","skipped","task_swapped_in"].includes(e.action)).map(e=>e.ruleId));
+  const rules=s.taskRules.filter(r=>{
+   if(r.planId!==plan.id||r.status!=="active"||excludedRules.has(r.id)||usedRecently.has(r.id))return false;
+   if((phase==="evening"&&r.preferredTime!=="evening"&&r.preferredTime!=="any")||(phase!=="evening"&&r.preferredTime==="evening"))return false;
+   if(s.tasks.some(t=>t.taskDate===today()&&t.ruleId===r.id&&t.status!=="replaced"&&t.status!=="deferred"))return false;
+   return ruleCompleted(s,r,today())<Math.max(1,Number(r.target)||1);
+  }).sort((a,b)=>{
+   const pref=r=>r.preferredTime===phase||r.preferredTime==="any"?0:1;
+   return pref(a)-pref(b)||String(a.createdAt).localeCompare(String(b.createdAt));
+  });
+  rules.slice(0,targets.length).forEach((rule,index)=>{
+   const order=s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay===phase).reduce((m,t)=>Math.max(m,Number(t.queueOrder)||0),-1)+1;
+   const next=ruleOccurrence(s,rule,today(),index,phase,order);if(next){s.tasks.push(next);log(s,{action:"created",date:today(),taskId:next.id,ruleId:rule.id,title:next.title,timeOfDay:phase,xpDelta:0,statDelta:{},reason:"Task được chọn từ rule của gói kế hoạch khi đổi Task."});replacements.push(next);}
+  });
+ }else{
+  const ids=new Set(group.map(t=>t.id));
+  const candidates=s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay===phase&&!ids.has(t.id)&&!t.hiddenFromQueue&&(phase==="evening"?(t.status==="pending"||t.status==="inactive"):t.status==="pending")).sort((a,b)=>(Number(a.batchOrder)||0)-(Number(b.batchOrder)||0)||queueOrder(a,b));
+  replacements=candidates.slice(0,targets.length);
+ }
+ if(replacements.length<targets.length){alert("Không đủ Task hợp lệ khác trong gói kế hoạch hiện tại để đổi. Không có Task nào bị thay đổi.");return false;}
+ const batchId=group[0].batchId,batchOrder=Number(group[0].batchOrder)||0;
  targets.forEach((old,index)=>{
   const next=replacements[index];
   if(old.status==="pending")old.status="replaced";
   old.hiddenFromQueue=true;old.replacedAt=now();
-  log(s,{action:"task_swapped_out",date:today(),taskId:old.id,title:old.title,timeOfDay:old.timeOfDay,replacedBy:next.title,xpDelta:0,statDelta:{},reason:"Người dùng đổi Task."});
+  log(s,{action:"task_swapped_out",date:today(),taskId:old.id,ruleId:old.ruleId||null,title:old.title,timeOfDay:old.timeOfDay,replacedBy:next.title,xpDelta:0,statDelta:{},reason:"Người dùng đổi Task."});
   next.status="pending";next.hiddenFromQueue=false;next.timeOfDay=phase;next.batchId=batchId;next.batchOrder=batchOrder;next.queueOrder=Number(old.queueOrder)||index;next.replacesTask=old.title;next.swappedAt=now();
-  log(s,{action:"task_swapped_in",date:today(),taskId:next.id,title:next.title,timeOfDay:phase,replacesTask:old.title,xpDelta:0,statDelta:{},reason:"Task được đưa vào bộ hiện tại theo yêu cầu người dùng."});
+  log(s,{action:"task_swapped_in",date:today(),taskId:next.id,ruleId:next.ruleId||null,title:next.title,timeOfDay:phase,replacesTask:old.title,xpDelta:0,statDelta:{},reason:"Task được đưa vào bộ hiện tại theo yêu cầu người dùng."});
  });
  if(phase==="evening")s.eveningActivatedDate=today();
  s.feedback="Đã đổi "+targets.length+" Task trong khung "+(phase==="evening"?"buổi tối":"ban ngày")+".";
@@ -245,6 +267,7 @@ function currentBatch(s){
  return firstPendingGroup(s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay!=="evening"));
 }
 function renderTasks(s){
+ if(ensurePlanTasks(s))save(s);
  const batch=currentBatch(s);
  view.innerHTML=style()+'<div class="rpg-wrap"><section class="rpg-panel"><div class="rpg-task-list">'+(batch.length?batch.map(t=>taskCard(t)).join(""):'<div class="rpg-empty">Đã hoàn thành toàn bộ Task hiện có. Nạp nhóm Task tiếp theo khi sẵn sàng.</div>')+'</div>'+(batch.length?'<div class="rpg-actions rpg-swap-actions"><button class="btn-ghost" id="swap-all">Đổi bộ 3 mới</button><button class="btn-ghost" id="swap-pending">Đổi Task chưa xong</button></div>':'')+'</section></div>';
  bindTaskButtons();
