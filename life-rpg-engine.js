@@ -106,40 +106,36 @@
   function parse(text){
     const payload=parseJson(text);
     if(payload){
-      if(Array.isArray(payload))return{tasks:payload.map(normalizeTask).filter(Boolean)};
+      if(Array.isArray(payload))return{status:"PLAN_READY",tasks:payload.map(normalizeTask).filter(Boolean)};
       if(typeof payload!=="object")return null;
-      const rawTasks=firstValue(payload,["tasks","dailyTasks","daily_tasks","taskList","task_list","dailyQuest","daily_quests","items"],[]);
+      const status=String(payload.status||"").toUpperCase();
+      if(status==="NEED_INFO")return{status:"NEED_INFO",questions:Array.isArray(payload.questions)?payload.questions.map(String).filter(Boolean).slice(0,6):[]};
+      const rawTasks=firstValue(payload,["tasks","dailyTasks","daily_tasks","taskList","task_list","items"],[]);
       const tasks=Array.isArray(rawTasks)?rawTasks.map(normalizeTask).filter(Boolean):(rawTasks&&typeof rawTasks==="object"?[normalizeTask(rawTasks)].filter(Boolean):[]);
-      const rawEvening=firstValue(payload,["eveningTasks","evening_tasks","nightTasks","night_tasks","replacementTasks","replacement_tasks"],[]);
-      const eveningTasks=Array.isArray(rawEvening)?rawEvening.map(normalizeTask).filter(Boolean):(rawEvening&&typeof rawEvening==="object"?[normalizeTask(rawEvening)].filter(Boolean):[]);
       const weekly=firstValue(payload,["weeklyQuests","weekly_quests","weeklyQuest","weekly_quest"],[]);
       const quests=firstValue(payload,["quests"],[]);
-      return{mainQuest:firstValue(payload,["mainQuest","main_quest","mainGoal","main_goal"],null),weeklyQuests:Array.isArray(weekly)?weekly:(weekly?[weekly]:[]),quests:Array.isArray(quests)?quests:[],tasks:tasks,eveningTasks:eveningTasks};
+      return{status:status||"PLAN_READY",mainQuest:firstValue(payload,["mainQuest","main_quest","mainGoal","main_goal"],null),weeklyQuests:Array.isArray(weekly)?weekly:(weekly?[weekly]:[]),quests:Array.isArray(quests)?quests:[],tasks:tasks};
     }
     return parseTaggedText(text);
   }
   function makePrompt(context){
-    const ctx=context||{},stats=ctx.currentStats||{};
-    const statsLine=STAT_KEYS.map(function(key){return key+":"+(Number(stats[key])||0);}).join(", ");
-    return[
-      "Bạn là AI lập kế hoạch cá nhân cho ứng dụng Life RPG. Hãy tự phân tích dữ liệu người dùng và tự sáng tạo Quest/Task phù hợp riêng với họ. Không dùng danh sách gợi ý có sẵn, không lặp ví dụ hoặc mẫu Task.",
-      "Đầu ra phải là đúng một JSON object hợp lệ. Không markdown, không code fence, không lời dẫn/kết luận. Dùng dấu ngoặc kép ASCII cho chuỗi, không dấu phẩy thừa. Mọi danh sách phải là JSON array; nếu không có dữ liệu thì dùng array rỗng.",
-      "Schema: object gồm mainQuest (object có title, description hoặc null); weeklyQuests (array object có title, description, target, mainQuest); tasks (array object, mỗi phần tử có title, tags, difficulty, energyRole và có thể có description, category, mainQuest, weeklyQuest, reason); eveningTasks (array object, mỗi phần tử có title, replacesTask, tags, difficulty, energyRole và có thể có description, reason).",
-      "Tạo 3, 6 hoặc 9 Task ban ngày, luôn theo nhóm đủ 3; không bắt buộc chọn số lượng lớn. Với mỗi Task ban ngày tạo đúng một phương án buổi tối tương ứng trong eveningTasks. replacesTask phải khớp chính xác title của Task ban ngày. Tổng số phần tử hai danh sách không vượt quá 20.",
-      "Tự chọn nội dung dựa trên mục tiêu, hồ sơ, lịch sử và hoàn cảnh người dùng; ưu tiên Task cụ thể, khả thi, đa dạng, tránh trùng lặp. Không đưa Task chung chung hoặc nhiệm vụ không liên quan. Ghép mỗi nhóm 3 Task để bổ trợ nhau và giữ nhịp năng lượng vừa sức; tối đa một Task Hard/Epic trong nhóm, có việc nhẹ/hồi phục, không dồn các việc tiêu hao cùng kiểu năng lượng. Task buổi tối ngắn, nhẹ và phù hợp thời gian tối.",
-      "Mỗi Task có 1–3 tag chỉ số trong đúng các mã SI, STR, EN, VIT, EQ, Y; có thể thêm tag chủ đề liên quan. Difficulty chỉ dùng Easy, Normal, Hard, Epic. energyRole chỉ dùng focus, movement, recovery, connection, reflection. Không xuất XP hoặc điểm Stats vì ứng dụng tự tính theo tag và độ khó. Không đưa ra chẩn đoán y tế; VIT chỉ là chỉ số game hóa, không phải đánh giá y khoa.",
-      "Chọn Quest và Task cá nhân hóa, không mặc định mục tiêu hay lĩnh vực nào nếu dữ liệu người dùng không nêu. Nếu thiếu thông tin, tạo số Task ít hơn và an toàn thay vì tự bịa hồ sơ.",
-      "DỮ LIỆU NGƯỜI DÙNG:",
-      "Tên và tiến độ: "+JSON.stringify({name:(ctx.userProfile||{}).name||"Player",level:(ctx.userProfile||{}).level||1,xp:(ctx.userProfile||{}).xp||0}),
-      "Mục tiêu dài hạn: "+JSON.stringify(ctx.goals||[]),
-      "Main Quest hiện tại: "+JSON.stringify(ctx.mainQuest||null),
-      "Weekly Quest hiện tại: "+JSON.stringify(ctx.weeklyQuest||null),
-      "Stats hiện tại: "+statsLine,
-      "Tỷ lệ hoàn thành gần đây: "+Math.round((Number(ctx.completionRate)||0)*100)+"%",
-      "Task đã bỏ qua gần đây: "+JSON.stringify((ctx.skippedTasks||[]).slice(-10)),
-      "Tăng trưởng Stats 7 ngày: "+JSON.stringify(ctx.statGrowth||{}),
-      "Lịch sử Task gần đây: "+JSON.stringify((ctx.recentTaskHistory||[]).slice(-20))
-    ].join("\\n");
+    const ctx=context||{};
+    const base=[
+      "Bạn là AI lập kế hoạch cá nhân cho ứng dụng Life RPG.",
+      "Mỗi lần Nạp Quest & Task, hãy thiết kế một gói nhiệm vụ cho khoảng 30 ngày tiếp theo.",
+      "Đọc USER_DATA trước. Nếu thiếu thông tin quan trọng để cá nhân hóa kế hoạch tháng, chưa tạo Task; trả NEED_INFO và hỏi 3-6 câu ngắn nhất về ưu tiên, deadline, thời gian, hoạt động muốn duy trì, điều muốn cải thiện hoặc tránh. Không hỏi lại điều đã có trong USER_DATA.",
+      "Khi đã đủ dữ liệu, tự quyết định mỗi Task thuộc daily, weekly, recurring hoặc one_time; tự chọn target, period và preferredTime. Không mặc định tần suất cao là tốt, không biến mọi sở thích thành nghĩa vụ, và tính tổng tải để duy trì khoảng 30 ngày.",
+      "Ưu tiên mục tiêu hiện tại, hoạt động người dùng thực sự muốn làm, dự án, kỹ năng, lịch sử hoàn thành, Task bị bỏ qua/xóa; cân bằng trí óc, thể chất, sáng tạo, hồi phục khi phù hợp. Task cụ thể, có điều kiện hoàn thành rõ ràng. Không chung chung, không đổi tên Task cũ để lặp lại, không tạo Task chỉ để farm Stats.",
+      "Main Quest là hướng phát triển lớn. Chỉ tạo Weekly Quest nếu có mục tiêu tuần đáng theo dõi.",
+      "Mỗi Task có 1-3 tag chỉ số từ SI, STR, EN, VIT, EQ, Y; có thể thêm tag chủ đề. difficulty chỉ Easy, Normal, Hard, Epic. energyRole chỉ focus, movement, recovery, connection, reflection. preferredTime chỉ morning, daytime, evening, any.",
+      "Không xuất XP hoặc điểm Stats. VIT chỉ là chỉ số game hóa, không phải đánh giá y khoa.",
+      "Luôn trả đúng một JSON object hợp lệ, không markdown, không code fence, không văn bản ngoài JSON. Dùng dấu ngoặc kép ASCII, không dấu phẩy thừa.",
+      "Nếu chưa đủ thông tin, schema là {status: NEED_INFO, questions: array gồm 3-6 câu ngắn}. Nếu đủ, schema là {status: PLAN_READY, mainQuest: object hoặc null, weeklyQuests: array, tasks: array}. Mỗi Task cần title, description, category, taskType, target, period, preferredTime, tags, difficulty, energyRole, mainQuest, weeklyQuest, reason.",
+      "Task type rules: daily => target là số lần/ngày, period day; weekly => số lần/tuần, period week; recurring => số lần trong chu kỳ 30 ngày, period month; one_time => target 1, period month. Các giá trị này phải khớp nhau.",
+      "USER_DATA: "+JSON.stringify(ctx.userData||ctx),
+      "CÂU TRẢ LỜI MỚI CỦA NGƯỜI DÙNG: "+JSON.stringify(ctx.answers||[])
+    ];
+    return base.join("\n");
   }
   root.LifeRpgTaskEngine={statKeys:STAT_KEYS.slice(),difficulty:Object.assign({},DIFFICULTY),statTags:statTags,score:score,parse:parse,makePrompt:makePrompt,schema:{version:"life-rpg-tagged-import.v1",maxDailyTasks:20,statuses:["pending","completed","skipped"]}};
 })(window);
