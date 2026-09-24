@@ -40,7 +40,7 @@
     const start=source.indexOf("{"),end=source.lastIndexOf("}");
     if(start>=0&&end>start)return JSON.parse(source.slice(start,end+1));
     const a=source.indexOf("["),b=source.lastIndexOf("]");
-    if(a>=0&&b>a)return JSON.parse(source.slice(a,b+1));
+    if(a>=0&&b>a){try{return JSON.parse(source.slice(a,b+1));}catch(_){}}
     return null;
   }
   function splitTags(value){return(Array.isArray(value)?value.map(String):String(value||"").split(/[,;|]/)).map(function(tag){return tag.replace(/^#/,"").trim();}).filter(Boolean);}
