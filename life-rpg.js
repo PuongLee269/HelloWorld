@@ -10,11 +10,13 @@ const now=()=>new Date().toISOString();
 const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))||fallback;}catch(_){return fallback;}};
 function fresh(){const old=read(PROFILE,{}),stats={};KEYS.forEach(k=>stats[k]=10);return{schemaVersion:2,currentDate:today(),user:{name:old.name||"Player",goals:[]},level:Math.max(1,Number(old.level)||1),xp:Math.max(0,Number(old.xp)||0),stats,tasks:[],taskRules:[],plans:[],activePlanId:null,planStart:null,planEnd:null,aiConversation:null,quests:[],history:[],preferences:{growthDays:7},bonuses:{},feedback:"",energyButtons:defaultEnergyButtons(),energyEvents:[]};
-function defaultEnergyButtons(){return[{id:"energy-low",title:"Tụt năng lượng",effects:{EN:-1,VIT:-1}},{id:"full-stomach",title:"Đầy bụng",effects:{EN:-1,VIT:-1}},{id:"fap",title:"Fap",effects:{EN:-1,VIT:-1}},{id:"drink-water",title:"Uống nước",effects:{VIT:1}},{id:"eat-fruit",title:"Ăn hoa quả",effects:{STR:1,VIT:1}}];}\nfunction state(){
+function defaultEnergyButtons(){return[{id:"energy-low",title:"Tụt năng lượng",effects:{EN:-1,VIT:-1}},{id:"full-stomach",title:"Đầy bụng",effects:{EN:-1,VIT:-1}},{id:"fap",title:"Fap",effects:{EN:-1,VIT:-1}},{id:"drink-water",title:"Uống nước",effects:{VIT:1}},{id:"eat-fruit",title:"Ăn hoa quả",effects:{STR:1,VIT:1}} ];}
+unction state(){
  const raw=read(STORE,null);if(!raw||![1,2].includes(raw.schemaVersion))return fresh();
  const base=fresh(),s=Object.assign(base,raw);s.schemaVersion=2;
  s.user=Object.assign(base.user,raw.user||{});s.stats=Object.assign(base.stats,raw.stats||{});s.preferences=Object.assign(base.preferences,raw.preferences||{});
- ["tasks","taskRules","plans","quests","history","energyEvents"].forEach(k=>s[k]=Array.isArray(raw[k])?raw[k]:[]);\n s.energyButtons=Array.isArray(raw.energyButtons)?raw.energyButtons:defaultEnergyButtons();
+ ["tasks","taskRules","plans","quests","history","energyEvents"].forEach(k=>s[k]=Array.isArray(raw[k])?raw[k]:[]);
+ s.energyButtons=Array.isArray(raw.energyButtons)?raw.energyButtons:defaultEnergyButtons();
  s.tasks.forEach(t=>{
   if(t.status==="skipped"&&!t.ruleId)t.status="pending";
   if(!t.taskType)t.taskType="one_time";
