@@ -6,7 +6,7 @@ Mori Quest biến Task hằng ngày thành vòng lặp RPG: AI tạo nội dung 
 
 App tĩnh, mở index.html qua GitHub Pages hoặc static web server. Có ba tab:
 
-1. **Task** — chỉ hiển thị các Task hôm nay, tag, độ khó, XP/Stats dự kiến, nút Hoàn thành/Bỏ qua.
+1. **Task** — chỉ hiển thị tối đa ba nội dung Task cùng ô tick.
 2. **Chỉ số** — Level, XP tới Level kế tiếp, radar 6 Stats, Growth 7/30 ngày và history.
 3. **Nạp Quest & Task** — prompt ngữ cảnh để sao chép vào ChatGPT và ô dán JSON hoặc danh sách Task có gắn thẻ.
 
@@ -25,11 +25,22 @@ AI cần trả về JSON theo dạng:
         "category": "YouTube",
         "tags": ["SI", "EN", "YouTube"],
         "difficulty": "Normal",
+        "timeOfDay": "day",
+        "energyRole": "focus",
         "mainQuest": "Xây kênh cá nhân",
         "weeklyQuest": "Đăng 3 video",
         "reason": "Đưa mục tiêu tuần tiến lên"
+      }],
+      "eveningTasks": [{
+        "title": "Viết kế hoạch nhẹ cho ngày mai",
+        "replacesTask": "Hoàn thiện một Short",
+        "tags": ["EQ", "VIT"],
+        "difficulty": "Easy",
+        "energyRole": "recovery"
       }]
     }
+
+Mỗi Task ban ngày cần một Task tối thay thế tương ứng trong eveningTasks; replacesTask phải trùng tiêu đề ban ngày chính xác. Ứng dụng tự chuyển lúc 18:00 theo giờ địa phương. Task ban ngày chưa hoàn thành sẽ chuyển sang trạng thái deferred và được ghi history; Task đã hoàn thành không bị thay. Nếu ban ngày đã hoàn thành hết, Task tối không được mở. Nếu không có phương án tối hợp lệ, Task ban ngày còn lại tiếp tục hiển thị.
 
 Có thể dùng văn bản gắn thẻ thay JSON:
 
@@ -42,12 +53,16 @@ Có thể dùng văn bản gắn thẻ thay JSON:
     Main Quest: Xây kênh cá nhân
     Weekly Quest: Đăng 3 video
     Reason: Đưa mục tiêu tuần tiến lên
+    [EVENING TASK] Viết kế hoạch nhẹ cho ngày mai
+    Tags: EQ, VIT
+    Difficulty: Easy
+    Replaces Task: Hoàn thiện một Short
 
 Mỗi Task cần 1–3 tag Stat chính xác trong SI, STR, EN, VIT, EQ, Y; tag chủ đề có thể thêm tự do. App bỏ qua XP và statEffects do AI gửi, tự tính từ tag và Difficulty để đảm bảo kết quả nhất quán. Tag được nhận diện qua mã Stat và alias tiếng Anh/Việt được liệt kê trong life-rpg-engine.js. Nếu thiếu tag Stat hợp lệ, app mặc định EN +1 và báo số Task dùng mặc định. Mỗi ngày tối đa 20 Task; tiêu đề trùng trong ngày được bỏ qua. AI được hướng dẫn tạo theo bội số của ba và xếp từng bộ ba bổ trợ nhau.
 
 ## Hiển thị theo bộ ba Task
 
-Tab điều hướng chỉ hiện icon. Tab Task chỉ hiện nội dung Task cùng ô tick; tag, điểm và độ khó vẫn được lưu và chấm nhưng không chiếm chỗ trên danh sách. App hiển thị tối đa ba Task theo thứ tự nhập. Chỉ khi cả ba Task trong bộ hiện tại đã hoàn thành thì bộ ba tiếp theo mới mở. Prompt AI yêu cầu mỗi bộ phối hợp vai trò như focus, movement, recovery, connection, reflection, giới hạn tối đa một Task Hard/Epic, có ít nhất một hoạt động nhẹ/hồi phục và tránh dồn nhiều việc nặng cùng kiểu năng lượng. Task có energyRole được lưu cùng dữ liệu.
+Tab điều hướng chỉ hiện icon. Tab Task chỉ hiện nội dung Task cùng ô tick; tag, điểm và độ khó vẫn được lưu và chấm nhưng không chiếm chỗ trên danh sách. App hiển thị tối đa ba Task theo thứ tự nhập. Chỉ khi cả ba Task trong bộ hiện tại đã hoàn thành thì bộ ba tiếp theo mới mở. Từ 18:00, những Task ban ngày chưa xong chuyển sang các phương án buổi tối AI đã tạo; các phương án phải liên kết chính xác bằng replacesTask. Prompt AI yêu cầu mỗi bộ phối hợp vai trò như focus, movement, recovery, connection, reflection, giới hạn tối đa một Task Hard/Epic, có ít nhất một hoạt động nhẹ/hồi phục và tránh dồn nhiều việc nặng cùng kiểu năng lượng. Task có energyRole được lưu cùng dữ liệu.
 
 ## Quy tắc điểm
 
@@ -63,4 +78,4 @@ Tab điều hướng chỉ hiện icon. Tab Task chỉ hiện nội dung Task c�
 
 ## Dữ liệu
 
-life-rpg.js quản lý ba tab, nhập Quest/Task, tính thưởng, Level, history và lưu cục bộ. life-rpg-engine.js chứa parser, alias tag, bảng điểm và quy tắc/prompt AI. Dữ liệu nằm trong Local Storage (tq_liferpg_state_v1); tên/Level/XP được mirror sang tq_profile cho hero Mori Quest. Sao lưu/truyền dữ liệu có thể bổ sung trong phiên bản tiếp theo.
+life-rpg.js quản lý ba tab, nhập Quest/Task, tính thưởng, Level, history và lưu cục bộ. life-rpg-engine.js chứa parser, alias tag, bảng điểm và quy tắc/prompt AI. Dữ liệu nằm trong Local Storage (tq_liferpg_state_v1); tên/Level/XP được mirror sang tq_profile cho hero Mori Quest. Tab Nạp hỗ trợ tải và phục hồi backup JSON.
