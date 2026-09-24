@@ -105,6 +105,44 @@ function complete(id){
  s.feedback="+"+t.xp+" XP · "+taskEffectsLine(effects)+(bonus?" · Thưởng +3 XP":"");save(s);render("tasks");
 }
 function skip(id){const s=rollover(state()),t=s.tasks.find(x=>x.id===id);if(!t||t.status!=="pending")return;t.status="skipped";log(s,{action:"skipped",date:today(),taskId:t.id,title:t.title,category:t.category,tags:t.tags,difficulty:t.difficulty,xpDelta:0,statDelta:{},reason:"Người dùng bỏ qua Task."});s.feedback="Đã bỏ qua Task; không thay đổi XP/Stats.";save(s);render("tasks");}
+function swapTasks(mode){
+ const s=rollover(state());applyEveningSwitch(s,false);
+ const group=currentBatch(s);if(!group.length){alert("Không có bộ Task đang mở để đổi.");return false;}
+ const phase=timeOfDay(),targets=mode==="all"?group.slice():group.filter(t=>t.status==="pending");
+ if(!targets.length){alert("Không có Task chưa hoàn thành trong bộ hiện tại.");return false;}
+ const ids=new Set(group.map(t=>t.id));
+ const candidates=s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay===phase&&!ids.has(t.id)&&!t.hiddenFromQueue&&(phase==="evening"?(t.status==="pending"||t.status==="inactive"):t.status==="pending")).sort((a,b)=>(Number(a.batchOrder)||0)-(Number(b.batchOrder)||0)||queueOrder(a,b));
+ if(candidates.length<targets.length){alert("Chưa đủ Task mới cùng khung giờ để đổi. Hãy nạp thêm hoặc thêm Task ở tab Nạp Quest & Task.");return false;}
+ const replacements=candidates.slice(0,targets.length),batchId=group[0].batchId,batchOrder=Number(group[0].batchOrder)||0;
+ targets.forEach((old,index)=>{
+  const next=replacements[index];
+  if(old.status==="pending")old.status="replaced";
+  old.hiddenFromQueue=true;old.replacedAt=now();
+  log(s,{action:"task_swapped_out",date:today(),taskId:old.id,title:old.title,timeOfDay:old.timeOfDay,replacedBy:next.title,xpDelta:0,statDelta:{},reason:"Người dùng đổi Task."});
+  next.status="pending";next.hiddenFromQueue=false;next.timeOfDay=phase;next.batchId=batchId;next.batchOrder=batchOrder;next.queueOrder=Number(old.queueOrder)||index;next.replacesTask=old.title;next.swappedAt=now();
+  log(s,{action:"task_swapped_in",date:today(),taskId:next.id,title:next.title,timeOfDay:phase,replacesTask:old.title,xpDelta:0,statDelta:{},reason:"Task được đưa vào bộ hiện tại theo yêu cầu người dùng."});
+ });
+ if(phase==="evening")s.eveningActivatedDate=today();
+ s.feedback="Đã đổi "+targets.length+" Task trong khung "+(phase==="evening"?"buổi tối":"ban ngày")+".";
+ save(s);render("tasks");return true;
+}
+function addManualTask(form){
+ const s=rollover(state()),date=today(),count=s.tasks.filter(t=>t.taskDate===date).length;
+ if(count>=20){alert("Đã đạt giới hạn 20 Task hôm nay.");return false;}
+ const title=String(form.title||"").trim();if(!title){alert("Nhập nội dung Task.");return false;}
+ const phase=form.timeOfDay==="evening"?"evening":"day",same=s.tasks.filter(t=>t.taskDate===date&&t.timeOfDay===phase);
+ const order=same.reduce((max,t)=>Math.max(max,Number(t.queueOrder)||0),-1)+1;
+ const raw={title,tags:String(form.tags||"").split(/[,;|]/).map(x=>x.trim()).filter(Boolean),difficulty:form.difficulty||"Normal",energyRole:form.energyRole||"focus"};
+ const task=makeTask(s,raw,order,date,phase,order);if(!task)return false;
+ s.tasks.push(task);log(s,{action:"created",date,taskId:task.id,title:task.title,tags:task.tags,difficulty:task.difficulty,timeOfDay:phase,xpDelta:0,statDelta:{},reason:"Task do người dùng thêm thủ công."});
+ s.feedback="Đã thêm Task vào hàng chờ "+(phase==="evening"?"buổi tối.":"ban ngày.");
+ save(s);if(phase==="evening"&&timeOfDay()==="evening")applyEveningSwitch(s,true);render("import");return true;
+}
+function removeTask(id){
+ const s=rollover(state()),index=s.tasks.findIndex(t=>t.id===id&&t.taskDate===today());if(index<0)return false;
+ const task=s.tasks[index];log(s,{action:"task_deleted",date:today(),taskId:task.id,title:task.title,timeOfDay:task.timeOfDay,xpDelta:0,statDelta:{},reason:"Task bị xóa khỏi hàng chờ; history thưởng trước đó vẫn được giữ."});
+ s.tasks.splice(index,1);s.feedback="Đã xóa Task khỏi danh sách hôm nay.";save(s);render("import");return true;
+}
 function radar(values,max,title){const cx=120,cy=105,r=72,n=KEYS.length,p=(i,k)=>{const a=-Math.PI/2+i*2*Math.PI/n;return(cx+Math.cos(a)*r*k).toFixed(1)+","+(cy+Math.sin(a)*r*k).toFixed(1);};let x='<svg viewBox="0 0 240 210" role="img" aria-label="'+esc(title)+'">';[.25,.5,.75,1].forEach(k=>x+='<polygon points="'+KEYS.map((_,i)=>p(i,k)).join(" ")+'" fill="none" stroke="#dfe2ed"/>');KEYS.forEach((k,i)=>x+='<line x1="'+cx+'" y1="'+cy+'" x2="'+p(i,1)+'" stroke="#dfe2ed"/>');x+='<polygon points="'+KEYS.map((k,i)=>p(i,Math.min(1,Math.max(0,Number(values[k])||0)/Math.max(1,max)))).join(" ")+'" fill="rgba(124,102,238,.24)" stroke="#7866ee" stroke-width="2"/>';KEYS.forEach((k,i)=>{const a=-Math.PI/2+i*2*Math.PI/n;x+='<text x="'+(cx+Math.cos(a)*99).toFixed(1)+'" y="'+(cy+Math.sin(a)*99+4).toFixed(1)+'" text-anchor="middle" font-size="10" fill="#41445a">'+k+'</text>';});return x+"</svg>";}
 function growth(s,days){const cutoff=new Date();cutoff.setDate(cutoff.getDate()-days+1);const key=cutoff.getFullYear()+"-"+String(cutoff.getMonth()+1).padStart(2,"0")+"-"+String(cutoff.getDate()).padStart(2,"0"),out={};KEYS.forEach(k=>out[k]=0);s.history.forEach(e=>{if(e.action==="completed"&&e.date>=key&&e.date<=today())KEYS.forEach(k=>out[k]+=Number((e.statDelta||{})[k])||0);});return out;}
 const CSS='.rpg-wrap{display:grid;gap:14px;color:#1b1e2e}.rpg-panel{padding:16px;border:1px solid rgba(0,0,0,.06);border-radius:16px;background:rgba(255,255,255,.9);box-shadow:0 12px 32px rgba(0,0,0,.07)}.rpg-panel h2,.rpg-panel h3{margin:0 0 9px}.rpg-muted{color:#777d9a;font-size:13px}.rpg-progress{height:9px;background:#e9e8f4;border-radius:99px;overflow:hidden;margin-top:7px}.rpg-progress span{display:block;height:100%;background:linear-gradient(90deg,#7866ee,#b09bff)}.rpg-task-list{display:grid;gap:9px}.rpg-taskrow{display:flex;align-items:flex-start;gap:12px;padding:16px;border:1px solid #e9e7f4;border-radius:13px;background:rgba(255,255,255,.94);font-size:16px;line-height:1.45;cursor:pointer}.rpg-taskrow input{width:24px;height:24px;min-width:24px;margin:0;accent-color:#7866ee;cursor:pointer}.rpg-taskrow input:checked+span{color:#798096;text-decoration:line-through}.rpg-head{display:flex;justify-content:space-between;gap:10px}.rpg-chip{background:#f1efff;border-radius:99px;padding:3px 8px;font-size:11px}.rpg-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.rpg-feedback{padding:10px 12px;background:#effaf2;border:1px solid #c9efd4;border-radius:12px;color:#226b3b}.rpg-empty{text-align:center;padding:20px;color:#777d9a}.rpg-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.rpg-stat{display:flex;justify-content:space-between;padding:8px 3px;border-bottom:1px solid #eee}.rpg-chart{display:grid;grid-template-columns:minmax(200px,1fr) minmax(180px,.8fr);align-items:center;gap:10px}.rpg-chart svg{width:100%;max-width:280px;display:block;margin:auto}.rpg-history{max-height:280px;overflow:auto}.rpg-history div{padding:8px;border-bottom:1px solid #eee;font-size:12px}.rpg-form{display:grid;gap:9px}.rpg-form textarea{height:330px;min-height:220px;resize:vertical;font:14px/1.5 ui-monospace,monospace}.rpg-code{white-space:pre-wrap;overflow-wrap:anywhere;background:#f4f2ff;border-radius:12px;padding:12px;font:12px/1.5 ui-monospace,monospace;max-height:460px;overflow:auto}.rpg-quest{padding:10px;border:1px solid #eee;border-radius:10px;margin-top:8px}@media(max-width:650px){.rpg-grid,.rpg-chart{grid-template-columns:1fr}}';
