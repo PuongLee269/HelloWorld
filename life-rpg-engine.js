@@ -60,7 +60,7 @@
       match=trimmed.match(/^[-*]\s+(.+)$/);
       if(match){current={title:match[1].trim(),tags:[]};result.tasks.push(current);return;}
       if(!current)return;
-      match=trimmed.match(/^(tags?|difficulty|description|main quest|weekly quest|reason|category)\s*:\s*(.*)$/i);
+      match=trimmed.match(/^(tags?|difficulty|description|main quest|weekly quest|replaces task|reason|category)\s*:\s*(.*)$/i);
       if(!match)return;
       const key=normalizeText(match[1]),value=match[2].trim();
       if(key==="tag"||key==="tags")current.tags=splitTags(value);
@@ -68,6 +68,7 @@
       else if(key==="description")current.description=value;
       else if(key==="main quest")current.mainQuest=value;
       else if(key==="weekly quest")current.weeklyQuest=value;
+      else if(key==="replaces task")current.replacesTask=value;
       else if(key==="reason")current.reason=value;
       else if(key==="category")current.category=value;
     });
