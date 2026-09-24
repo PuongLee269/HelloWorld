@@ -31,8 +31,8 @@
     return {difficulty:level,xp:DIFFICULTY[level].xp,statEffects:effects,statTags:selected,usedDefaultTag:keys.length===0};
   }
   function stripFence(text){
-    return String(text||"").replace(/^\\uFEFF/,"").replace(/[\\u200B-\\u200D\\u2060]/g,"").trim()
-      .replace(/^```[a-zA-Z0-9_-]*\\s*/,"").replace(/\\s*```$/,"").trim();
+    return String(text||"").replace(/^\uFEFF/,"").replace(/[\u200B-\u200D\u2060]/g,"").trim()
+      .replace(/^\`\`\`[a-zA-Z0-9_-]*\s*/,"").replace(/\s*\`\`\`$/,"").trim();
   }
   function balancedJsonCandidates(source){
     const out=[];
@@ -41,7 +41,7 @@
       const stack=[];let quoted=false,escape=false;
       for(let i=start;i<source.length;i++){
         const c=source[i];
-        if(quoted){if(escape)escape=false;else if(c==="\\\\")escape=true;else if(c==='"')quoted=false;continue;}
+        if(quoted){if(escape)escape=false;else if(c==="\\")escape=true;else if(c==='"')quoted=false;continue;}
         if(c==='"'){quoted=true;continue;}
         if(c==="{"||c==="[")stack.push(c);
         else if(c==="}"||c==="]"){
