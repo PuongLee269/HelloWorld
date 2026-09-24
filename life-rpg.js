@@ -64,7 +64,7 @@ function dateAdd(value,days){const d=new Date(value+"T00:00:00");d.setDate(d.get
 function dateDiff(from,to){return Math.round((new Date(to+"T00:00:00")-new Date(from+"T00:00:00"))/86400000);}
 function periodBounds(rule,date,s){
  if(rule.taskType==="daily")return{start:date,end:date};
- if(rule.taskType==="weekly"){const d=new Date(date+"T00:00:00"),day=(d.getDay()+6)%7;return{start:dateAdd(date,-day),end:dateAdd(date,6-day)};}
+ if(rule.taskType==="weekly"){const anchor=s.planStart||rule.planStartDate||date,offset=Math.max(0,dateDiff(anchor,date)),start=dateAdd(anchor,Math.floor(offset/7)*7);return{start,end:dateAdd(start,6)};}
  return{start:s.planStart||rule.planStartDate,end:s.planEnd||rule.planEndDate};
 }
 function ruleCompleted(s,rule,date){
@@ -87,7 +87,7 @@ function ensurePlanTasks(s){
  let changed=false,created=0;
  for(const rule of dayRules){
   const bounds=periodBounds(rule,date,s),periodDays=Math.max(1,dateDiff(bounds.start,bounds.end)+1),dayIndex=Math.max(0,Math.min(periodDays-1,dateDiff(bounds.start,date)));
-  const done=ruleCompleted(s,rule,date),todayRows=s.tasks.filter(t=>t.taskDate===date&&t.ruleId===rule.id&&t.status!=="replaced"&&t.status!=="deferred");
+  const done=ruleCompleted(s,rule,date),todayRows=s.tasks.filter(t=>t.taskDate===date&&t.ruleId===rule.id);
   const outstanding=s.tasks.filter(t=>t.ruleId===rule.id&&t.taskDate<date&&t.status==="pending");
   outstanding.forEach(t=>{t.status="deferred";t.deferredAt=now();log(s,{action:"rescheduled",date,taskId:t.id,ruleId:rule.id,title:t.title,xpDelta:0,statDelta:{},reason:"Task chưa hoàn thành được giữ trong lịch sử và xét lại theo hạn mức của chu kỳ."});changed=true;});
   let count=0;
@@ -99,8 +99,8 @@ function ensurePlanTasks(s){
     const total=oneTime.length,ordinal=oneTimeIndex.get(rule.id)||0,idealDay=Math.floor((ordinal+1)*periodDays/(total+1));
     due=dayIndex>=idealDay;
    }else{
-    const target=Math.max(1,Number(rule.target)||1),dueByToday=Math.floor((dayIndex+1)*target/periodDays),daysLeft=periodDays-dayIndex;
-    due=done<dueByToday||(target-done)>=daysLeft;
+    const target=Math.max(1,Number(rule.target)||1),dueBeforeToday=Math.floor(dayIndex*target/periodDays),dueByToday=Math.floor((dayIndex+1)*target/periodDays),daysLeft=periodDays-dayIndex;
+    const scheduledToday=dueByToday>dueBeforeToday;due=scheduledToday||done<dueBeforeToday||(target-done)>=daysLeft;
    }
    if(due)count=1;
   }
