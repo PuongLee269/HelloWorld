@@ -104,6 +104,12 @@
     return weak;
   }
 
+  function parseDate(value) {
+    const parts = String(value || "").split("-").map(Number);
+    if (parts.length !== 3) return new Date();
+    return new Date(parts[0], parts[1]-1, parts[2]);
+  }
+
   function generateLocal(context, count, date) {
     const history = Array.isArray(context && context.recentTaskHistory) ? context.recentTaskHistory : [];
     const currentDate = parseDate(date);
