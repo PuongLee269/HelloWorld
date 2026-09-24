@@ -177,14 +177,38 @@ function applyEveningSwitch(s,force){
  log(s,{action:"evening_plan_activated",date:today(),title:"Đã chuyển Task còn lại sang buổi tối",count:replacements.length,xpDelta:0,statDelta:{}});
  save(s);return true;
 }
+function advancePlanBatch(s,phase,batch){
+ const plan=s.plans.find(p=>p.id===s.activePlanId&&p.status==="active"),date=today();if(!plan||date>plan.endDate)return 0;
+ const batchRules=new Set(batch.map(t=>t.ruleId).filter(Boolean)),cutoff=dateAdd(date,-3);
+ const recent=new Set(s.history.filter(e=>e.ruleId&&e.date>=cutoff&&["created","completed","skipped","task_swapped_in","task_deleted"].includes(e.action)).map(e=>e.ruleId));
+ const compatible=r=>phase==="evening"?(r.preferredTime==="evening"||r.preferredTime==="any"):r.preferredTime!=="evening";
+ const remaining=r=>{
+  const target=Math.max(1,Number(r.target)||1),done=ruleCompleted(s,r,date);
+  if(r.taskType==="daily")return Math.max(0,target-s.tasks.filter(t=>t.ruleId===r.id&&t.taskDate===date&&t.status!=="replaced"&&t.status!=="deferred"&&t.status!=="archived"&&t.status!=="deleted").length);
+  const bounds=periodBounds(r,date,s),pending=s.tasks.filter(t=>t.ruleId===r.id&&t.taskDate>=bounds.start&&t.taskDate<=bounds.end&&t.status==="pending").length;
+  return Math.max(0,target-done-pending);
+ };
+ const active=s.taskRules.filter(r=>r.planId===plan.id&&r.status==="active"&&compatible(r)&&!batchRules.has(r.id)&&remaining(r)>0&&!s.tasks.some(t=>t.ruleId===r.id&&t.taskDate===date&&t.status==="pending"));
+ const sort=(a,b)=>((a.preferredTime===phase?0:1)-(b.preferredTime===phase?0:1))||String(a.createdAt).localeCompare(String(b.createdAt));
+ const preferred=active.filter(r=>!recent.has(r.id)).sort(sort),rotation=active.filter(r=>recent.has(r.id)).sort(sort),choices=preferred.concat(rotation);
+ let created=0;
+ for(const rule of choices){
+  if(created>=3||s.tasks.filter(t=>t.taskDate===date&&!["replaced","deferred","archived","deleted"].includes(t.status)).length>=20)break;
+  const order=s.tasks.filter(t=>t.taskDate===date&&t.timeOfDay===phase).reduce((m,t)=>Math.max(m,Number(t.queueOrder)||0),-1)+1;
+  const task=ruleOccurrence(s,rule,date,created,phase,order);if(!task)continue;
+  s.tasks.push(task);log(s,{action:"created",date,taskId:task.id,ruleId:rule.id,title:task.title,timeOfDay:phase,taskType:rule.taskType,target:rule.target,period:rule.period,xpDelta:0,statDelta:{},reason:"Lượt Task tiếp theo được mở từ gói kế hoạch sau khi hoàn thành bộ trước."});created++;
+ }
+ return created;
+}
 function complete(id){
  const s=rollover(state()),t=s.tasks.find(x=>x.id===id);if(!t||t.status!=="pending")return;
  t.status="completed";t.completedAt=now();const effects={};
  Object.keys(t.statEffects||{}).forEach(k=>{if(KEYS.includes(k)){const amount=Math.max(0,Math.min(5,Math.round(Number(t.statEffects[k])||0)));if(amount){s.stats[k]=(Number(s.stats[k])||0)+amount;effects[k]=amount;}}});
  addXp(s,t.xp);
  log(s,{action:"completed",date:today(),taskId:t.id,ruleId:t.ruleId||null,title:t.title,category:t.category,tags:t.tags,difficulty:t.difficulty,xpDelta:t.xp,statDelta:effects,mainQuestId:t.mainQuestId,weeklyQuestId:t.weeklyQuestId,reason:t.reason,createdAt:t.createdAt,completedAt:t.completedAt,originalTaskDate:t.originalTaskDate||t.taskDate});
+ const finishedBatch=t.batchId?s.tasks.filter(x=>x.batchId===t.batchId&&!x.hiddenFromQueue&&["pending","completed"].includes(x.status)):[],advanced=finishedBatch.length>=3&&finishedBatch.every(x=>x.status==="completed")?advancePlanBatch(s,t.timeOfDay,finishedBatch):0;
  let bonus=0;if(completedToday(s,today())>=6&&!s.bonuses["six-tasks:"+today()]){s.bonuses["six-tasks:"+today()]=true;bonus=3;addXp(s,bonus);log(s,{action:"daily_bonus",date:today(),title:"Thưởng hoàn thành 6 Task",xpDelta:bonus,statDelta:{}});}
- s.feedback="+"+t.xp+" XP · "+taskEffectsLine(effects)+(bonus?" · Thưởng +3 XP":"");save(s);render("tasks");
+ s.feedback="+"+t.xp+" XP · "+taskEffectsLine(effects)+(bonus?" · Thưởng +3 XP":"")+(advanced?" · Đã mở "+advanced+" Task tiếp theo":"");save(s);render("tasks");
 }
 function skip(id){const s=rollover(state()),t=s.tasks.find(x=>x.id===id);if(!t||t.status!=="pending")return;t.status="skipped";log(s,{action:"skipped",date:today(),taskId:t.id,ruleId:t.ruleId||null,title:t.title,category:t.category,tags:t.tags,difficulty:t.difficulty,xpDelta:0,statDelta:{},reason:"Người dùng bỏ qua Task."});s.feedback="Đã bỏ qua Task; không thay đổi XP/Stats.";save(s);render("tasks");}
 function swapTasks(mode){
