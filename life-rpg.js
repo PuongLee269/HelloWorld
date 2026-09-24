@@ -128,8 +128,10 @@ function importPlan(s,parsed){
  }).filter(Boolean);
  const unique=[],seen=new Set();rules.forEach(r=>{const key=r.title.toLowerCase();if(!seen.has(key)){seen.add(key);unique.push(r);}});
  if(!unique.length)throw new Error("Gói kế hoạch chưa có Task hợp lệ.");
+ const archivedRuleIds=new Set(s.taskRules.filter(r=>r.status==="active").map(r=>r.id));
  s.taskRules.forEach(r=>{if(r.status==="active")r.status="archived";});
  s.plans.forEach(p=>{if(p.status==="active")p.status="archived";});
+ s.tasks.forEach(t=>{if(archivedRuleIds.has(t.ruleId)&&t.status==="pending")t.status="archived";});
  const start=today(),end=dateAdd(start,29),planId="plan-"+Date.now()+"-"+Math.random().toString(36).slice(2,7);
  const main=parsed.mainQuest;if(main)addQuest(s,"main",main);
  (parsed.weeklyQuests||[]).forEach(q=>addQuest(s,"weekly",q));
@@ -284,7 +286,7 @@ function renderStats(s){
 }
 function buildPrompt(){const s=state(),actions=s.history.filter(e=>e.action==="completed"||e.action==="skipped"),den=actions.length,done=actions.filter(e=>e.action==="completed").length,skipped=actions.filter(e=>e.action==="skipped"||e.action==="task_deleted").slice(-20).map(e=>({title:e.title,action:e.action,date:e.date,reason:e.reason}));return window.LifeRpgTaskEngine.makePrompt({userData:{profile:{name:s.user.name,level:s.level,xp:s.xp},goals:s.user.goals,mainQuest:activeQuest(s,"main"),weeklyQuest:activeQuest(s,"weekly"),currentStats:s.stats,completionRate:den?done/den:0,taskHistory:s.history.slice(-60),skippedOrDeleted:skipped,activePlan:s.plans.find(p=>p.id===s.activePlanId)||null,activeTaskRules:s.taskRules.filter(r=>r.planId===s.activePlanId&&r.status==="active").map(r=>({title:r.title,taskType:r.taskType,target:r.target,period:r.period,preferredTime:r.preferredTime,tags:r.tags})),statGrowth:growth(s,30)},answers:s.aiConversation&&s.aiConversation.status==="ANSWERED"?s.aiConversation.answers||[]:[]});}
 function taskManagerMarkup(s){
- const tasks=s.tasks.filter(t=>t.taskDate===today()&&t.status!=="deleted").sort((a,b)=>(a.timeOfDay==="evening"?1:0)-(b.timeOfDay==="evening"?1:0)||(Number(a.batchOrder)||0)-(Number(b.batchOrder)||0)||queueOrder(a,b));
+ const tasks=s.tasks.filter(t=>t.taskDate===today()&&t.status!=="deleted"&&t.status!=="archived").sort((a,b)=>(a.timeOfDay==="evening"?1:0)-(b.timeOfDay==="evening"?1:0)||(Number(a.batchOrder)||0)-(Number(b.batchOrder)||0)||queueOrder(a,b));
  const status={pending:"Chờ",completed:"Đã xong",deferred:"Đã chuyển",inactive:"Phương án dự phòng",replaced:"Đã đổi",skipped:"Bỏ qua"};
  return '<section class="rpg-panel"><h2>Danh sách Task hôm nay</h2><form id="manual-task-form" class="rpg-manage-form"><input name="title" maxlength="140" placeholder="Nội dung Task" required><input name="tags" maxlength="180" placeholder="Tag chỉ số hoặc chủ đề (tùy chọn)"><select name="difficulty"><option>Easy</option><option selected>Normal</option><option>Hard</option><option>Epic</option></select><select name="timeOfDay"><option value="day">Ban ngày</option><option value="evening">Buổi tối</option></select><button class="btn-primary">Thêm Task thủ công</button></form><div class="rpg-manage-list">'+(tasks.length?tasks.map(t=>'<div class="rpg-manage-row"><span>'+esc(t.title)+' <small>· '+(t.timeOfDay==="evening"?"Buổi tối":"Ban ngày")+' · '+esc(status[t.status]||t.status)+'</small></span><button class="btn-ghost" data-remove-task="'+esc(t.id)+'" aria-label="Xóa '+esc(t.title)+'">Xóa</button></div>').join(""):'<div class="rpg-empty">Chưa có Task.</div>')+'</div></section>';
 }
