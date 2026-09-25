@@ -389,6 +389,23 @@ function renderEnergy(s){
  document.getElementById("confirm-reset-energy").onclick=clearEnergyHistory;
  const form=document.getElementById("energy-button-form");form.onsubmit=e=>{e.preventDefault();const f=e.currentTarget,data={title:f.elements.title.value,icon:f.elements.icon.value};KEYS.forEach(k=>data[k]=f.elements[k].value);if(addEnergyButton(data))f.reset();};
 }
+function renderSettings(s){
+ view.innerHTML=style()+'<div class="rpg-wrap"><section class="rpg-panel"><h2>Cài đặt</h2><p class="rpg-muted">Chọn một mục để mở cửa sổ thao tác.</p><div class="settings-tools"><button type="button" data-settings-tool="energy">⚡<span>Nút năng lượng</span></button><button type="button" data-settings-tool="import">📥<span>Nạp Quest & Task</span></button><button type="button" data-settings-tool="manage">🗂️<span>Quản lý Task</span></button><button type="button" data-settings-tool="ai">🤖<span>Prompt AI & tag</span></button><button type="button" data-settings-tool="profile">👤<span>Hồ sơ & sao lưu</span></button></div></section><div id="settings-tool-modal" class="energy-modal" hidden><div class="energy-modal-backdrop" data-settings-close></div><section class="energy-modal-card settings-tool-card" role="dialog" aria-modal="true"><div class="rpg-head"><h2 id="settings-tool-title">Cài đặt</h2><button type="button" class="btn-ghost" data-settings-close aria-label="Đóng">×</button></div><div id="settings-tool-body"></div></section></div></div>';
+ view.querySelectorAll("[data-settings-tool]").forEach(b=>b.onclick=()=>openSettingsTool(b.dataset.settingsTool));
+ view.querySelectorAll("[data-settings-close]").forEach(b=>b.onclick=()=>{document.getElementById("settings-tool-modal").hidden=true;});
+}
+function openSettingsTool(tool){
+ const modal=document.getElementById("settings-tool-modal"),body=document.getElementById("settings-tool-body");if(!modal||!body)return;
+ const labels={energy:"Nút năng lượng",import:"Nạp Quest & Task",manage:"Quản lý Task",ai:"Prompt AI & tag",profile:"Hồ sơ & sao lưu"};
+ document.getElementById("settings-tool-title").textContent=labels[tool]||"Cài đặt";modal.hidden=false;
+ if(tool==="energy")renderEnergy(state(),body);else renderImport(state(),body,({import:0,manage:1,ai:2,profile:4})[tool]||0);
+}
+function refreshEnergyTool(){
+ const body=document.getElementById("settings-tool-body"),modal=document.getElementById("settings-tool-modal");if(activeTab==="settings"&&body&&modal&&!modal.hidden)renderEnergy(state(),body);else render("settings");
+}
+function refreshImportTool(){
+ const body=document.getElementById("settings-tool-body"),modal=document.getElementById("settings-tool-modal"),title=document.getElementById("settings-tool-title");if(activeTab==="settings"&&body&&modal&&!modal.hidden){const focus=title.textContent==="Quản lý Task"?1:title.textContent==="Prompt AI & tag"?2:title.textContent==="Hồ sơ & sao lưu"?4:0;renderImport(state(),body,focus);}else render("settings");
+}
 function renderStats(s){
  const need=needed(s.level),pct=Math.min(100,Math.round(s.xp/need*100)),days=Number(s.preferences.growthDays)||7,g=growth(s,days),max=Math.max(1,...KEYS.map(k=>s.stats[k])),gmax=Math.max(1,...KEYS.map(k=>g[k]));
  view.innerHTML=style()+'<div class="rpg-wrap"><section class="rpg-panel"><div class="rpg-head"><h2>Level '+s.level+'</h2><strong>'+s.xp+' / '+need+' XP</strong></div><div class="rpg-progress"><span style="width:'+pct+'%"></span></div><div class="rpg-muted">Còn '+(need-s.xp)+' XP tới Level '+(s.level+1)+'</div></section><section class="rpg-panel"><h2>6 chỉ số hiện tại</h2><div class="rpg-chart"><div>'+radar(s.stats,max,"Current Stats")+'</div><div>'+KEYS.map(k=>'<div class="rpg-stat"><span><b>'+k+'</b> · '+NAMES[k]+'</span><strong>'+Math.round(s.stats[k]||0)+'</strong></div>').join("")+'</div></div><p class="rpg-muted">VIT là chỉ số game hóa, không phải chẩn đoán hoặc đo tuổi sinh học y khoa.</p></section><section class="rpg-panel"><div class="rpg-head"><h2>Tiến độ tăng trong '+days+' ngày</h2><div><button class="btn-ghost" data-days="7">7 ngày</button> <button class="btn-ghost" data-days="30">30 ngày</button></div></div><div class="rpg-chart"><div>'+radar(g,gmax,"Stat Growth")+'</div><div>'+KEYS.map(k=>'<div class="rpg-stat"><span><b>'+k+'</b> · '+NAMES[k]+'</span><strong>+'+Math.round(g[k]||0)+'</strong></div>').join("")+'</div></div></section><section class="rpg-panel"><h2>Lịch sử XP & Stats</h2><div class="rpg-history">'+(s.history.slice().reverse().slice(0,80).map(e=>'<div><b>'+esc(e.date||"")+'</b> · '+esc(e.title||e.action)+' · '+(Number(e.xpDelta)>0?"+"+e.xpDelta:Number(e.xpDelta)||0)+' XP · '+esc(taskEffectsLine(e.statDelta||{}))+'</div>').join("")||'<div class="rpg-muted">Chưa có lịch sử.</div>')+'</div></section></div>';
@@ -418,10 +435,10 @@ function renderImport(s){
  document.getElementById("copy-prompt").onclick=async()=>{try{await navigator.clipboard.writeText(prompt);document.getElementById("copy-prompt").textContent="Đã sao chép";}catch(_){const r=document.createRange();r.selectNodeContents(document.getElementById("prompt-text"));const sel=window.getSelection();sel.removeAllRanges();sel.addRange(r);document.getElementById("copy-prompt").textContent="Chọn prompt rồi sao chép";}};
 }
 function render(tab){
- const current=rollover(state());applyEveningSwitch(current,false);activeTab=["tasks","stats","import","energy"].includes(tab)?tab:"tasks";
- const items=[{id:"tasks",label:"Task",icon:"✅"},{id:"stats",label:"Chỉ số",icon:"📊"},{id:"energy",label:"Năng lượng",icon:"⚡"},{id:"import",label:"Nạp Quest & Task",icon:"📋"}];
+ const current=rollover(state());applyEveningSwitch(current,false);activeTab=["tasks","stats","settings"].includes(tab)?tab:"tasks";
+ const items=[{id:"tasks",label:"Task",icon:"✅"},{id:"stats",label:"Chỉ số",icon:"📊"},{id:"settings",label:"Cài đặt",icon:"⚙️"}];
  if(tabsBar){tabsBar.innerHTML=items.map(i=>'<button type="button" class="tab-btn '+(activeTab===i.id?"active":"")+'" data-rpg-tab="'+i.id+'" aria-label="'+i.label+'">'+i.icon+'</button>').join("");tabsBar.querySelectorAll("[data-rpg-tab]").forEach(b=>b.onclick=()=>render(b.dataset.rpgTab));}
- const s=rollover(state());if(activeTab==="stats")renderStats(s);else if(activeTab==="energy")renderEnergy(s);else if(activeTab==="import")renderImport(s);else renderTasks(s);
+ const s=rollover(state());if(activeTab==="stats")renderStats(s);else if(activeTab==="settings")renderSettings(s);else renderTasks(s);
 }
 function rolloverForLegacy(){rollover(state());return true;}
 const storageKey="tq_liferpg_state_v1";if(!localStorage.getItem(storageKey))save(fresh());else{try{const stored=JSON.parse(localStorage.getItem(storageKey));if(stored.schemaVersion!==2)save(state());}catch(_){}}
