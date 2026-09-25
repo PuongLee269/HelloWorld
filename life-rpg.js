@@ -327,7 +327,7 @@ function energyQuickMarkup(s,returnTab){
 }
 function bindEnergyQuick(returnTab){
  document.querySelectorAll("[data-energy-quick]").forEach(b=>b.onclick=()=>recordEnergy(b.dataset.energyQuick,returnTab));
- document.querySelectorAll("[data-open-energy]").forEach(b=>b.onclick=()=>openSettingsTool("energy"));
+ document.querySelectorAll("[data-open-energy]").forEach(b=>b.onclick=()=>{render("settings");openSettingsTool("energy");});
 }
 function recordEnergy(buttonId,returnTab){
  const s=state(),button=s.energyButtons.find(b=>b.id===buttonId);if(!button)return;
