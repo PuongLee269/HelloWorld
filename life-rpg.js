@@ -481,6 +481,7 @@ function rolloverForLegacy(){rollover(state());return true;}
 const storageKey="tq_liferpg_state_v1";if(!localStorage.getItem(storageKey))save(fresh());else{try{const stored=JSON.parse(localStorage.getItem(storageKey));if(stored.schemaVersion!==2)save(state());}catch(_){}}
 try{if(window.stopDaySyncMonitoring)window.stopDaySyncMonitoring();}catch(_){}
 window.LifeRpg={render,rollover:rolloverForLegacy,state,completeTask:complete,skipTask:skip,importPaste,buildPrompt,swapTasks,addManualTask,removeTask,recordLucky};
+const heroLucky=document.querySelector("[data-lucky-button]");if(heroLucky)heroLucky.onclick=recordLucky;
 window.render=render;render("tasks");
 let lastTimeBlock=timeOfDay();window.setInterval(()=>{const nextBlock=timeOfDay(),dayChanged=state().currentDate!==today();if(dayChanged||nextBlock!==lastTimeBlock){lastTimeBlock=nextBlock;render(activeTab);}},60000);
 window.setInterval(()=>{if(activeTab==="tasks")updateEnergyCooldownUI();},1000);
