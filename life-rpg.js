@@ -417,7 +417,7 @@ function recordLucky(){
  const event={id:"lucky-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),date:today(),at:now(),statDelta:delta};
  s.luckyEvents=s.luckyEvents||[];s.luckyEvents.push(event);if(s.luckyEvents.length>5000)s.luckyEvents=s.luckyEvents.slice(-5000);
  log(s,{action:"lucky_event",date:event.date,at:event.at,title:"Lucky",xpDelta:0,statDelta:delta,reason:"Ghi nhận thời điểm gặp may."});
- s.feedback="Đã ghi nhận Lucky"+(taskEffectsLine(delta)?" · "+taskEffectsLine(delta):"");save(s);render(activeTab);
+ s.feedback="Đã ghi nhận Lucky"+(taskEffectsLine(delta)?" · "+taskEffectsLine(delta):"");save(s);if(activeTab==="stats")render("stats");const button=document.querySelector("[data-lucky-button]");if(button){button.textContent="🍀 Lucky ✓";setTimeout(()=>{if(button.isConnected)button.textContent="🍀 Lucky";},1300);}
 }
 function luckyHistoryText(events){
  const rows=(events||[]).slice().reverse().map(e=>{const time=new Date(e.at);return(e.date||"")+" "+(Number.isNaN(time.getTime())?"":time.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}))+" | "+(taskEffectsLine(e.statDelta)||"Không cộng chỉ số");});
