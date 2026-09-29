@@ -7,6 +7,8 @@
   const form = document.getElementById("mori-auth-form");
   const error = document.getElementById("mori-auth-error");
   const endpointInput = form && form.elements.endpoint;
+  const connectionPanel = document.getElementById("mori-auth-connection");
+  const saveEndpointButton = document.getElementById("mori-auth-save-endpoint");
   const challengeBox = document.getElementById("mori-auth-turnstile");
   let widget = null;
   let turnstileKey = "";
@@ -61,21 +63,34 @@
   }
 
   if (endpointInput) endpointInput.value = endpoint();
+  if (connectionPanel && !endpoint()) connectionPanel.open = true;
   (async function init() {
     if (!gate || !app || !form) return;
     const base = endpoint();
-    if (!base) { setError("Nhập URL Worker đã triển khai để bật đăng nhập Mori Quest."); return; }
+    if (!base) { setError("Thiết lập kết nối một lần trong mục bên dưới để bật đăng nhập."); return; }
     if (!/^https:\/\//i.test(base)) { setError("Worker URL phải dùng HTTPS."); return; }
     if (await validateSavedSession(base)) return;
     try { await getConfig(base); setError(""); }
     catch (e) { setError(e.message || "Không kết nối được Worker."); }
   })();
 
+  if (saveEndpointButton) saveEndpointButton.onclick = async () => {
+    const value = String(endpointInput && endpointInput.value || "").trim().replace(/\/+$/, "");
+    if (!/^https:\/\//i.test(value)) { setError("Worker URL phải dùng HTTPS."); return; }
+    saveEndpointButton.disabled = true; saveEndpointButton.textContent = "Đang kiểm tra…";
+    try {
+      await getConfig(value);
+      localStorage.setItem(ENDPOINT_KEY, value);
+      if (connectionPanel) connectionPanel.open = false;
+      setError("Đã lưu kết nối. Lần sau chỉ cần nhập mật khẩu.");
+    } catch (e) { setError(e.message || "Không thể kết nối Worker."); }
+    finally { saveEndpointButton.disabled = false; saveEndpointButton.textContent = "Lưu kết nối trên thiết bị này"; }
+  };
+
   if (form) form.onsubmit = async event => {
     event.preventDefault(); setError("");
-    const base = String(endpointInput.value || "").trim().replace(/\/+$/, "");
-    if (!/^https:\/\//i.test(base)) { setError("Worker URL phải dùng HTTPS."); return; }
-    localStorage.setItem(ENDPOINT_KEY, base);
+    const base = endpoint();
+    if (!base) { if (connectionPanel) connectionPanel.open = true; setError("Lưu kết nối Worker một lần trước khi đăng nhập."); return; }
     const button = form.querySelector("button[type=submit]");
     button.disabled = true; button.textContent = "Đang xác thực…";
     try {
