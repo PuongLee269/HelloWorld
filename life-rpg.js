@@ -52,7 +52,7 @@ function addQuest(s,type,raw){
  if(type==="main")s.quests.forEach(q=>{if(q.type==="main"&&q.status==="active")q.status="completed";});
  const quest={id:"quest-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),type,title,description:String(raw.description||""),target:Math.max(1,Number(raw.target)||4),status:"active",createdAt:now(),mainQuestId:null};
  const parent=raw.mainQuest||raw.main_quest;if(type==="weekly"&&parent){const m=addQuest(s,"main",parent);quest.mainQuestId=m&&m.id;}
- s.quests.push(quest);log(s,{action:"quest_created",date:today(),questType:type,title,xpDelta:0,statDelta:{},reason:"Được nhập từ gói Quest AI."});return quest;
+ s.quests.push(quest);log(s,{action:"quest_created",date:today(),questType:type,title,xpDelta:0,statDelta:{},reason:"Quest được thêm thủ công trong ứng dụng."});return quest;
 }
 function makeTask(s,raw,index,date,forcedTime,sequence){
  const title=String(raw.title||raw.text||"").trim();if(!title)return null;
@@ -168,9 +168,9 @@ function applyEveningSwitch(s,force){
  if(timeOfDay()!=="evening")return false;
  const flag="evening-switch:"+today(),already=!!s.bonuses[flag];
  if(already&&!force)return false;
- const pending=s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay!=="evening"&&t.status==="pending");
+ const pending=s.tasks.filter(t=>t.taskDate===today()&&!t.manual&&t.timeOfDay!=="evening"&&t.status==="pending");
  if(!pending.length){if(!already){s.bonuses[flag]=true;s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay==="evening"&&t.status==="pending").forEach(t=>t.status="inactive");log(s,{action:"evening_check",date:today(),title:"Không còn Task ban ngày cần thay thế",xpDelta:0,statDelta:{}});save(s);}return false;}
- const alts=s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay==="evening"&&(t.status==="pending"||t.status==="inactive"));
+ const alts=s.tasks.filter(t=>t.taskDate===today()&&!t.manual&&t.timeOfDay==="evening"&&(t.status==="pending"||t.status==="inactive"));
  if(!alts.length)return false;
  const selected=alts.filter(e=>pending.some(d=>e.replacesTask&&e.replacesTask.toLowerCase()===d.title.toLowerCase()));
  const replacements=selected.length?selected:alts.filter(e=>!e.replacesTask);
@@ -281,7 +281,7 @@ function addManualTask(form){
  const phase=["morning","evening","all_day"].includes(form.timeOfDay)?form.timeOfDay:"all_day",same=s.tasks.filter(t=>t.taskDate===date&&t.timeOfDay===phase);
  const order=same.reduce((max,t)=>Math.max(max,Number(t.queueOrder)||0),-1)+1;
  const raw={title,tags:String(form.tags||"").split(/[,;|]/).map(x=>x.trim()).filter(Boolean),difficulty:form.difficulty||"Normal",energyRole:form.energyRole||"focus",mainQuestId:form.mainQuestId||null,weeklyQuestId:form.weeklyQuestId||null};
- const task=makeTask(s,raw,order,date,phase,order);if(!task)return false;
+ const task=makeTask(s,raw,order,date,phase,order);if(!task)return false;task.manual=true;
  s.tasks.push(task);log(s,{action:"created",date,taskId:task.id,title:task.title,tags:task.tags,difficulty:task.difficulty,timeOfDay:phase,xpDelta:0,statDelta:{},reason:"Task do người dùng thêm thủ công."});
  s.feedback="Đã thêm Task vào hàng chờ "+(phase==="morning"?"buổi sáng":phase==="evening"?"buổi tối":phase==="all_day"?"cả ngày":"ban ngày")+".";if(phase==="evening")s.eveningActivatedDate=date;save(s);refreshManualTool();return true;
 }
