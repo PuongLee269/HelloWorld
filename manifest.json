@@ -1,6 +1,6 @@
 {
-  "name": "Todo Quest",
-  "short_name": "TodoQuest",
+  "name": "Mori Quest",
+  "short_name": "Mori Quest",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#f6f7ff",

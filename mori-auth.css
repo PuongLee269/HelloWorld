@@ -8,4 +8,6 @@
 .mori-auth-card input { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid #c8c9d6; border-radius: 10px; font: inherit; }
 .mori-auth-card small { color: #646a84; }
 .mori-auth-submit { min-height: 46px; border: 0; border-radius: 10px; background: #7866ee; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
-#mori-auth-error { color: #a43b3b; min-height: 1.4em; }
+#mori-auth-error { color: #646a84; min-height: 1.4em; }
+#mori-auth-error[role="alert"] { color: #a43b3b; }
+.mori-auth-submit:disabled { opacity: .55; cursor: wait; }
