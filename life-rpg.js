@@ -401,7 +401,7 @@ function renderEnergy(s,target=view){
  const form=document.getElementById("energy-button-form");form.onsubmit=e=>{e.preventDefault();const f=e.currentTarget,data={title:f.elements.title.value,icon:f.elements.icon.value};KEYS.forEach(k=>data[k]=f.elements[k].value);if(addEnergyButton(data))f.reset();};
 }
 function renderSettings(s){
- view.innerHTML=style()+'<div class="rpg-wrap"><section class="rpg-panel"><h2>Cài đặt</h2><p class="rpg-muted">Chọn một mục để mở cửa sổ thao tác.</p><div class="settings-tools"><button type="button" class="btn-ghost" data-settings-tool="energy">⚡<span>Nút năng lượng</span></button><button type="button" class="btn-ghost" data-settings-tool="lucky">🍀<span>Lucky</span></button><button type="button" class="btn-ghost" data-settings-tool="quests">🧭<span>Quest & Task</span></button><button type="button" class="btn-ghost" data-settings-tool="profile">👤<span>Hồ sơ & sao lưu</span></button></div></section><div id="settings-tool-modal" class="energy-modal" hidden><div class="energy-modal-backdrop" data-settings-close></div><section class="energy-modal-card settings-tool-card" role="dialog" aria-modal="true"><div class="rpg-head"><h2 id="settings-tool-title">Cài đặt</h2><button type="button" class="btn-ghost" data-settings-close aria-label="Đóng">×</button></div><div id="settings-tool-body"></div></section></div></div>';
+ view.innerHTML=style()+'<div class="rpg-wrap"><section class="rpg-panel"><h2>Cài đặt</h2><p class="rpg-muted">Chọn một mục để mở cửa sổ thao tác.</p><div class="settings-tools"><button type="button" class="btn-ghost" data-settings-tool="energy">⚡<span>Nút năng lượng</span></button><button type="button" class="btn-ghost" data-settings-tool="lucky">🍀<span>Lucky</span></button><button type="button" class="btn-ghost" data-settings-tool="quests">🧭<span>Quest & Task</span></button><button type="button" class="btn-ghost" data-settings-tool="profile">👤<span>Hồ sơ & sao lưu</span></button><button type="button" class="btn-ghost" data-settings-tool="ai">🤖<span>AI Quest</span></button></div></section><div id="settings-tool-modal" class="energy-modal" hidden><div class="energy-modal-backdrop" data-settings-close></div><section class="energy-modal-card settings-tool-card" role="dialog" aria-modal="true"><div class="rpg-head"><h2 id="settings-tool-title">Cài đặt</h2><button type="button" class="btn-ghost" data-settings-close aria-label="Đóng">×</button></div><div id="settings-tool-body"></div></section></div></div>';
  view.querySelectorAll("[data-settings-tool]").forEach(b=>b.onclick=()=>openSettingsTool(b.dataset.settingsTool));
  view.querySelectorAll("[data-settings-close]").forEach(b=>b.onclick=()=>{document.getElementById("settings-tool-modal").hidden=true;});
 }
@@ -421,9 +421,9 @@ function renderLuckySettings(s,target){
 }
 function openSettingsTool(tool){
  const modal=document.getElementById("settings-tool-modal"),body=document.getElementById("settings-tool-body");if(!modal||!body)return;
- const labels={energy:"Nút năng lượng",lucky:"Cài đặt Lucky",quests:"Quest & Task",profile:"Hồ sơ & sao lưu"};
+ const labels={energy:"Nút năng lượng",lucky:"Cài đặt Lucky",quests:"Quest & Task",profile:"Hồ sơ & sao lưu",ai:"AI Quest"};
  document.getElementById("settings-tool-title").textContent=labels[tool]||"Cài đặt";modal.hidden=false;
- if(tool==="energy")renderEnergy(state(),body);else if(tool==="lucky")renderLuckySettings(state(),body);else if(tool==="quests")renderManualQuestTask(state(),body);else renderImport(state(),body,4);
+ if(tool==="energy")renderEnergy(state(),body);else if(tool==="lucky")renderLuckySettings(state(),body);else if(tool==="quests")renderManualQuestTask(state(),body);else if(tool==="ai"&&window.MoriQuestAI)window.MoriQuestAI.render(state(),body);else renderImport(state(),body,4);
 }
 function refreshEnergyTool(){
  const body=document.getElementById("settings-tool-body"),modal=document.getElementById("settings-tool-modal");if(activeTab==="settings"&&body&&modal&&!modal.hidden)renderEnergy(state(),body);else render("settings");
