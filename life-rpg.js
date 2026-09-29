@@ -59,7 +59,7 @@ function makeTask(s,raw,index,date,forcedTime,sequence){
  const tags=window.LifeRpgTaskEngine.statTags(raw.tags||raw.category||"");
  const score=window.LifeRpgTaskEngine.score(tags,raw.difficulty);
  const allTags=(Array.isArray(raw.tags)?raw.tags:String(raw.tags||"").split(/[,;|]/)).map(x=>String(x).trim()).filter(Boolean).slice(0,12);
- const shift=forcedTime||(["day","evening"].includes(raw.timeOfDay)?raw.timeOfDay:"day");
+ const shift=forcedTime||(["morning","day","evening","all_day"].includes(raw.timeOfDay)?raw.timeOfDay:"day");
  const order=Number.isFinite(sequence)?sequence:(s.tasks.filter(t=>t.taskDate===date&&t.timeOfDay===shift).length+index),batchOrder=Math.floor(order/3);
  const main=raw.mainQuestId?s.quests.find(q=>q.id===raw.mainQuestId):s.quests.find(q=>q.type==="main"&&q.status==="active"&&raw.mainQuest&&q.title.toLowerCase()===String(raw.mainQuest).toLowerCase());
  const weekly=raw.weeklyQuestId?s.quests.find(q=>q.id===raw.weeklyQuestId):s.quests.find(q=>q.type==="weekly"&&q.status==="active"&&raw.weeklyQuest&&q.title.toLowerCase()===String(raw.weeklyQuest).toLowerCase());
@@ -76,7 +76,7 @@ function ruleCompleted(s,rule,date){
  const bounds=periodBounds(rule,date,s);
  return s.history.filter(e=>e.action==="completed"&&e.ruleId===rule.id&&e.date>=bounds.start&&e.date<=bounds.end).length;
 }
-function rulePhase(rule){if(rule.preferredTime==="evening")return"evening";if(rule.preferredTime==="any")return timeOfDay()==="evening"?"evening":"day";return"day";}
+function rulePhase(rule){if(rule.preferredTime==="evening")return"evening";if(rule.preferredTime==="morning")return"morning";if(rule.preferredTime==="any"||rule.preferredTime==="all_day")return timeOfDay()==="evening"?"evening":timeOfDay()==="morning"?"morning":"day";return"day";}
 function ruleOccurrence(s,rule,date,index,phase,order){
  const raw={title:rule.title,description:rule.description,category:rule.category,tags:rule.tags,difficulty:rule.difficulty,energyRole:rule.energyRole,mainQuestId:rule.mainQuestId,weeklyQuestId:rule.weeklyQuestId,reason:rule.reason};
  const t=makeTask(s,raw,index,date,phase,order);if(!t)return null;
@@ -162,7 +162,7 @@ function importPaste(text){
  if(parsed.status!=="PLAN_READY"||!Array.isArray(parsed.tasks)||!parsed.tasks.length)throw new Error("Không thấy gói PLAN_READY có danh sách tasks.");
  return importPlan(s,parsed);
 }
-function timeOfDay(){return new Date().getHours()>=18?"evening":"day";}
+function timeOfDay(){const h=new Date().getHours();return h>=18?"evening":h<12?"morning":"day";}
 function applyEveningSwitch(s,force){
  if(s.activePlanId&&s.taskRules.some(r=>r.planId===s.activePlanId&&r.status==="active"))return false;
  if(timeOfDay()!=="evening")return false;
@@ -278,19 +278,18 @@ function addManualTask(form){
  const s=rollover(state()),date=today(),count=s.tasks.filter(t=>t.taskDate===date).length;
  if(count>=50){alert("Đã đạt giới hạn 50 Task hôm nay.");return false;}
  const title=String(form.title||"").trim();if(!title){alert("Nhập nội dung Task.");return false;}
- const phase=form.timeOfDay==="evening"?"evening":"day",same=s.tasks.filter(t=>t.taskDate===date&&t.timeOfDay===phase);
+ const phase=["morning","evening","all_day"].includes(form.timeOfDay)?form.timeOfDay:"all_day",same=s.tasks.filter(t=>t.taskDate===date&&t.timeOfDay===phase);
  const order=same.reduce((max,t)=>Math.max(max,Number(t.queueOrder)||0),-1)+1;
- const raw={title,tags:String(form.tags||"").split(/[,;|]/).map(x=>x.trim()).filter(Boolean),difficulty:form.difficulty||"Normal",energyRole:form.energyRole||"focus"};
+ const raw={title,tags:String(form.tags||"").split(/[,;|]/).map(x=>x.trim()).filter(Boolean),difficulty:form.difficulty||"Normal",energyRole:form.energyRole||"focus",mainQuestId:form.mainQuestId||null,weeklyQuestId:form.weeklyQuestId||null};
  const task=makeTask(s,raw,order,date,phase,order);if(!task)return false;
  s.tasks.push(task);log(s,{action:"created",date,taskId:task.id,title:task.title,tags:task.tags,difficulty:task.difficulty,timeOfDay:phase,xpDelta:0,statDelta:{},reason:"Task do người dùng thêm thủ công."});
- s.feedback="Đã thêm Task vào hàng chờ "+(phase==="evening"?"buổi tối.":"ban ngày.");
- save(s);if(phase==="evening"&&timeOfDay()==="evening")applyEveningSwitch(s,true);refreshImportTool();return true;
+ s.feedback="Đã thêm Task vào hàng chờ "+(phase==="morning"?"buổi sáng":phase==="evening"?"buổi tối":phase==="all_day"?"cả ngày":"ban ngày")+".";if(phase==="evening")s.eveningActivatedDate=date;save(s);refreshManualTool();return true;
 }
 function removeTask(id){
  const s=rollover(state()),index=s.tasks.findIndex(t=>t.id===id&&t.taskDate===today());if(index<0)return false;
  const task=s.tasks[index];log(s,{action:"task_deleted",date:today(),taskId:task.id,ruleId:task.ruleId||null,title:task.title,timeOfDay:task.timeOfDay,xpDelta:0,statDelta:{},reason:"Task bị xóa khỏi hàng chờ; history thưởng trước đó vẫn được giữ."});
  if(task.ruleId){task.status="deleted";task.deletedAt=now();}else s.tasks.splice(index,1);
- s.feedback="Đã xóa Task khỏi danh sách hôm nay.";save(s);refreshImportTool();return true;
+ s.feedback="Đã xóa Task khỏi danh sách hôm nay.";save(s);refreshManualTool();return true;
 }
 function radar(values,max,title){const cx=120,cy=105,r=72,n=KEYS.length,p=(i,k)=>{const a=-Math.PI/2+i*2*Math.PI/n;return(cx+Math.cos(a)*r*k).toFixed(1)+","+(cy+Math.sin(a)*r*k).toFixed(1);};let x='<svg viewBox="0 0 240 210" role="img" aria-label="'+esc(title)+'">';[.25,.5,.75,1].forEach(k=>x+='<polygon points="'+KEYS.map((_,i)=>p(i,k)).join(" ")+'" fill="none" stroke="#dfe2ed"/>');KEYS.forEach((k,i)=>x+='<line x1="'+cx+'" y1="'+cy+'" x2="'+p(i,1)+'" stroke="#dfe2ed"/>');x+='<polygon points="'+KEYS.map((k,i)=>p(i,Math.min(1,Math.max(0,Number(values[k])||0)/Math.max(1,max)))).join(" ")+'" fill="rgba(124,102,238,.24)" stroke="#7866ee" stroke-width="2"/>';KEYS.forEach((k,i)=>{const a=-Math.PI/2+i*2*Math.PI/n;x+='<text x="'+(cx+Math.cos(a)*99).toFixed(1)+'" y="'+(cy+Math.sin(a)*99+4).toFixed(1)+'" text-anchor="middle" font-size="10" fill="#41445a">'+k+'</text>';});return x+"</svg>";}
 function growth(s,days){const cutoff=new Date();cutoff.setDate(cutoff.getDate()-days+1);const key=cutoff.getFullYear()+"-"+String(cutoff.getMonth()+1).padStart(2,"0")+"-"+String(cutoff.getDate()).padStart(2,"0"),out={};KEYS.forEach(k=>out[k]=0);s.history.forEach(e=>{if(["completed","energy_event"].includes(e.action)&&e.date>=key&&e.date<=today())KEYS.forEach(k=>out[k]+=Number((e.statDelta||{})[k])||0);});return out;}
@@ -307,13 +306,9 @@ function firstPendingGroup(tasks){
  return[];
 }
 function currentBatch(s){
- const evening=timeOfDay()==="evening",hasPlan=!!(s.activePlanId&&s.taskRules.some(r=>r.planId===s.activePlanId&&r.status==="active"));
- if(evening&&(hasPlan||s.eveningActivatedDate===today())){
-  const night=firstPendingGroup(s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay==="evening"));
-  if(night.length)return night;
-  return firstPendingGroup(s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay!=="evening"));
- }
- return firstPendingGroup(s.tasks.filter(t=>t.taskDate===today()&&t.timeOfDay!=="evening"));
+ const phase=timeOfDay(),tasks=s.tasks.filter(t=>t.taskDate===today()&&!t.hiddenFromQueue),available=slots=>tasks.filter(t=>slots.includes(t.timeOfDay));
+ const priorities=phase==="morning"?[["morning","all_day"],["day"]]:phase==="evening"?[["evening","all_day"],["day"]]:[["day","all_day"],["morning"]];
+ for(const slots of priorities){const group=firstPendingGroup(available(slots));if(group.length)return group;}return[];
 }
 function renderTasks(s){
  if(ensurePlanTasks(s))save(s);
@@ -407,7 +402,7 @@ function renderEnergy(s,target=view){
  const form=document.getElementById("energy-button-form");form.onsubmit=e=>{e.preventDefault();const f=e.currentTarget,data={title:f.elements.title.value,icon:f.elements.icon.value};KEYS.forEach(k=>data[k]=f.elements[k].value);if(addEnergyButton(data))f.reset();};
 }
 function renderSettings(s){
- view.innerHTML=style()+'<div class="rpg-wrap"><section class="rpg-panel"><h2>Cài đặt</h2><p class="rpg-muted">Chọn một mục để mở cửa sổ thao tác.</p><div class="settings-tools"><button type="button" class="btn-ghost" data-settings-tool="energy">⚡<span>Nút năng lượng</span></button><button type="button" class="btn-ghost" data-settings-tool="lucky">🍀<span>Lucky</span></button><button type="button" class="btn-ghost" data-settings-tool="import">📥<span>Nạp Quest & Task</span></button><button type="button" class="btn-ghost" data-settings-tool="manage">🗂️<span>Quản lý Task</span></button><button type="button" class="btn-ghost" data-settings-tool="ai">🤖<span>Prompt AI & tag</span></button><button type="button" class="btn-ghost" data-settings-tool="profile">👤<span>Hồ sơ & sao lưu</span></button></div></section><div id="settings-tool-modal" class="energy-modal" hidden><div class="energy-modal-backdrop" data-settings-close></div><section class="energy-modal-card settings-tool-card" role="dialog" aria-modal="true"><div class="rpg-head"><h2 id="settings-tool-title">Cài đặt</h2><button type="button" class="btn-ghost" data-settings-close aria-label="Đóng">×</button></div><div id="settings-tool-body"></div></section></div></div>';
+ view.innerHTML=style()+'<div class="rpg-wrap"><section class="rpg-panel"><h2>Cài đặt</h2><p class="rpg-muted">Chọn một mục để mở cửa sổ thao tác.</p><div class="settings-tools"><button type="button" class="btn-ghost" data-settings-tool="energy">⚡<span>Nút năng lượng</span></button><button type="button" class="btn-ghost" data-settings-tool="lucky">🍀<span>Lucky</span></button><button type="button" class="btn-ghost" data-settings-tool="quests">🧭<span>Quest & Task</span></button><button type="button" class="btn-ghost" data-settings-tool="profile">👤<span>Hồ sơ & sao lưu</span></button></div></section><div id="settings-tool-modal" class="energy-modal" hidden><div class="energy-modal-backdrop" data-settings-close></div><section class="energy-modal-card settings-tool-card" role="dialog" aria-modal="true"><div class="rpg-head"><h2 id="settings-tool-title">Cài đặt</h2><button type="button" class="btn-ghost" data-settings-close aria-label="Đóng">×</button></div><div id="settings-tool-body"></div></section></div></div>';
  view.querySelectorAll("[data-settings-tool]").forEach(b=>b.onclick=()=>openSettingsTool(b.dataset.settingsTool));
  view.querySelectorAll("[data-settings-close]").forEach(b=>b.onclick=()=>{document.getElementById("settings-tool-modal").hidden=true;});
 }
@@ -427,16 +422,15 @@ function renderLuckySettings(s,target){
 }
 function openSettingsTool(tool){
  const modal=document.getElementById("settings-tool-modal"),body=document.getElementById("settings-tool-body");if(!modal||!body)return;
- const labels={energy:"Nút năng lượng",lucky:"Cài đặt Lucky",import:"Nạp Quest & Task",manage:"Quản lý Task",ai:"Prompt AI & tag",profile:"Hồ sơ & sao lưu"};
+ const labels={energy:"Nút năng lượng",lucky:"Cài đặt Lucky",quests:"Quest & Task",profile:"Hồ sơ & sao lưu"};
  document.getElementById("settings-tool-title").textContent=labels[tool]||"Cài đặt";modal.hidden=false;
- if(tool==="energy")renderEnergy(state(),body);else if(tool==="lucky")renderLuckySettings(state(),body);else renderImport(state(),body,({import:0,manage:1,ai:2,profile:4})[tool]||0);
+ if(tool==="energy")renderEnergy(state(),body);else if(tool==="lucky")renderLuckySettings(state(),body);else if(tool==="quests")renderManualQuestTask(state(),body);else renderImport(state(),body,4);
 }
 function refreshEnergyTool(){
  const body=document.getElementById("settings-tool-body"),modal=document.getElementById("settings-tool-modal");if(activeTab==="settings"&&body&&modal&&!modal.hidden)renderEnergy(state(),body);else render("settings");
 }
-function refreshImportTool(){
- const body=document.getElementById("settings-tool-body"),modal=document.getElementById("settings-tool-modal"),title=document.getElementById("settings-tool-title");if(activeTab==="settings"&&body&&modal&&!modal.hidden){const focus=title.textContent==="Quản lý Task"?1:title.textContent==="Prompt AI & tag"?2:title.textContent==="Hồ sơ & sao lưu"?4:0;renderImport(state(),body,focus);}else render("settings");
-}
+function refreshImportTool(){const body=document.getElementById("settings-tool-body"),modal=document.getElementById("settings-tool-modal");if(activeTab==="settings"&&body&&modal&&!modal.hidden)renderImport(state(),body,4);else render("settings");}
+function refreshManualTool(){const body=document.getElementById("settings-tool-body"),modal=document.getElementById("settings-tool-modal"),title=document.getElementById("settings-tool-title");if(activeTab==="settings"&&body&&modal&&!modal.hidden&&title.textContent==="Quest & Task")renderManualQuestTask(state(),body);else if(activeTab==="settings"&&body&&modal&&!modal.hidden&&title.textContent==="Hồ sơ & sao lưu")refreshImportTool();else render("settings");}
 function historyRecordText(e){
  const time=new Date(e.at),timeText=Number.isNaN(time.getTime())?"":time.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
  const xp=Number(e.xpDelta)||0,stats=taskEffectsLine(e.statDelta||{});
@@ -459,6 +453,26 @@ function taskManagerMarkup(s){
  const tasks=s.tasks.filter(t=>t.taskDate===today()&&t.status!=="deleted"&&t.status!=="archived").sort((a,b)=>(a.timeOfDay==="evening"?1:0)-(b.timeOfDay==="evening"?1:0)||(Number(a.batchOrder)||0)-(Number(b.batchOrder)||0)||queueOrder(a,b));
  const status={pending:"Chờ",completed:"Đã xong",deferred:"Đã chuyển",inactive:"Phương án dự phòng",replaced:"Đã đổi",skipped:"Bỏ qua"};
  return '<section class="rpg-panel"><h2>Danh sách Task hôm nay</h2><form id="manual-task-form" class="rpg-manage-form"><input name="title" maxlength="140" placeholder="Nội dung Task" required><input name="tags" maxlength="180" placeholder="SI, STR, EN, VIT, EQ, Y" title="SI: tư duy · STR: thể lực · EN: sức bền · VIT: phục hồi · EQ: cảm xúc · Y: nội tâm"><select name="difficulty"><option>Easy</option><option selected>Normal</option><option>Hard</option><option>Epic</option></select><select name="timeOfDay"><option value="day">Ban ngày</option><option value="evening">Buổi tối</option></select><button class="btn-primary">Thêm Task thủ công</button></form><div class="rpg-manage-list">'+(tasks.length?tasks.map(t=>'<div class="rpg-manage-row"><span>'+esc(t.title)+' <small>· '+(t.timeOfDay==="evening"?"Buổi tối":"Ban ngày")+' · '+esc(status[t.status]||t.status)+'</small></span><button class="btn-ghost" data-remove-task="'+esc(t.id)+'" aria-label="Xóa '+esc(t.title)+'">Xóa</button></div>').join(""):'<div class="rpg-empty">Chưa có Task.</div>')+'</div></section>';
+}
+const QUEST_PRESETS=[
+ {type:"main",title:"Xây dựng sức khỏe bền vững",description:"Duy trì các hành động nhỏ cho sức khỏe và sức bền."},
+ {type:"main",title:"Phát triển kỹ năng cá nhân",description:"Học và luyện một kỹ năng có ích cho mục tiêu dài hạn."},
+ {type:"main",title:"Hoàn thành dự án cá nhân",description:"Tiến từng bước đều đặn để hoàn tất dự án đang theo đuổi."},
+ {type:"main",title:"Nuôi dưỡng cân bằng nội tâm",description:"Dành thời gian cho cảm xúc, hồi phục và sự chú tâm."},
+ {type:"weekly",title:"Vận động 3 lần trong tuần",description:"Hoàn thành ba buổi vận động phù hợp trong tuần.",target:3},
+ {type:"weekly",title:"Học tập 3 buổi trong tuần",description:"Có ba phiên học tập tập trung trong tuần.",target:3},
+ {type:"weekly",title:"Tiến dự án 2 buổi trong tuần",description:"Tạo tiến triển cụ thể cho dự án hai lần trong tuần.",target:2}
+];
+function addPresetQuest(index){const preset=QUEST_PRESETS[index];if(!preset)return;const s=state(),quest=addQuest(s,preset.type,preset);if(preset.type==="weekly"){const main=activeQuest(s,"main");if(main)quest.mainQuestId=main.id;}s.feedback="Đã thêm Quest: "+quest.title;save(s);refreshManualTool();}
+function addManualQuest(form){const s=state(),type=form.type==="weekly"?"weekly":"main",quest=addQuest(s,type,{title:String(form.title||"").trim(),description:String(form.description||"").trim(),target:Math.max(1,Number(form.target)||1)});if(!quest)return false;if(type==="weekly"&&form.mainQuestId)quest.mainQuestId=form.mainQuestId;s.feedback="Đã tạo Quest: "+quest.title;save(s);refreshManualTool();return true;}
+function renderManualQuestTask(s,target){
+ const main=s.quests.filter(q=>q.type==="main"&&q.status==="active"),weekly=s.quests.filter(q=>q.type==="weekly"&&q.status==="active"),tasks=s.tasks.filter(t=>t.taskDate===today()&&t.status!=="deleted"&&t.status!=="archived").sort((a,b)=>({morning:0,day:1,all_day:2,evening:3}[a.timeOfDay]??1)-({morning:0,day:1,all_day:2,evening:3}[b.timeOfDay]??1)||(Number(a.batchOrder)||0)-(Number(b.batchOrder)||0)||queueOrder(a,b)),status={pending:"Chờ",completed:"Đã xong",deferred:"Đã chuyển",inactive:"Phương án dự phòng",replaced:"Đã đổi",skipped:"Bỏ qua"};
+ const questSelect=(name,items,label)=>'<label>'+label+'<select name="'+name+'"><option value="">Không liên kết</option>'+items.map(q=>'<option value="'+esc(q.id)+'">'+esc(q.title)+'</option>').join("")+'</select></label>';
+ target.innerHTML=style()+'<div class="rpg-wrap"><section class="rpg-panel"><h3>Quest mẫu</h3><p class="rpg-muted">Chọn mẫu để thêm vào Quest đang dùng. Bạn cũng có thể tạo Quest riêng bên dưới.</p><div class="rpg-grid">'+QUEST_PRESETS.map((q,i)=>'<div class="rpg-quest"><b>'+esc(q.title)+'</b><p class="rpg-muted">'+esc(q.description)+'</p><button type="button" class="btn-ghost" data-add-preset="'+i+'">Thêm '+(q.type==="main"?"Main":"Weekly")+" Quest</button></div>").join("")+'</div></section><section class="rpg-panel"><h3>Tạo Quest thủ công</h3><form id="manual-quest-form" class="rpg-form"><label>Loại Quest<select name="type"><option value="main">Main Quest</option><option value="weekly">Weekly Quest</option></select></label><label>Tên Quest<input name="title" maxlength="120" required placeholder="Ví dụ: Xây dựng kênh cá nhân"></label><label>Mô tả ngắn<textarea name="description" maxlength="300"></textarea></label><label>Mục tiêu số lần mỗi tuần<input name="target" type="number" min="1" max="30" value="3"></label>'+questSelect("mainQuestId",main,"Liên kết Main Quest")+'<button class="btn-primary">Tạo Quest</button></form><div class="rpg-manage-list">'+(s.quests.filter(q=>q.status==="active").map(q=>'<div class="rpg-manage-row"><span><b>'+esc(q.title)+'</b><small> · '+(q.type==="main"?"Main Quest":"Weekly Quest")+(q.type==="weekly"&&q.mainQuestId?" · liên kết Main":"")+'</small></span></div>').join("")||'<div class="rpg-empty">Chưa có Quest đang dùng.</div>')+'</div></section><section class="rpg-panel"><h3>Thêm Task thủ công</h3><p class="rpg-muted">Chọn thời điểm Task phù hợp. Cả ngày sẽ nằm trong hàng chờ ở mọi khung giờ.</p><form id="manual-task-form" class="rpg-form"><label>Nội dung Task<input name="title" maxlength="140" placeholder="Việc cần làm" required></label><label>Tag chỉ số / chủ đề<input name="tags" maxlength="180" placeholder="SI, STR, EN, VIT, EQ, Y" title="SI: tư duy · STR: thể lực · EN: sức bền · VIT: phục hồi · EQ: cảm xúc · Y: nội tâm"></label><div class="rpg-grid"><label>Độ khó<select name="difficulty"><option>Easy</option><option selected>Normal</option><option>Hard</option><option>Epic</option></select></label><label>Thời điểm<select name="timeOfDay"><option value="morning">Buổi sáng</option><option value="evening">Buổi tối</option><option value="all_day">Cả ngày</option></select></label></div>'+questSelect("mainQuestId",main,"Main Quest liên quan")+questSelect("weeklyQuestId",weekly,"Weekly Quest liên quan")+'<button class="btn-primary">Thêm Task</button></form></section><section class="rpg-panel"><h3>Task hôm nay ('+tasks.length+')</h3><div class="rpg-manage-list">'+(tasks.length?tasks.map(t=>'<div class="rpg-manage-row"><span>'+esc(t.title)+' <small>· '+({morning:"Buổi sáng",evening:"Buổi tối",all_day:"Cả ngày",day:"Ban ngày"}[t.timeOfDay]||"Ban ngày")+' · '+esc(status[t.status]||t.status)+'</small></span><button class="btn-ghost" data-remove-task="'+esc(t.id)+'" aria-label="Xóa '+esc(t.title)+'">Xóa</button></div>').join(""):'<div class="rpg-empty">Chưa có Task hôm nay.</div>')+'</div></section></div>';
+ target.querySelectorAll("[data-add-preset]").forEach(b=>b.onclick=()=>addPresetQuest(Number(b.dataset.addPreset)));
+ const questForm=target.querySelector("#manual-quest-form");questForm.onsubmit=e=>{e.preventDefault();const f=e.currentTarget;addManualQuest({type:f.elements.type.value,title:f.elements.title.value,description:f.elements.description.value,target:f.elements.target.value,mainQuestId:f.elements.mainQuestId.value});};
+ const taskForm=target.querySelector("#manual-task-form");taskForm.onsubmit=e=>{e.preventDefault();const f=e.currentTarget;if(addManualTask({title:f.elements.title.value,tags:f.elements.tags.value,difficulty:f.elements.difficulty.value,timeOfDay:f.elements.timeOfDay.value,mainQuestId:f.elements.mainQuestId.value,weeklyQuestId:f.elements.weeklyQuestId.value}))f.reset();};
+ target.querySelectorAll("[data-remove-task]").forEach(b=>b.onclick=()=>removeTask(b.dataset.removeTask));
 }
 function renderImport(s,target=view,focus=0){
  const prompt=buildPrompt(),tasks=s.tasks.filter(t=>t.taskDate===today()).length,interview=s.aiConversation&&["NEED_INFO","ANSWERED"].includes(s.aiConversation.status)?(s.aiConversation.status==="NEED_INFO"?'<section class="rpg-panel"><h2>AI cần thêm thông tin</h2><ol>'+(s.aiConversation.questions||[]).map(q=>"<li>"+esc(q)+"</li>").join("")+'</ol><form id="ai-answer-form" class="rpg-form"><label>Câu trả lời, có thể trả lời từng dòng<textarea name="answers" placeholder="Nhập câu trả lời theo thứ tự câu hỏi..." required></textarea></label><button class="btn-primary">Lưu câu trả lời và tạo Prompt tiếp theo</button></form></section>':'<section class="rpg-panel"><h2>Tiếp tục cuộc trao đổi với AI</h2><p class="rpg-muted">Câu trả lời đã được lưu vào USER_DATA. Sao chép Prompt phía dưới, gửi tiếp trong cùng cuộc trò chuyện AI rồi dán phản hồi JSON để nạp kế hoạch.</p></section>'):"";
