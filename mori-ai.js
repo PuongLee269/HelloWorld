@@ -210,14 +210,18 @@
 
   function saveBackup(button) {
     const state = window.LifeRpg && window.LifeRpg.state && window.LifeRpg.state();
-    if (!state) { button.textContent = "Không đọc được dữ liệu"; return; }
+    if (!state) { window.alert("Không thể lưu: chưa đọc được hồ sơ và tiến trình cá nhân."); return; }
     const date = new Date().toISOString().slice(0, 10);
     const payload = { format: "life-rpg-backup.v1", exportedAt: new Date().toISOString(), state };
-    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
-    const link = document.createElement("a"); link.href = url; link.download = "mori-quest-backup-" + date + ".json";
-    document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
-    button.textContent = "✅ Đã lưu backup";
-    setTimeout(() => { if (button.isConnected) button.textContent = "💾 Lưu dữ liệu"; }, 1800);
+    try {
+      const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+      const link = document.createElement("a"); link.href = url; link.download = "mori-quest-backup-" + date + ".json";
+      document.body.appendChild(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      window.alert("Đã lưu hồ sơ và toàn bộ tiến trình cá nhân trong bản sao lưu JSON trên thiết bị này.");
+    } catch (error) {
+      window.alert("Không thể tải bản sao lưu. Hãy thử lại hoặc kiểm tra quyền tải tệp của trình duyệt.");
+    }
   }
 
   function installSaveButton() {
