@@ -63,12 +63,10 @@
     if (!gate || !app || !form) return;
     const base = endpoint();
     if (!base) {
-      form.querySelector('button[type="submit"]').disabled = true;
       setError("Đang hoàn tất kết nối. Vui lòng quay lại sau.");
       return;
     }
     if (!/^https:\/\//i.test(base)) {
-      form.querySelector('button[type="submit"]').disabled = true;
       setError("Kết nối chưa sẵn sàng.");
       return;
     }
@@ -77,7 +75,6 @@
       await getConfig(base);
       setError("");
     } catch (_) {
-      form.querySelector('button[type="submit"]').disabled = true;
       setError("Đang hoàn tất kết nối. Vui lòng quay lại sau.");
     }
   })();
