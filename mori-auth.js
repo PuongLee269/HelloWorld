@@ -1,19 +1,16 @@
 (function () {
   "use strict";
-  const ENDPOINT_KEY = "mori_quest_ai_endpoint_v1";
+  const WORKER_URL = ""; // Set after the Cloudflare Worker is fully configured.
   const TOKEN_KEY = "mori_quest_session_v1";
   const gate = document.getElementById("mori-auth-gate");
   const app = document.querySelector("[data-mori-private]");
   const form = document.getElementById("mori-auth-form");
   const error = document.getElementById("mori-auth-error");
-  const endpointInput = form && form.elements.endpoint;
-  const connectionPanel = document.getElementById("mori-auth-connection");
-  const saveEndpointButton = document.getElementById("mori-auth-save-endpoint");
   const challengeBox = document.getElementById("mori-auth-turnstile");
   let widget = null;
   let turnstileKey = "";
 
-  const endpoint = () => String(localStorage.getItem(ENDPOINT_KEY) || "").trim().replace(/\/+$/, "");
+  const endpoint = () => WORKER_URL.trim().replace(/\/+$/, "");
   const setError = message => { if (error) error.textContent = message || ""; };
   function unlock() {
     if (app) app.classList.add("mori-unlocked");
@@ -62,35 +59,33 @@
     } catch (_) { return false; }
   }
 
-  if (endpointInput) endpointInput.value = endpoint();
-  if (connectionPanel && !endpoint()) connectionPanel.open = true;
   (async function init() {
     if (!gate || !app || !form) return;
     const base = endpoint();
-    if (!base) { setError("Thiết lập kết nối một lần trong mục bên dưới để bật đăng nhập."); return; }
-    if (!/^https:\/\//i.test(base)) { setError("Worker URL phải dùng HTTPS."); return; }
+    if (!base) {
+      form.querySelector('button[type="submit"]').disabled = true;
+      setError("Đang hoàn tất kết nối. Vui lòng quay lại sau.");
+      return;
+    }
+    if (!/^https:\/\//i.test(base)) {
+      form.querySelector('button[type="submit"]').disabled = true;
+      setError("Kết nối chưa sẵn sàng.");
+      return;
+    }
     if (await validateSavedSession(base)) return;
-    try { await getConfig(base); setError(""); }
-    catch (e) { setError(e.message || "Không kết nối được Worker."); }
-  })();
-
-  if (saveEndpointButton) saveEndpointButton.onclick = async () => {
-    const value = String(endpointInput && endpointInput.value || "").trim().replace(/\/+$/, "");
-    if (!/^https:\/\//i.test(value)) { setError("Worker URL phải dùng HTTPS."); return; }
-    saveEndpointButton.disabled = true; saveEndpointButton.textContent = "Đang kiểm tra…";
     try {
-      await getConfig(value);
-      localStorage.setItem(ENDPOINT_KEY, value);
-      if (connectionPanel) connectionPanel.open = false;
-      setError("Đã lưu kết nối. Lần sau chỉ cần nhập mật khẩu.");
-    } catch (e) { setError(e.message || "Không thể kết nối Worker."); }
-    finally { saveEndpointButton.disabled = false; saveEndpointButton.textContent = "Lưu kết nối trên thiết bị này"; }
-  };
+      await getConfig(base);
+      setError("");
+    } catch (_) {
+      form.querySelector('button[type="submit"]').disabled = true;
+      setError("Đang hoàn tất kết nối. Vui lòng quay lại sau.");
+    }
+  })();
 
   if (form) form.onsubmit = async event => {
     event.preventDefault(); setError("");
     const base = endpoint();
-    if (!base) { if (connectionPanel) connectionPanel.open = true; setError("Lưu kết nối Worker một lần trước khi đăng nhập."); return; }
+    if (!base) { setError("Đang hoàn tất kết nối. Vui lòng quay lại sau."); return; }
     const button = form.querySelector("button[type=submit]");
     button.disabled = true; button.textContent = "Đang xác thực…";
     try {
