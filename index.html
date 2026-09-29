@@ -12,6 +12,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#8b7cff">
 <title data-app="document-title">Mori Quest</title>
+<link rel="stylesheet" href="./mori-auth.css?v=1">
 <style>
 :root{
   --ink:#1b1e2e;
@@ -725,7 +726,18 @@ th{
 </head>
 <body>
 
-<div class="wrap">
+<main id="mori-auth-gate" class="mori-auth-gate" aria-labelledby="mori-auth-title">
+  <form id="mori-auth-form" class="mori-auth-card">
+    <h1 id="mori-auth-title">Mori Quest</h1>
+    <p>Đăng nhập để mở dữ liệu Mori Quest đang lưu trên thiết bị này.</p>
+    <label>URL Cloudflare Worker<input name="endpoint" type="url" placeholder="https://mori-quest-ai.example.workers.dev" required></label>
+    <label>Mật khẩu<input name="password" type="password" autocomplete="current-password" required></label>
+    <div id="mori-auth-turnstile"></div><p id="mori-auth-error" role="alert" aria-live="polite"></p>
+    <button class="mori-auth-submit" type="submit">Đăng nhập</button>
+    <small>Mật khẩu được xác minh qua HTTPS bởi Worker; không lưu trong mã nguồn GitHub hay trên thiết bị.</small>
+  </form>
+</main>
+<div class="wrap" data-mori-private>
   <h1>
     <span class="app-title" data-app="title">Mori Quest</span>
     <span class="app-version" data-app="version"></span>
@@ -764,7 +776,7 @@ th{
 const APP_NAME = 'Mori Quest';
 
 const CONFIG = {
-  VERSION:'1.0',
+  VERSION:'1.1',
   ENDPOINT:'https://script.google.com/macros/s/AKfycbyQ3imjnhKrzmuz4-KbPNsHzpYGY_Mv45os1bZEPoQrQ-UM8RjJvCznfP5x6RB6QX_Qpw/exec',
   SETTINGS_PASS:'1000',
   HERO_LEVELS:[
@@ -4177,5 +4189,7 @@ if(lbTimer===null){
 </script>
 <script src="./life-rpg-engine.js?v=task-loop-1"></script>
 <script src="./life-rpg.js?v=rvit-unlimited-points-1"></script>
+<script src="./mori-ai.js?v=1"></script>
+<script src="./mori-auth.js?v=1"></script>
 </body>
 </html>

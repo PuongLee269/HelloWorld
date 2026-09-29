@@ -1,0 +1,11 @@
+[data-mori-private] { display: none !important; }
+[data-mori-private].mori-unlocked { display: block !important; }
+.mori-auth-gate { min-height: 100vh; display: grid; place-items: center; padding: 20px; background: #f6f7ff; color: #1b1e2e; font: 16px/1.5 system-ui, sans-serif; }
+.mori-auth-gate[hidden] { display: none; }
+.mori-auth-card { width: min(100%, 420px); display: grid; gap: 14px; padding: 24px; border: 1px solid rgba(0,0,0,.08); border-radius: 20px; background: #fff; box-shadow: 0 16px 40px rgba(0,0,0,.12); }
+.mori-auth-card h1, .mori-auth-card p { margin: 0; }
+.mori-auth-card label { display: grid; gap: 6px; font-weight: 600; }
+.mori-auth-card input { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid #c8c9d6; border-radius: 10px; font: inherit; }
+.mori-auth-card small { color: #646a84; }
+.mori-auth-submit { min-height: 46px; border: 0; border-radius: 10px; background: #7866ee; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+#mori-auth-error { color: #a43b3b; min-height: 1.4em; }

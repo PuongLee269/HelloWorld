@@ -86,3 +86,9 @@ Tab điều hướng chỉ hiện icon. Tab Task chỉ hiện nội dung Task c�
 ## Dữ liệu
 
 life-rpg.js quản lý ba tab, nhập Quest/Task, tính thưởng, Level, history và lưu cục bộ. life-rpg-engine.js chứa parser, alias tag, bảng điểm và quy tắc/prompt AI. Dữ liệu nằm trong Local Storage (tq_liferpg_state_v1); tên/Level/XP được mirror sang tq_profile cho hero Mori Quest. Tab Nạp hỗ trợ tải và phục hồi backup JSON; quản lý danh sách Task hôm nay, thêm Task thủ công theo tag/độ khó/khung giờ, hoặc xóa Task dư. Xóa khỏi hàng chờ ghi event riêng và không xóa history XP/Stats đã phát sinh.
+
+## AI Quest and local backups
+
+The optional AI Quest integration uses a separately deployed Cloudflare Worker; configure its provider key, login password, Turnstile keys, and signing key as Worker secrets. Never put these secrets in this repository. Setup steps are in [`worker/README.md`](worker/README.md). The app asks which data categories to share, displays the outgoing JSON, and requires confirmation before sending it to the Worker and AI provider. Review the preview before sharing personal data.
+
+**Privacy and access:** this repository and its GitHub Pages site are public. The shared password screen is a casual access gate and does not make the source, static assets, or browser Local Storage private. Use protected hosting for genuinely private data. The **Lưu dữ liệu** button downloads a JSON backup that the app can restore; it does not synchronize devices or cloud storage.
