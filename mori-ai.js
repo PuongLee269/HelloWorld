@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  const ENDPOINT_KEY = "mori_quest_ai_endpoint_v1";
+  const WORKER_URL = ""; // Set after the Cloudflare Worker is fully configured.
   const TOKEN_KEY = "mori_quest_session_v1";
   const TURNSTILE_ACTION = "mori_quest_ai";
   let pendingPlan = null;
@@ -16,7 +16,7 @@
   }
 
   function endpointValue() {
-    return String(localStorage.getItem(ENDPOINT_KEY) || "").trim().replace(/\/+$/, "");
+    return WORKER_URL.trim().replace(/\/+$/, "");
   }
 
   function selectedContext(appState, form) {
@@ -150,7 +150,7 @@
 
   async function run(form, appState, resultTarget) {
     const endpoint = endpointValue();
-    if (!endpoint || !/^https:\/\//i.test(endpoint)) throw new Error("Nhập URL HTTPS của Cloudflare Worker và lưu cấu hình trước.");
+    if (!endpoint || !/^https:\/\//i.test(endpoint)) throw new Error("Kết nối AI chưa sẵn sàng. Vui lòng quay lại sau.");
     const labels = selectedLabels(form);
     const context = selectedContext(appState, form);
     const answers = pendingAnswers.slice(0, 6).map(x => x.slice(0, 500));
@@ -183,7 +183,7 @@
   }
 
   function render(appState, target) {
-    target.innerHTML = '<div class="rpg-wrap"><section class="rpg-panel"><h3>Tạo Quest bằng AI</h3><p class="rpg-muted">Nhập URL Worker đã triển khai. Mặc định không chia sẻ dữ liệu hồ sơ; hãy chọn từng nhóm trước khi xem phần sẽ gửi. Khóa AI phải được đặt trong Worker, không nhập vào ứng dụng này.</p><form id="mori-ai-form" class="rpg-form"><label>Cloudflare Worker URL<input name="endpoint" type="url" inputmode="url" placeholder="https://mori-quest-ai.example.workers.dev" value="' + escapeHtml(endpointValue()) + '" required></label><button class="btn-ghost" type="button" id="mori-ai-save">Lưu URL Worker trên thiết bị này</button><fieldset><legend>Chọn dữ liệu chia sẻ (mặc định tắt)</legend><label><input type="checkbox" name="shareProfile"> Tên hồ sơ</label><label><input type="checkbox" name="shareGoals"> Mục tiêu</label><label><input type="checkbox" name="shareQuests"> Quest và kế hoạch Task hiện tại</label><label><input type="checkbox" name="shareStats"> Level, XP và 6 chỉ số</label><label><input type="checkbox" name="shareHistory"> Tối đa 15 sự kiện lịch sử gần nhất</label></fieldset><details id="mori-ai-data-preview"><summary>Xem chính xác dữ liệu được chọn để gửi</summary><pre id="mori-ai-data-preview-body"></pre></details><p class="rpg-muted">Dữ liệu đã chọn sẽ gửi tới Worker và nhà cung cấp AI. Ứng dụng không lưu câu trả lời AI trên máy; Worker mẫu không ghi nội dung yêu cầu vào log. Có thể bỏ bản xem trước để xóa câu trả lời tạm.</p><div id="mori-ai-turnstile"></div><div class="rpg-actions"><button class="btn-primary" type="submit" id="mori-ai-generate">Tạo bản xem trước</button><button class="btn-ghost" type="button" id="mori-ai-clear">Xóa dữ liệu trao đổi tạm</button></div><div id="mori-ai-error" data-ai-error aria-live="polite"></div></form></section><div id="mori-ai-result"></div><section class="rpg-panel"><h3>Triển khai Worker</h3><p class="rpg-muted">Cần đặt OPENAI_API_KEY, TURNSTILE_SECRET_KEY và TURNSTILE_SITE_KEY trong Cloudflare Worker Secrets/Vars, rồi nhập URL Worker ở trên. Hướng dẫn nằm trong worker/README.md của mã nguồn.</p></section></div>';
+    target.innerHTML = '<div class="rpg-wrap"><section class="rpg-panel"><h3>Tạo Quest bằng AI</h3><p class="rpg-muted">Tạo kế hoạch Quest và Task sau khi hoàn tất kết nối. Mặc định không chia sẻ dữ liệu hồ sơ; hãy chọn từng nhóm trước khi xem phần sẽ gửi.</p><form id="mori-ai-form" class="rpg-form"><fieldset><legend>Chọn dữ liệu chia sẻ (mặc định tắt)</legend><label><input type="checkbox" name="shareProfile"> Tên hồ sơ</label><label><input type="checkbox" name="shareGoals"> Mục tiêu</label><label><input type="checkbox" name="shareQuests"> Quest và kế hoạch Task hiện tại</label><label><input type="checkbox" name="shareStats"> Level, XP và 6 chỉ số</label><label><input type="checkbox" name="shareHistory"> Tối đa 15 sự kiện lịch sử gần nhất</label></fieldset><details id="mori-ai-data-preview"><summary>Xem chính xác dữ liệu được chọn để gửi</summary><pre id="mori-ai-data-preview-body"></pre></details><p class="rpg-muted">Dữ liệu đã chọn sẽ gửi tới Worker và nhà cung cấp AI. Ứng dụng không lưu câu trả lời AI trên máy; Worker mẫu không ghi nội dung yêu cầu vào log. Có thể bỏ bản xem trước để xóa câu trả lời tạm.</p><div id="mori-ai-turnstile"></div><div class="rpg-actions"><button class="btn-primary" type="submit" id="mori-ai-generate">Tạo bản xem trước</button><button class="btn-ghost" type="button" id="mori-ai-clear">Xóa dữ liệu trao đổi tạm</button></div><div id="mori-ai-error" data-ai-error aria-live="polite"></div></form></section><div id="mori-ai-result"></div><section class="rpg-panel"><h3>Triển khai Worker</h3><p class="rpg-muted">Kết nối AI đang được cấu hình. Sau khi sẵn sàng, hãy chọn dữ liệu muốn chia sẻ trước khi tạo kế hoạch.</p></section></div>';
     const form = target.querySelector("#mori-ai-form"), result = target.querySelector("#mori-ai-result");
     const updateDataPreview = () => {
       const data = { context: selectedContext(appState, form), answers: pendingAnswers };
@@ -191,14 +191,8 @@
     };
     form.querySelectorAll('input[type="checkbox"]').forEach(input => input.addEventListener("change", updateDataPreview));
     updateDataPreview();
-    target.querySelector("#mori-ai-save").onclick = () => {
-      const value = String(form.elements.endpoint.value || "").trim().replace(/\/+$/, "");
-      if (!/^https:\/\//i.test(value)) { showError(target.querySelector("#mori-ai-error"), new Error("Chỉ lưu URL HTTPS.")); return; }
-      localStorage.setItem(ENDPOINT_KEY, value);
-      target.querySelector("#mori-ai-error").textContent = "Đã lưu URL Worker trên thiết bị này.";
-    };
     form.onsubmit = event => {
-      event.preventDefault(); localStorage.setItem(ENDPOINT_KEY, String(form.elements.endpoint.value || "").trim().replace(/\/+$/, ""));
+      event.preventDefault();
       target.querySelector("#mori-ai-error").replaceChildren();
       run(form, appState, result).catch(error => showError(target.querySelector("#mori-ai-error"), error));
     };
