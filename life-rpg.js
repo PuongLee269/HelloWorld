@@ -353,7 +353,7 @@ function recordEnergy(buttonId,returnTab){
 }
 function addEnergyButton(form){const s=state(),title=String(form.title||"").trim();if(!title){alert("Nhập tên nút.");return false;}const icon=String(form.icon||"✨").trim()||"✨",effects={};KEYS.forEach(k=>{const n=Math.max(-5,Math.min(5,Math.round(Number(form[k])||0)));if(n)effects[k]=n;});if(!Object.keys(effects).length){alert("Chọn ít nhất một chỉ số từ -5 đến +5.");return false;}s.energyButtons.push({id:"custom-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),title:title.slice(0,60),icon,effects,custom:true});save(s);refreshEnergyTool();return true;}
 function energyIcon(button){return button.icon||({"Tụt năng lượng":"🪫","Đầy bụng":"🍽️","Fap":"🫣","Uống nước":"💧","Ăn hoa quả":"🍎"}[button.title]||"✨");}
-function energyEffectOptions(selected){return Array.from({length:11},(_,i)=>i-5).map(n=>'<option value="'+n+'" '+(Number(selected)===n?"selected":"")+'>'+(n>0?"+"+n:String(n))+'</option>').join("");}
+function energyEffectOptions(selected){const value=selected==null||selected===""?0:Number(selected);return Array.from({length:11},(_,i)=>i-5).map(n=>'<option value="'+n+'" '+(value===n?"selected":"")+'>'+(n>0?"+"+n:String(n))+'</option>').join("");}
 function updateEnergyButton(form){const s=state(),button=s.energyButtons.find(b=>b.id===form.id);if(!button)return;const title=String(form.title||"").trim();if(!title){alert("Nhập tên nút.");return;}const effects={};KEYS.forEach(k=>{const n=Math.max(-5,Math.min(5,Math.round(Number(form[k])||0)));if(n)effects[k]=n;});button.title=title.slice(0,60);button.icon=String(form.icon||"✨").trim()||"✨";button.effects=effects;save(s);refreshEnergyTool();}
 function deleteEnergyButton(id){
  const s=state(),i=s.energyButtons.findIndex(b=>b.id===id);if(i<0)return;
