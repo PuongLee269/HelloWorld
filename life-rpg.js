@@ -465,7 +465,7 @@ function downloadHistoryCSV(days){
   if(e.at){const d=new Date(e.at);if(!Number.isNaN(d.getTime()))time=d.toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit",second:"2-digit"});}
   return[date,time,e.action||"",e.title||"",Number(e.xpDelta)||0,JSON.stringify(e.statDelta||{}),e.reason||"",e.taskId||"",e.ruleId||""].map(quote).join(",");
  })).join("\r\n");
- const url=URL.createObjectURL(new Blob(["\\ufeff",csv],{type:"text/csv;charset=utf-8"})),a=document.createElement("a");
+ const url=URL.createObjectURL(new Blob([String.fromCharCode(65279),csv],{type:"text/csv;charset=utf-8"})),a=document.createElement("a");
  a.href=url;a.download="mori-quest-history-"+days+"-days-"+end+".csv";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
  return rows.length;
 }
