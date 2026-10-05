@@ -39,7 +39,7 @@
       context.progress = { level: appState.level, xp: appState.xp, currentStats: appState.stats || {} };
     }
     if (form.elements.shareHistory.checked) {
-      context.yearHistory = window.LifeRpg && window.LifeRpg.summarizeHistory ? window.LifeRpg.summarizeHistory(appState.history || [], 365) : { periodDays: 365, eventCount: 0, byAction: {}, byMonth: {}, latestEvents: [] };
+      context.recentHistory = window.LifeRpg && window.LifeRpg.summarizeHistory ? window.LifeRpg.summarizeHistory(appState.history || [], 365) : { periodDays: 365, eventCount: 0, byAction: {}, byMonth: {}, latestEvents: [] };
     }
     return context;
   }
