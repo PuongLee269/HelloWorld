@@ -37,7 +37,20 @@ function state(){
  s.bonuses=raw.bonuses||{};s.plans=s.plans||[];s.aiConversation=s.aiConversation||null;return s;
 }
 function save(s){s.updatedAt=now();localStorage.setItem(STORE,JSON.stringify(s));const p=read(PROFILE,{});p.name=s.user.name||p.name||"Player";p.level=s.level;p.xp=s.xp;try{localStorage.setItem(PROFILE,JSON.stringify(p));}catch(_){}try{if(window.renderHero)window.renderHero();if(window.scheduleAutoSync)window.scheduleAutoSync();}catch(_){}}
-function log(s,event){s.history.push(Object.assign({id:"event-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),at:now()},event));if(s.history.length>5000)s.history=s.history.slice(-5000);}
+const MAX_HISTORY_EVENTS=10000;
+function log(s,event){s.history.push(Object.assign({id:"event-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),at:now()},event));if(s.history.length>MAX_HISTORY_EVENTS)s.history=s.history.slice(-MAX_HISTORY_EVENTS);}
+function summarizeHistory(entries,days=365){
+ const end=today(),start=dateAdd(end,-Math.max(1,Number(days)||365)+1),rows=(Array.isArray(entries)?entries:[]).filter(e=>e&&e.date>=start&&e.date<=end).sort((a,b)=>String(a.at||"").localeCompare(String(b.at||""))),byAction={},byMonth={},byItem={},statDelta={};
+ let xpDelta=0,completed=0,skipped=0;
+ rows.forEach(e=>{
+  const action=String(e.action||"unknown");byAction[action]=(byAction[action]||0)+1;
+  const month=String(e.date||"").slice(0,7);if(month){const m=byMonth[month]||(byMonth[month]={events:0,completed:0,skipped:0,xpDelta:0});m.events++;if(action==="completed"){m.completed++;completed++;}if(action==="skipped"||action==="task_deleted"){m.skipped++;skipped++;}m.xpDelta+=Number(e.xpDelta)||0;}
+  xpDelta+=Number(e.xpDelta)||0;Object.keys(e.statDelta||{}).forEach(k=>statDelta[k]=(statDelta[k]||0)+(Number(e.statDelta[k])||0));
+  if(["completed","skipped","task_deleted","energy_event","lucky_event","rvit_checkin"].includes(action)){const title=String(e.title||action).slice(0,100),key=action+"|"+title,item=byItem[key]||(byItem[key]={action,title,count:0,xpDelta:0});item.count++;item.xpDelta+=Number(e.xpDelta)||0;}
+ });
+ const frequent=Object.values(byItem).sort((a,b)=>b.count-a.count).slice(0,20),latest=rows.slice(-30).map(e=>({action:e.action,date:e.date,title:String(e.title||"").slice(0,120),reason:String(e.reason||"").slice(0,160),xpDelta:Number(e.xpDelta)||0,statDelta:e.statDelta||{}}));
+ return{periodDays:Math.max(1,Number(days)||365),from:start,to:end,eventCount:rows.length,byAction,totals:{completed,skipped,xpDelta,statDelta},byMonth,frequentItems:frequent,latestEvents:latest};
+}
 function needed(level){return 100+Math.max(0,(Number(level)||1)-1)*50;}
 function addXp(s,amount){s.xp=Math.max(0,s.xp+(Number(amount)||0));while(s.xp>=needed(s.level)){s.xp-=needed(s.level);s.level++;}}
 function completedToday(s,date){return s.history.filter(e=>e.action==="completed"&&e.date===date).length;}
@@ -486,7 +499,7 @@ function renderStats(s){
  const copy=document.getElementById("copy-stat-history");if(copy)copy.onclick=async()=>{const ok=await copyHistoryToClipboard();copy.textContent=ok?"Đã sao chép":"Không thể sao chép";setTimeout(()=>{if(copy.isConnected)copy.textContent="📋 Sao chép";},1600);};
  const rc=document.getElementById("copy-rvit-data");if(rc)rc.onclick=async()=>{const ok=await copyRVITData();rc.textContent=ok?"Đã sao chép":"Không thể sao chép";setTimeout(()=>{if(rc.isConnected)rc.textContent="📋 Sao chép dữ liệu";},1600);};const re=document.getElementById("export-rvit-data");if(re)re.onclick=exportRVITCSV;
 }
-function buildPrompt(){const s=state(),actions=s.history.filter(e=>e.action==="completed"||e.action==="skipped"),den=actions.length,done=actions.filter(e=>e.action==="completed").length,skipped=actions.filter(e=>e.action==="skipped"||e.action==="task_deleted").slice(-20).map(e=>({title:e.title,action:e.action,date:e.date,reason:e.reason}));return window.LifeRpgTaskEngine.makePrompt({userData:{profile:{name:s.user.name,level:s.level,xp:s.xp},goals:s.user.goals,mainQuest:activeQuest(s,"main"),weeklyQuest:activeQuest(s,"weekly"),currentStats:s.stats,completionRate:den?done/den:0,taskHistory:s.history.slice(-60),skippedOrDeleted:skipped,activePlan:s.plans.find(p=>p.id===s.activePlanId)||null,activeTaskRules:s.taskRules.filter(r=>r.planId===s.activePlanId&&r.status==="active").map(r=>({title:r.title,taskType:r.taskType,target:r.target,period:r.period,preferredTime:r.preferredTime,tags:r.tags})),statGrowth:growth(s,30)},answers:s.aiConversation&&s.aiConversation.status==="ANSWERED"?s.aiConversation.answers||[]:[]});}
+function buildPrompt(){const s=state(),actions=s.history.filter(e=>e.action==="completed"||e.action==="skipped"),den=actions.length,done=actions.filter(e=>e.action==="completed").length,skipped=actions.filter(e=>e.action==="skipped"||e.action==="task_deleted").slice(-20).map(e=>({title:e.title,action:e.action,date:e.date,reason:e.reason}));return window.LifeRpgTaskEngine.makePrompt({userData:{profile:{name:s.user.name,level:s.level,xp:s.xp},goals:s.user.goals,mainQuest:activeQuest(s,"main"),weeklyQuest:activeQuest(s,"weekly"),currentStats:s.stats,completionRate:den?done/den:0,taskHistory:summarizeHistory(s.history,365),skippedOrDeleted:skipped,activePlan:s.plans.find(p=>p.id===s.activePlanId)||null,activeTaskRules:s.taskRules.filter(r=>r.planId===s.activePlanId&&r.status==="active").map(r=>({title:r.title,taskType:r.taskType,target:r.target,period:r.period,preferredTime:r.preferredTime,tags:r.tags})),statGrowth:growth(s,30)},answers:s.aiConversation&&s.aiConversation.status==="ANSWERED"?s.aiConversation.answers||[]:[]});}
 function taskManagerMarkup(s){
  const tasks=s.tasks.filter(t=>t.taskDate===today()&&t.status!=="deleted"&&t.status!=="archived").sort((a,b)=>(a.timeOfDay==="evening"?1:0)-(b.timeOfDay==="evening"?1:0)||(Number(a.batchOrder)||0)-(Number(b.batchOrder)||0)||queueOrder(a,b));
  const status={pending:"Chờ",completed:"Đã xong",deferred:"Đã chuyển",inactive:"Phương án dự phòng",replaced:"Đã đổi",skipped:"Bỏ qua"};
@@ -555,7 +568,7 @@ function render(tab){
 function rolloverForLegacy(){rollover(state());return true;}
 const storageKey="tq_liferpg_state_v1";if(!localStorage.getItem(storageKey))save(fresh());else{try{const stored=JSON.parse(localStorage.getItem(storageKey));if(stored.schemaVersion!==2)save(state());}catch(_){}}
 try{if(window.stopDaySyncMonitoring)window.stopDaySyncMonitoring();}catch(_){}
-window.LifeRpg={render,rollover:rolloverForLegacy,state,completeTask:complete,skipTask:skip,importPaste,buildPrompt,swapTasks,addManualTask,removeTask,recordLucky};
+window.LifeRpg={render,rollover:rolloverForLegacy,state,completeTask:complete,skipTask:skip,importPaste,buildPrompt,swapTasks,addManualTask,removeTask,recordLucky,summarizeHistory};
 const heroLucky=document.querySelector("[data-lucky-button]");if(heroLucky)heroLucky.onclick=recordLucky;const heroRvit=document.querySelector("[data-rvit-button]");if(heroRvit)heroRvit.onclick=openRVITDialog;
 window.render=render;render("tasks");
 let lastTimeBlock=timeOfDay();window.setInterval(()=>{const nextBlock=timeOfDay(),dayChanged=state().currentDate!==today();if(dayChanged||nextBlock!==lastTimeBlock){lastTimeBlock=nextBlock;render(activeTab);}},60000);
