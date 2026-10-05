@@ -48,7 +48,7 @@ function summarizeHistory(entries,days=365){
   xpDelta+=Number(e.xpDelta)||0;Object.keys(e.statDelta||{}).forEach(k=>statDelta[k]=(statDelta[k]||0)+(Number(e.statDelta[k])||0));
   if(["completed","skipped","task_deleted","energy_event","lucky_event","rvit_checkin"].includes(action)){const title=String(e.title||action).slice(0,100),key=action+"|"+title,item=byItem[key]||(byItem[key]={action,title,count:0,xpDelta:0});item.count++;item.xpDelta+=Number(e.xpDelta)||0;}
  });
- const frequent=Object.values(byItem).sort((a,b)=>b.count-a.count).slice(0,20),latest=rows.slice(-30).map(e=>({action:e.action,date:e.date,title:String(e.title||"").slice(0,120),reason:String(e.reason||"").slice(0,160),xpDelta:Number(e.xpDelta)||0,statDelta:e.statDelta||{}}));
+ const frequent=Object.values(byItem).sort((a,b)=>b.count-a.count).slice(0,12),latest=rows.slice(-20).map(e=>({action:e.action,date:e.date,title:String(e.title||"").slice(0,90),reason:String(e.reason||"").slice(0,120),xpDelta:Number(e.xpDelta)||0,statDelta:e.statDelta||{}}));
  return{periodDays:Math.max(1,Number(days)||365),from:start,to:end,eventCount:rows.length,byAction,totals:{completed,skipped,xpDelta,statDelta},byMonth,frequentItems:frequent,latestEvents:latest};
 }
 function needed(level){return 100+Math.max(0,(Number(level)||1)-1)*50;}
