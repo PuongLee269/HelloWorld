@@ -39,7 +39,7 @@
       context.progress = { level: appState.level, xp: appState.xp, currentStats: appState.stats || {} };
     }
     if (form.elements.shareHistory.checked) {
-      context.recentHistory = (appState.history || []).slice(-15).map(e => ({ action: e.action, date: e.date, title: String(e.title || "").slice(0, 140), reason: String(e.reason || "").slice(0, 160), xpDelta: e.xpDelta }));
+      context.yearHistory = window.LifeRpg && window.LifeRpg.summarizeHistory ? window.LifeRpg.summarizeHistory(appState.history || [], 365) : { periodDays: 365, eventCount: 0, byAction: {}, byMonth: {}, latestEvents: [] };
     }
     return context;
   }
@@ -50,7 +50,7 @@
     if (form.elements.shareGoals.checked) labels.push("mục tiêu");
     if (form.elements.shareQuests.checked) labels.push("Quest và kế hoạch");
     if (form.elements.shareStats.checked) labels.push("Level, XP và 6 chỉ số");
-    if (form.elements.shareHistory.checked) labels.push("15 sự kiện lịch sử gần nhất");
+    if (form.elements.shareHistory.checked) labels.push("tóm tắt lịch sử 365 ngày");
     return labels;
   }
 
@@ -183,7 +183,7 @@
   }
 
   function render(appState, target) {
-    target.innerHTML = '<div class="rpg-wrap"><section class="rpg-panel"><h3>Tạo Quest bằng AI</h3><p class="rpg-muted">Tạo kế hoạch Quest và Task sau khi hoàn tất kết nối. Mặc định không chia sẻ dữ liệu hồ sơ; hãy chọn từng nhóm trước khi xem phần sẽ gửi.</p><form id="mori-ai-form" class="rpg-form"><fieldset><legend>Chọn dữ liệu chia sẻ (mặc định tắt)</legend><label><input type="checkbox" name="shareProfile"> Tên hồ sơ</label><label><input type="checkbox" name="shareGoals"> Mục tiêu</label><label><input type="checkbox" name="shareQuests"> Quest và kế hoạch Task hiện tại</label><label><input type="checkbox" name="shareStats"> Level, XP và 6 chỉ số</label><label><input type="checkbox" name="shareHistory"> Tối đa 15 sự kiện lịch sử gần nhất</label></fieldset><details id="mori-ai-data-preview"><summary>Xem chính xác dữ liệu được chọn để gửi</summary><pre id="mori-ai-data-preview-body"></pre></details><p class="rpg-muted">Dữ liệu đã chọn sẽ gửi tới Worker và nhà cung cấp AI. Ứng dụng không lưu câu trả lời AI trên máy; Worker mẫu không ghi nội dung yêu cầu vào log. Có thể bỏ bản xem trước để xóa câu trả lời tạm.</p><div id="mori-ai-turnstile"></div><div class="rpg-actions"><button class="btn-primary" type="submit" id="mori-ai-generate">Tạo bản xem trước</button><button class="btn-ghost" type="button" id="mori-ai-clear">Xóa dữ liệu trao đổi tạm</button></div><div id="mori-ai-error" data-ai-error aria-live="polite"></div></form></section><div id="mori-ai-result"></div><section class="rpg-panel"><h3>Triển khai Worker</h3><p class="rpg-muted">Kết nối AI đang được cấu hình. Sau khi sẵn sàng, hãy chọn dữ liệu muốn chia sẻ trước khi tạo kế hoạch.</p></section></div>';
+    target.innerHTML = '<div class="rpg-wrap"><section class="rpg-panel"><h3>Tạo Quest bằng AI</h3><p class="rpg-muted">Tạo kế hoạch Quest và Task sau khi hoàn tất kết nối. Mặc định không chia sẻ dữ liệu hồ sơ; hãy chọn từng nhóm trước khi xem phần sẽ gửi.</p><form id="mori-ai-form" class="rpg-form"><fieldset><legend>Chọn dữ liệu chia sẻ (mặc định tắt)</legend><label><input type="checkbox" name="shareProfile"> Tên hồ sơ</label><label><input type="checkbox" name="shareGoals"> Mục tiêu</label><label><input type="checkbox" name="shareQuests"> Quest và kế hoạch Task hiện tại</label><label><input type="checkbox" name="shareStats"> Level, XP và 6 chỉ số</label><label><input type="checkbox" name="shareHistory"> Tóm tắt lịch sử trong 365 ngày gần nhất</label></fieldset><details id="mori-ai-data-preview"><summary>Xem chính xác dữ liệu được chọn để gửi</summary><pre id="mori-ai-data-preview-body"></pre></details><p class="rpg-muted">Dữ liệu đã chọn sẽ gửi tới Worker và nhà cung cấp AI. Ứng dụng không lưu câu trả lời AI trên máy; Worker mẫu không ghi nội dung yêu cầu vào log. Có thể bỏ bản xem trước để xóa câu trả lời tạm.</p><div id="mori-ai-turnstile"></div><div class="rpg-actions"><button class="btn-primary" type="submit" id="mori-ai-generate">Tạo bản xem trước</button><button class="btn-ghost" type="button" id="mori-ai-clear">Xóa dữ liệu trao đổi tạm</button></div><div id="mori-ai-error" data-ai-error aria-live="polite"></div></form></section><div id="mori-ai-result"></div><section class="rpg-panel"><h3>Triển khai Worker</h3><p class="rpg-muted">Kết nối AI đang được cấu hình. Sau khi sẵn sàng, hãy chọn dữ liệu muốn chia sẻ trước khi tạo kế hoạch.</p></section></div>';
     const form = target.querySelector("#mori-ai-form"), result = target.querySelector("#mori-ai-result");
     const updateDataPreview = () => {
       const data = { context: selectedContext(appState, form), answers: pendingAnswers };
