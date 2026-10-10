@@ -10,14 +10,17 @@ const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth
 const now=()=>new Date().toISOString();
 const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))||fallback;}catch(_){return fallback;}};
-function fresh(){const old=read(PROFILE,{}),stats={};KEYS.forEach(k=>stats[k]=10);return{schemaVersion:2,currentDate:today(),user:{name:old.name||"Player",goals:[]},level:Math.max(1,Number(old.level)||1),xp:Math.max(0,Number(old.xp)||0),stats,tasks:[],taskRules:[],plans:[],activePlanId:null,planStart:null,planEnd:null,aiConversation:null,quests:[],history:[],preferences:{growthDays:7},bonuses:{},feedback:"",rvitEntries:[],energyButtons:defaultEnergyButtons(),energyEvents:[],energyCooldowns:{},luckyButton:{icon:"🍀",effects:{}},luckyEvents:[]};}
+function fresh(){const old=read(PROFILE,{}),stats={};KEYS.forEach(k=>stats[k]=10);return{schemaVersion:3,currentDate:today(),user:{name:old.name||"Player",goals:[]},level:Math.max(1,Number(old.level)||1),xp:Math.max(0,Number(old.xp)||0),stats,tasks:[],dailyTasks:[],taskRules:[],plans:[],activePlanId:null,planStart:null,planEnd:null,aiConversation:null,quests:[],history:[],preferences:{growthDays:7},bonuses:{},feedback:"",rvitEntries:[],vitals:{hp:100,maxHp:100,mana:100,maxMana:100},sleepQualities:{},pendingSleepRecovery:null,energyButtons:defaultEnergyButtons(),energyEvents:[],energyCooldowns:{},luckyButton:{icon:"🍀",effects:{}},luckyEvents:[]};}
 function defaultEnergyButtons(){return[{id:"energy-low",title:"Tụt năng lượng",icon:"🪫",effects:{EN:-1,VIT:-1}},{id:"full-stomach",title:"Đầy bụng",icon:"🍽️",effects:{EN:-1,VIT:-1}},{id:"fap",title:"Fap",icon:"🫣",effects:{EN:-1,VIT:-1}},{id:"drink-water",title:"Uống nước",icon:"💧",effects:{VIT:1}},{id:"eat-fruit",title:"Ăn hoa quả",icon:"🍎",effects:{STR:1,VIT:1}}];}
 function state(){
- const raw=read(STORE,null);if(!raw||![1,2].includes(raw.schemaVersion))return fresh();
- const base=fresh(),s=Object.assign(base,raw);s.schemaVersion=2;s.activePlanId=null;
- s.user=Object.assign(base.user,raw.user||{});s.stats=Object.assign(base.stats,raw.stats||{});s.preferences=Object.assign(base.preferences,raw.preferences||{});
+ const raw=read(STORE,null);if(!raw||![1,2,3].includes(raw.schemaVersion))return fresh();
+ const base=fresh(),s=Object.assign(base,raw);s.schemaVersion=3;s.activePlanId=null;
+ s.user=Object.assign(base.user,raw.user||{});s.stats=Object.assign(base.stats,raw.stats||{});s.preferences=Object.assign(base.preferences,raw.preferences||{});s.dailyTasks=Array.isArray(raw.dailyTasks)?raw.dailyTasks:[];s.vitals=Object.assign(base.vitals,raw.vitals||{});s.sleepQualities=raw.sleepQualities&&typeof raw.sleepQualities==="object"?raw.sleepQualities:{};s.pendingSleepRecovery=raw.pendingSleepRecovery||null;
  ["tasks","taskRules","plans","quests","history","energyEvents","rvitEntries"].forEach(k=>s[k]=Array.isArray(raw[k])?raw[k]:[]);
  s.energyButtons=Array.isArray(raw.energyButtons)?raw.energyButtons:defaultEnergyButtons();
+ s.energyButtons.forEach(b=>{b.reason=String(b.reason||"");b.hp=Math.max(-100,Math.min(100,Number(b.hp)||0));b.mana=Math.max(-100,Math.min(100,Number(b.mana)||0));b.maxHpIncrease=Math.max(0,Math.min(100,Number(b.maxHpIncrease)||0));b.maxManaIncrease=Math.max(0,Math.min(100,Number(b.maxManaIncrease)||0));const uses=(s.energyEvents||[]).filter(e=>e.buttonId===b.id).length;b.totalUses=Number.isFinite(Number(b.totalUses))?Number(b.totalUses):uses;b.level=Math.floor(b.totalUses/30)+1;});
+ s.vitals.maxHp=Math.max(1,Number(s.vitals.maxHp)||100);s.vitals.maxMana=Math.max(1,Number(s.vitals.maxMana)||100);s.vitals.hp=Math.max(0,Math.min(s.vitals.maxHp,Number(s.vitals.hp)||0));s.vitals.mana=Math.max(0,Math.min(s.vitals.maxMana,Number(s.vitals.mana)||0));
+ if(!s.dailyTasks.length){s.taskRules.filter(r=>r.status==="active").slice(0,3).forEach(r=>{const count=s.history.filter(e=>e.action==="completed"&&e.ruleId===r.id).length;s.dailyTasks.push({id:"daily-"+r.id,title:r.title,description:r.description||"",reason:r.reason||"Task cũ được chuyển sang Task chính lặp hàng ngày.",xp:Number(r.xp)||0,statEffects:r.statEffects||{},repeatPerDay:1,cooldownMinutes:0,totalCompletions:count,level:Math.floor(count/30)+1,createdAt:r.createdAt||now()});});}
  s.energyCooldowns=raw.energyCooldowns&&typeof raw.energyCooldowns==="object"?raw.energyCooldowns:{};
  s.luckyButton=Object.assign({icon:"🍀",effects:{}},raw.luckyButton||{});s.luckyButton.effects=Object.assign({},s.luckyButton.effects||{});KEYS.forEach(k=>s.luckyButton.effects[k]=Math.max(0,Math.min(5,Math.round(Number(s.luckyButton.effects[k])||0))));s.luckyEvents=Array.isArray(raw.luckyEvents)?raw.luckyEvents:[];
  s.tasks.forEach(t=>{
@@ -53,8 +56,8 @@ function summarizeHistory(entries,days=365){
 }
 function needed(level){return 100+Math.max(0,(Number(level)||1)-1)*50;}
 function addXp(s,amount){s.xp=Math.max(0,s.xp+(Number(amount)||0));while(s.xp>=needed(s.level)){s.xp-=needed(s.level);s.level++;}}
-function completedToday(s,date){return s.history.filter(e=>e.action==="completed"&&e.date===date).length;}
-function rollover(s){const t=today();if(!s.currentDate)s.currentDate=t;let cursor=s.currentDate,guard=0;while(cursor<t&&guard++<366){if(!completedToday(s,cursor)&&!s.bonuses["penalty:"+cursor]){s.bonuses["penalty:"+cursor]=true;addXp(s,-6);log(s,{action:"daily_penalty",date:cursor,xpDelta:-6,statDelta:{},title:"Không hoàn thành task trong ngày"});}const d=new Date(cursor+"T00:00:00");d.setDate(d.getDate()+1);cursor=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}if(s.currentDate!==t){s.currentDate=t;save(s);}return s;}
+function completedToday(s,date){return s.history.filter(e=>(e.action==="completed"||e.action==="daily_task_completed")&&e.date===date).length;}
+function rollover(s){const t=today();if(!s.currentDate)s.currentDate=t;if(s.currentDate<t){s.pendingSleepRecovery={date:t,fromDate:s.currentDate};s.currentDate=t;save(s);}return s;}
 function activeQuest(s,type){return s.quests.find(q=>q.type===type&&q.status==="active")||null;}
 function taskEffectsLine(e){return Object.keys(e||{}).map(k=>k+" +"+e[k]).join(" · ");}
 function taskSort(a,b){const order={pending:0,completed:1,skipped:2};return(order[a.status]??3)-(order[b.status]??3)||String(a.createdAt).localeCompare(String(b.createdAt));}
@@ -220,14 +223,11 @@ function advancePlanBatch(s,phase,batch){
  return created;
 }
 function complete(id){
- const s=rollover(state()),t=s.tasks.find(x=>x.id===id);if(!t||t.status!=="pending")return;
- const levelBefore=s.level;t.status="completed";t.completedAt=now();const effects={};
- Object.keys(t.statEffects||{}).forEach(k=>{if(KEYS.includes(k)){const amount=Math.max(0,Math.min(5,Math.round(Number(t.statEffects[k])||0)));if(amount){s.stats[k]=(Number(s.stats[k])||0)+amount;effects[k]=amount;}}});
- addXp(s,t.xp);
- log(s,{action:"completed",date:today(),taskId:t.id,ruleId:t.ruleId||null,title:t.title,category:t.category,tags:t.tags,difficulty:t.difficulty,xpDelta:t.xp,statDelta:effects,mainQuestId:t.mainQuestId,weeklyQuestId:t.weeklyQuestId,reason:t.reason,createdAt:t.createdAt,completedAt:t.completedAt,originalTaskDate:t.originalTaskDate||t.taskDate});
- const finishedBatch=t.batchId?s.tasks.filter(x=>x.batchId===t.batchId&&!x.hiddenFromQueue&&["pending","completed"].includes(x.status)):[],advanced=finishedBatch.length>0&&finishedBatch.every(x=>x.status==="completed")?advancePlanBatch(s,t.timeOfDay,finishedBatch):0;
- let bonus=0;if(completedToday(s,today())>=6&&!s.bonuses["six-tasks:"+today()]){s.bonuses["six-tasks:"+today()]=true;bonus=3;addXp(s,bonus);log(s,{action:"daily_bonus",date:today(),title:"Thưởng hoàn thành 6 Task",xpDelta:bonus,statDelta:{}});}
- s.feedback="+"+t.xp+" XP · "+taskEffectsLine(effects)+(bonus?" · Thưởng +3 XP":"")+(advanced?" · Đã mở "+advanced+" Task tiếp theo":"");save(s);render("tasks");showRPGReward("Hoàn thành Task",Number(t.xp)+bonus,effects,levelBefore,s.level);
+ const s=rollover(state()),daily=s.dailyTasks.find(x=>x.id===id);if(daily){completeDailyTask(id);return;}
+ const t=s.tasks.find(x=>x.id===id);if(!t||t.status!=="pending")return;const before=s.level;t.status="completed";t.completedAt=now();const effects={};
+ Object.keys(t.statEffects||{}).forEach(k=>{if(KEYS.includes(k)){const amount=Math.max(-5,Math.min(5,Math.round(Number(t.statEffects[k])||0))),old=Number(s.stats[k])||0,actual=Math.max(0,old+amount)-old;if(actual){s.stats[k]=old+actual;effects[k]=actual;}}});
+ addXp(s,t.xp);log(s,{action:"completed",date:today(),taskId:t.id,ruleId:t.ruleId||null,title:t.title,category:t.category,tags:t.tags,difficulty:t.difficulty,xpDelta:t.xp,statDelta:effects,reason:t.reason,completedAt:t.completedAt});
+ s.feedback="+"+t.xp+" XP · "+taskEffectsLine(effects);save(s);render("tasks");showRPGReward(t.title,t.xp,effects,before,s.level);
 }
 function skip(id){const s=rollover(state()),t=s.tasks.find(x=>x.id===id);if(!t||t.status!=="pending")return;t.status="skipped";log(s,{action:"skipped",date:today(),taskId:t.id,ruleId:t.ruleId||null,title:t.title,category:t.category,tags:t.tags,difficulty:t.difficulty,xpDelta:0,statDelta:{},reason:"Người dùng bỏ qua Task."});s.feedback="Đã bỏ qua Task; không thay đổi XP/Stats.";save(s);render("tasks");}
 function swapTasks(mode){
@@ -287,6 +287,50 @@ function swapTasks(mode){
  s.feedback="Đã đổi "+targets.length+" Task trong khung "+(phase==="evening"?"buổi tối":"ban ngày")+".";
  save(s);render("tasks");return true;
 }
+function dailyTaskRuns(s,task,date=today()){return s.history.filter(e=>e.action==="daily_task_completed"&&e.dailyTaskId===task.id&&e.date===date);}
+function dailyTaskCooldownRemaining(s,task){const rows=dailyTaskRuns(s,task).sort((a,b)=>String(b.at||"").localeCompare(String(a.at||""))),minutes=Math.max(0,Number(task.cooldownMinutes)||0);if(!rows.length||!minutes)return 0;return Math.max(0,Date.parse(rows[0].at)+minutes*60000-Date.now());}
+function saveDailyTask(form){
+ const s=state(),id=String(form.id||""),existing=s.dailyTasks.find(t=>t.id===id);if(!existing&&s.dailyTasks.length>=3){alert("Tối đa 3 Task chính.");return false;}
+ const title=String(form.title||"").trim(),reason=String(form.reason||"").trim();if(!title||!reason){alert("Nhập tên Task và lý do thiết lập.");return false;}
+ const statEffects={};KEYS.forEach(k=>{const v=Math.max(-5,Math.min(5,Math.round(Number(form[k])||0)));if(v)statEffects[k]=v;});
+ const data={id:id||"daily-task-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),title:title.slice(0,140),description:String(form.description||"").slice(0,300),reason:reason.slice(0,500),xp:Math.max(0,Math.min(1000,Math.round(Number(form.xp)||0))),statEffects,repeatPerDay:Math.max(1,Math.min(30,Math.round(Number(form.repeatPerDay)||1))),cooldownMinutes:Math.max(0,Math.min(1440,Math.round(Number(form.cooldownMinutes)||0))),totalCompletions:existing?Number(existing.totalCompletions)||0:0,level:existing?Number(existing.level)||1:1,createdAt:existing?existing.createdAt:now(),updatedAt:now()};
+ if(existing)Object.assign(existing,data);else s.dailyTasks.push(data);if(existing)existing.level=Math.floor(existing.totalCompletions/30)+1;
+ log(s,{action:existing?"daily_task_updated":"daily_task_created",date:today(),dailyTaskId:data.id,title:data.title,xpDelta:0,statDelta:{},reason:data.reason});save(s);refreshManualTool();return true;
+}
+function deleteDailyTask(id){const s=state(),i=s.dailyTasks.findIndex(t=>t.id===id);if(i<0)return;const t=s.dailyTasks[i];log(s,{action:"daily_task_deleted",date:today(),dailyTaskId:t.id,title:t.title,xpDelta:0,statDelta:{},reason:t.reason});s.dailyTasks.splice(i,1);save(s);refreshManualTool();}
+function completeDailyTask(id){
+ const s=rollover(state()),task=s.dailyTasks.find(t=>t.id===id);if(!task)return;const runs=dailyTaskRuns(s,task);if(runs.length>=task.repeatPerDay||dailyTaskCooldownRemaining(s,task)>0)return;
+ const levelBefore=s.level,taskLevelBefore=task.level||1,effects={};
+ Object.entries(task.statEffects||{}).forEach(([k,raw])=>{if(!KEYS.includes(k))return;const delta=Math.max(-5,Math.min(5,Math.round(Number(raw)||0))),before=Number(s.stats[k])||0,after=Math.max(0,before+delta),applied=after-before;if(applied){s.stats[k]=after;effects[k]=applied;}});
+ addXp(s,task.xp);task.totalCompletions=(Number(task.totalCompletions)||0)+1;task.level=Math.floor(task.totalCompletions/30)+1;
+ log(s,{action:"daily_task_completed",date:today(),at:now(),dailyTaskId:task.id,title:task.title,xpDelta:task.xp,statDelta:effects,reason:task.reason,taskLevel:task.level});
+ let bonus=0;if(completedToday(s,today())>=6&&!s.bonuses["six-tasks:"+today()]){s.bonuses["six-tasks:"+today()]=true;bonus=3;addXp(s,bonus);log(s,{action:"daily_bonus",date:today(),title:"Thưởng hoàn thành 6 Task",xpDelta:bonus,statDelta:{}});}
+ const levelUp=task.level>taskLevelBefore;s.feedback="+"+task.xp+" XP · "+(taskEffectsLine(effects)||"Không đổi chỉ số")+(levelUp?" · Task lên Level "+task.level:"")+(bonus?" · Thưởng +3 XP":"");save(s);render("tasks");showRPGReward((levelUp?"⭐ Task lên Level "+task.level+" · ":"")+task.title,Number(task.xp)+bonus,effects,levelBefore,s.level);
+}
+function formatTaskCooldown(ms){const n=Math.ceil(ms/1000),m=Math.floor(n/60);return m?m+":"+String(n%60).padStart(2,"0"):n+"s";}
+function dailyTaskMarkup(s,t){
+ const runs=dailyTaskRuns(s,t),wait=dailyTaskCooldownRemaining(s,t),done=runs.length>=t.repeatPerDay,total=Number(t.totalCompletions)||0,level=Number(t.level)||1;
+ return'<article class="rpg-panel"><div class="rpg-head"><div><div class="rpg-chip">⭐ Task Level '+level+'</div><h3>'+esc(t.title)+'</h3></div><span class="rpg-chip">'+runs.length+' / '+t.repeatPerDay+' hôm nay</span></div>'+(t.description?'<p class="rpg-muted">'+esc(t.description)+'</p>':"")+'<div class="rpg-progress"><span style="width:'+Math.round(total%30/30*100)+'%"></span></div><div class="rpg-muted">Tiến độ Level · '+(total%30)+' / 30'+(wait>0?' · Hồi chiêu <span data-task-cooldown="'+esc(t.id)+'">'+formatTaskCooldown(wait)+'</span>':"")+'</div><button type="button" class="btn-primary" data-complete-daily-task="'+esc(t.id)+'" '+(done||wait>0?"disabled":"")+'>'+(done?"Đã hoàn thành hôm nay":wait>0?"Đang hồi chiêu":"Ghi nhận hoàn thành")+'</button></article>';
+}
+function updateDailyTaskCooldownUI(){const s=state();document.querySelectorAll("[data-complete-daily-task]").forEach(b=>{const t=s.dailyTasks.find(x=>x.id===b.dataset.completeDailyTask);if(!t)return;const n=dailyTaskRuns(s,t).length,w=dailyTaskCooldownRemaining(s,t),label=b.parentElement.querySelector("[data-task-cooldown]");if(n>=t.repeatPerDay){b.disabled=true;b.textContent="Đã hoàn thành hôm nay";}else if(w>0){b.disabled=true;b.textContent="Đang hồi chiêu";if(label)label.textContent=formatTaskCooldown(w);}else{b.disabled=false;b.textContent="Ghi nhận hoàn thành";if(label)label.textContent="";}});}
+function vitalsMarkup(s){
+ const v=s.vitals,bar=(name,n,max,color)=>'<div style="margin:8px 0"><div style="display:flex;justify-content:space-between"><b>'+name+'</b><span>'+Math.round(n)+' / '+Math.round(max)+'</span></div><div class="rpg-progress"><span style="width:'+Math.max(0,Math.min(100,n/max*100))+'%;background:'+color+'"></span></div></div>';
+ return'<section class="rpg-panel"><div class="rpg-head"><h2>❤️ HP · 🔷 Mana</h2><span class="rpg-chip">Hằng ngày</span></div>'+bar("HP",v.hp,v.maxHp,"linear-gradient(90deg,#f45c70,#ff9d75)")+bar("Mana",v.mana,v.maxMana,"linear-gradient(90deg,#4b8df8,#76d7ff)")+'</section>';
+}
+function openSleepRecovery(s){
+ const p=s.pendingSleepRecovery;if(!p||p.date!==today()||document.getElementById("sleep-recovery-modal"))return;
+ const m=document.createElement("div");m.className="energy-modal";m.id="sleep-recovery-modal";m.innerHTML='<div class="energy-modal-backdrop" data-sleep-close></div><section class="energy-modal-card" role="dialog" aria-modal="true"><h2>Hồi phục qua đêm</h2><p class="rpg-muted">Chọn chất lượng giấc ngủ đêm qua để tính hồi HP và Mana.</p><div class="rpg-grid">'+[1,2,3,4,5].map(n=>'<button type="button" class="btn-ghost" data-sleep-quality="'+n+'">'+n+' · '+["","Rất kém","Kém","Bình thường","Tốt","Rất tốt"][n]+'</button>').join("")+'</div><button type="button" class="btn-ghost" data-sleep-later>Để sau</button></section>';document.body.appendChild(m);m.querySelectorAll("[data-sleep-close],[data-sleep-later]").forEach(b=>b.onclick=()=>m.remove());m.querySelectorAll("[data-sleep-quality]").forEach(b=>b.onclick=()=>applySleepRecovery(Number(b.dataset.sleepQuality)));
+}
+function applySleepRecovery(q){
+ const s=state(),p=s.pendingSleepRecovery;if(!p||p.date!==today())return;const ratio=Math.max(1,Math.min(5,Math.round(q)))/5,v=s.vitals,oldHp=v.hp,oldMana=v.mana;
+ v.hp=Math.min(v.maxHp,v.hp+Math.round(v.maxHp*ratio));v.mana=Math.min(v.maxMana,v.mana+Math.round(v.maxMana*ratio));s.sleepQualities[today()]=Math.round(ratio*5);s.pendingSleepRecovery=null;
+ const d={HP:v.hp-oldHp,Mana:v.mana-oldMana};log(s,{action:"sleep_recovery",date:today(),title:"Hồi phục sau giấc ngủ",xpDelta:0,statDelta:d,reason:"Chất lượng ngủ "+Math.round(ratio*5)+"/5; hồi "+Math.round(ratio*100)+"% giới hạn HP và Mana."});save(s);render("tasks");showRPGReward("Hồi phục sau giấc ngủ",0,d,s.level,s.level);
+}
+function copyBalanceData(){
+ const s=state(),data={app:"Mori Quest",exportedAt:now(),taskTemplates:s.dailyTasks.map(t=>({title:t.title,description:t.description,reason:t.reason,xp:t.xp,statEffects:t.statEffects,repeatPerDay:t.repeatPerDay,cooldownMinutes:t.cooldownMinutes,level:t.level,totalCompletions:t.totalCompletions})),energyButtons:s.energyButtons.map(b=>({title:b.title,icon:energyIcon(b),reason:b.reason,effects:b.effects,hp:b.hp,mana:b.mana,maxHpIncrease:b.maxHpIncrease,maxManaIncrease:b.maxManaIncrease,level:b.level,totalUses:b.totalUses})),vitals:s.vitals};
+ const textData=JSON.stringify(data,null,2);try{navigator.clipboard.writeText(textData).then(()=>alert("Đã sao chép cấu hình cân bằng."),()=>fallbackCopy(textData));}catch(_){fallbackCopy(textData);}
+}
+function fallbackCopy(textData){const a=document.createElement("textarea");a.value=textData;a.setAttribute("readonly","");a.style.position="fixed";a.style.opacity="0";document.body.appendChild(a);a.select();try{document.execCommand("copy");alert("Đã sao chép cấu hình cân bằng.");}catch(_){alert("Không thể sao chép cấu hình.");}a.remove();}
 function addManualTask(form){
  const s=rollover(state()),date=today(),count=s.tasks.filter(t=>t.taskDate===date).length;
  if(count>=50){alert("Đã đạt giới hạn 50 Task hôm nay.");return false;}
@@ -599,7 +643,7 @@ function render(tab){
  const s=rollover(state());if(activeTab==="stats")renderStats(s);else if(activeTab==="settings")renderSettings(s);else renderTasks(s);
 }
 function rolloverForLegacy(){rollover(state());return true;}
-const storageKey="tq_liferpg_state_v1";if(!localStorage.getItem(storageKey))save(fresh());else{try{const stored=JSON.parse(localStorage.getItem(storageKey));if(stored.schemaVersion!==2)save(state());}catch(_){}}
+const storageKey="tq_liferpg_state_v1";if(!localStorage.getItem(storageKey))save(fresh());else{try{const stored=JSON.parse(localStorage.getItem(storageKey));if(stored.schemaVersion!==3)save(state());}catch(_){}}
 try{if(window.stopDaySyncMonitoring)window.stopDaySyncMonitoring();}catch(_){}
 window.LifeRpg={render,rollover:rolloverForLegacy,state,completeTask:complete,skipTask:skip,importPaste,buildPrompt,swapTasks,addManualTask,removeTask,recordLucky,summarizeHistory};
 const heroLucky=document.querySelector("[data-lucky-button]");if(heroLucky)heroLucky.onclick=recordLucky;const heroRvit=document.querySelector("[data-rvit-button]");if(heroRvit)heroRvit.onclick=openRVITDialog;
