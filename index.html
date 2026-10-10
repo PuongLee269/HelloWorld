@@ -740,6 +740,8 @@ th{
           <button type="button" class="hero-lucky hero-rvit" data-rvit-button aria-label="Ghi nhận mức năng lượng nội tại">🫀 rVIT</button>
           <span class="hero-level" data-hero="level">Level 1</span>
           <span class="hero-xp" data-hero="xp">0 E</span>
+          <span class="hero-vital hero-hp" data-hero="hp">❤️ HP 100 / 100</span>
+          <span class="hero-vital hero-mana" data-hero="mana">🔷 Mana 100 / 100</span>
           <span class="hero-weekly" data-hero="weekly-avg">TB tuần: --</span>
         </div>
         <div class="hero-progress">
@@ -1003,6 +1005,8 @@ const heroRefs = heroEl ? {
   name: heroEl.querySelector('[data-hero="name"]'),
   level: heroEl.querySelector('[data-hero="level"]'),
   xp: heroEl.querySelector('[data-hero="xp"]'),
+  hp: heroEl.querySelector('[data-hero="hp"]'),
+  mana: heroEl.querySelector('[data-hero="mana"]'),
   weeklyAvg: heroEl.querySelector('[data-hero="weekly-avg"]'),
   xpLabel: heroEl.querySelector('[data-hero="xp-label"]'),
   xpFill: heroEl.querySelector('[data-hero="xp-fill"]')
@@ -1810,6 +1814,13 @@ function renderHero(){
   const name = (profile.name || '').trim() || 'Player';
   const pct = need ? Math.min(100, Math.round(xp/need*100)) : 100;
   const weeklyAvgGain = calcWeeklyAverageEGain(profile);
+  let rpgVitals = {};
+  try { rpgVitals = (JSON.parse(localStorage.getItem("tq_liferpg_state_v1") || "{}").vitals || {}); } catch(_) {}
+  const defaultVitalMax = Math.min(10000, 100 + 5 * (level - 1));
+  const maxHp = Math.max(1, Number(rpgVitals.maxHp) || defaultVitalMax);
+  const maxMana = Math.max(1, Number(rpgVitals.maxMana) || defaultVitalMax);
+  const hp = Math.max(0, Math.min(maxHp, Number.isFinite(Number(rpgVitals.hp)) ? Number(rpgVitals.hp) : defaultVitalMax));
+  const mana = Math.max(0, Math.min(maxMana, Number.isFinite(Number(rpgVitals.mana)) ? Number(rpgVitals.mana) : defaultVitalMax));
 
   const customHeroBg = backgroundTheme.customHeroBgUrl || '';
   const customAppBg = backgroundTheme.customAppBgUrl || '';
@@ -1834,6 +1845,12 @@ function renderHero(){
   }
   if(heroRefs.xp){
     heroRefs.xp.textContent = `${xp} E`;
+  }
+  if(heroRefs.hp){
+    heroRefs.hp.textContent = `❤️ HP ${Math.round(hp)} / ${Math.round(maxHp)}`;
+  }
+  if(heroRefs.mana){
+    heroRefs.mana.textContent = `🔷 Mana ${Math.round(mana)} / ${Math.round(maxMana)}`;
   }
   if(heroRefs.xpLabel){
     heroRefs.xpLabel.textContent = need ? `${xp} / ${need} E` : `${xp} E`;
