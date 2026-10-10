@@ -327,10 +327,10 @@ function completeDailyTask(id){
 }
 function formatTaskCooldown(ms){const n=Math.ceil(ms/1000),m=Math.floor(n/60);return m?m+":"+String(n%60).padStart(2,"0"):n+"s";}
 function dailyTaskMarkup(s,t){
- const runs=dailyTaskRuns(s,t),wait=dailyTaskCooldownRemaining(s,t),done=runs.length>=t.repeatPerDay,total=Number(t.totalCompletions)||0,level=Number(t.level)||1,reward=dailyTaskRewards(t);
- return'<article class="rpg-panel"><div class="rpg-head"><div><div class="rpg-chip">⭐ Task Level '+level+'</div><h3>'+esc(t.title)+'</h3></div><span class="rpg-chip">'+runs.length+' / '+t.repeatPerDay+' hôm nay</span></div>'+(t.description?'<p class="rpg-muted">'+esc(t.description)+'</p>':"")+'<div class="rpg-progress"><span style="width:'+Math.round(total%30/30*100)+'%"></span></div><div class="rpg-muted">Tiến độ Level · '+(total%30)+' / 30 · '+reward.xp+' XP · '+esc(taskEffectsLine(reward.statEffects)||"Không đổi Stat")+(wait>0?' · Hồi chiêu <span data-task-cooldown="'+esc(t.id)+'">'+formatTaskCooldown(wait)+'</span>':"")+'</div><button type="button" class="btn-primary" data-complete-daily-task="'+esc(t.id)+'" '+(done||wait>0?"disabled":"")+'>'+(done?"Đã hoàn thành hôm nay":wait>0?"Đang hồi chiêu":"Ghi nhận hoàn thành")+'</button></article>';
+ const runs=dailyTaskRuns(s,t),wait=dailyTaskCooldownRemaining(s,t),done=runs.length>=t.repeatPerDay,blocked=wait>0;
+ return'<label class="rpg-taskrow"><input type="checkbox" data-complete-daily-task="'+esc(t.id)+'" '+(done?"checked disabled":blocked?"disabled":"")+' aria-label="'+esc(t.title+(done?" — hoàn thành hôm nay":blocked?" — đang hồi chiêu":""))+'"><span>'+esc(t.title)+'</span></label>';
 }
-function updateDailyTaskCooldownUI(){const s=state();document.querySelectorAll("[data-complete-daily-task]").forEach(b=>{const t=s.dailyTasks.find(x=>x.id===b.dataset.completeDailyTask);if(!t)return;const n=dailyTaskRuns(s,t).length,w=dailyTaskCooldownRemaining(s,t),label=b.parentElement.querySelector("[data-task-cooldown]");if(n>=t.repeatPerDay){b.disabled=true;b.textContent="Đã hoàn thành hôm nay";}else if(w>0){b.disabled=true;b.textContent="Đang hồi chiêu";if(label)label.textContent=formatTaskCooldown(w);}else{b.disabled=false;b.textContent="Ghi nhận hoàn thành";if(label)label.textContent="";}});}
+function updateDailyTaskCooldownUI(){const s=state();document.querySelectorAll("[data-complete-daily-task]").forEach(box=>{const t=s.dailyTasks.find(x=>x.id===box.dataset.completeDailyTask);if(!t)return;const done=dailyTaskRuns(s,t).length>=t.repeatPerDay,wait=dailyTaskCooldownRemaining(s,t)>0;box.checked=done;box.disabled=done||wait;box.setAttribute("aria-label",t.title+(done?" — hoàn thành hôm nay":wait?" — đang hồi chiêu":""));box.title=done?"Đã hoàn thành hôm nay":wait?"Task đang hồi chiêu":t.title;});}
 function vitalsMarkup(s){
  const v=s.vitals,bar=(name,n,max,color)=>'<div style="margin:8px 0"><div style="display:flex;justify-content:space-between"><b>'+name+'</b><span>'+Math.round(n)+' / '+Math.round(max)+'</span></div><div class="rpg-progress"><span style="width:'+Math.max(0,Math.min(100,n/max*100))+'%;background:'+color+'"></span></div></div>';
  return'<section class="rpg-panel"><div class="rpg-head"><h2>❤️ HP · 🔷 Mana</h2><span class="rpg-chip">Hằng ngày</span></div>'+bar("HP",v.hp,v.maxHp,"linear-gradient(90deg,#f45c70,#ff9d75)")+bar("Mana",v.mana,v.maxMana,"linear-gradient(90deg,#4b8df8,#76d7ff)")+'</section>';
@@ -397,9 +397,9 @@ function currentBatch(s){
 }
 function renderTasks(s){
  const tasks=s.dailyTasks||[];
- view.innerHTML=style()+'<div class="rpg-wrap">'+vitalsMarkup(s)+energyQuickMarkup(s,"tasks")+'<section class="rpg-panel"><div class="rpg-head"><h2>Task chính hôm nay</h2><span class="rpg-chip">'+tasks.length+' / 3</span></div>'+(tasks.length?tasks.map(t=>dailyTaskMarkup(s,t)).join(""):'<div class="rpg-empty">Chưa có Task chính. Tạo tối đa 3 Task lặp hàng ngày trong Cài đặt → Task chính.</div>')+'<button type="button" class="btn-ghost" data-open-daily-config>⚙️ Cài đặt Task chính</button></section></div>';
+ view.innerHTML=style()+'<div class="rpg-wrap">'+energyQuickMarkup(s,"tasks")+'<section class="rpg-panel"><div class="rpg-head"><h2>Task chính hôm nay</h2><span class="rpg-chip">'+tasks.length+' / 3</span></div><div class="rpg-task-list">'+(tasks.length?tasks.map(t=>dailyTaskMarkup(s,t)).join(""):'<div class="rpg-empty">Chưa có Task chính. Tạo tối đa 3 Task lặp hàng ngày trong Cài đặt → Task chính.</div>')+'</div><button type="button" class="btn-ghost" data-open-daily-config>⚙️ Cài đặt Task chính</button></section></div>';
  bindEnergyQuick("tasks");
- view.querySelectorAll("[data-complete-daily-task]").forEach(b=>b.onclick=()=>completeDailyTask(b.dataset.completeDailyTask));
+ view.querySelectorAll("[data-complete-daily-task]").forEach(box=>box.onchange=()=>{if(box.checked)completeDailyTask(box.dataset.completeDailyTask);});
  const config=view.querySelector("[data-open-daily-config]");if(config)config.onclick=()=>{render("settings");openSettingsTool("quests");};
  updateDailyTaskCooldownUI();openSleepRecovery(s);
 }
