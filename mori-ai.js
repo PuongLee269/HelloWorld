@@ -202,34 +202,6 @@
     };
   }
 
-  function saveBackup(button) {
-    const state = window.LifeRpg && window.LifeRpg.state && window.LifeRpg.state();
-    if (!state) { window.alert("Không thể lưu: chưa đọc được hồ sơ và tiến trình cá nhân."); return; }
-    const date = new Date().toISOString().slice(0, 10);
-    const payload = { format: "life-rpg-backup.v1", exportedAt: new Date().toISOString(), state };
-    try {
-      const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
-      const link = document.createElement("a"); link.href = url; link.download = "mori-quest-backup-" + date + ".json";
-      document.body.appendChild(link); link.click(); link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      window.alert("Đã lưu hồ sơ và toàn bộ tiến trình cá nhân trong bản sao lưu JSON trên thiết bị này.");
-    } catch (error) {
-      window.alert("Không thể tải bản sao lưu. Hãy thử lại hoặc kiểm tra quyền tải tệp của trình duyệt.");
-    }
-  }
-
-  function installSaveButton() {
-    const meta = document.querySelector(".hero-meta");
-    if (!meta || document.getElementById("mori-save-data")) return;
-    const button = document.createElement("button");
-    button.type = "button"; button.id = "mori-save-data"; button.className = "hero-lucky";
-    button.textContent = "💾 Lưu dữ liệu"; button.setAttribute("aria-label", "Tải bản sao lưu dữ liệu Mori Quest về thiết bị này");
-    button.addEventListener("click", () => saveBackup(button));
-    meta.appendChild(button);
-  }
-
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", installSaveButton, { once: true });
-  else installSaveButton();
-
+  // Sao lưu dữ liệu được đặt trong Cài đặt → Hồ sơ & sao lưu.
   window.MoriQuestAI = { render };
 })();
