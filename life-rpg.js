@@ -75,7 +75,7 @@ function summarizeHistory(entries,days=365){
  return{periodDays:Math.max(1,Number(days)||365),from:start,to:end,eventCount:rows.length,byAction,totals:{completed,skipped,xpDelta,statDelta},byMonth,frequentItems:frequent,latestEvents:latest};
 }
 function needed(level){return 100+Math.max(0,(Number(level)||1)-1)*50;}
-function playerLevelStatReward(level){return 1+Math.floor(Math.max(0,Number(level)-2)/5);}
+function playerLevelStatReward(level){return 1+levelStep(level);}
 function addXp(s,amount){
  s.xp=Math.max(0,s.xp+(Number(amount)||0));let gained=0;
  while(s.xp>=needed(s.level)){
@@ -86,7 +86,7 @@ function addXp(s,amount){
   v.maxHp=Math.min(10000,(Number(v.maxHp)||100)+5);v.maxMana=Math.min(10000,(Number(v.maxMana)||100)+5);
   v.hp=Math.min(v.maxHp,(Number(v.hp)||0)+5);v.mana=Math.min(v.maxMana,(Number(v.mana)||0)+5);
   statDelta.HP=v.hp-hpBefore;statDelta["Max HP"]=5;statDelta.Mana=v.mana-manaBefore;statDelta["Max Mana"]=5;
-  log(s,{action:"character_level_up",date:today(),title:"Lên Level "+s.level,level:s.level,xpDelta:0,statDelta,reason:"Thưởng "+statReward+" điểm cho mỗi chỉ số nhân vật; phần thưởng tăng thêm 1 điểm mỗi 5 cấp. HP/Mana tối đa +5 và hồi +5."});
+  log(s,{action:"character_level_up",date:today(),title:"Lên Level "+s.level,level:s.level,xpDelta:0,statDelta,reason:"Thưởng "+statReward+" điểm cho mỗi chỉ số nhân vật; mức thưởng tăng cùng nhịp scale của nút năng lượng. HP/Mana tối đa +5 và hồi +5."});
  }
  return gained;
 }
