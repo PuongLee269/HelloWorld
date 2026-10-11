@@ -75,14 +75,18 @@ function summarizeHistory(entries,days=365){
  return{periodDays:Math.max(1,Number(days)||365),from:start,to:end,eventCount:rows.length,byAction,totals:{completed,skipped,xpDelta,statDelta},byMonth,frequentItems:frequent,latestEvents:latest};
 }
 function needed(level){return 100+Math.max(0,(Number(level)||1)-1)*50;}
+function playerLevelStatReward(level){return 1+Math.floor(Math.max(0,Number(level)-2)/5);}
 function addXp(s,amount){
  s.xp=Math.max(0,s.xp+(Number(amount)||0));let gained=0;
  while(s.xp>=needed(s.level)){
   s.xp-=needed(s.level);s.level++;s.vitalsLevelApplied=s.level;gained++;
+  const statReward=playerLevelStatReward(s.level),statDelta={};
+  KEYS.forEach(k=>{s.stats[k]=(Number(s.stats[k])||0)+statReward;statDelta[k]=statReward;});
   const v=s.vitals||(s.vitals={hp:100,maxHp:100,mana:100,maxMana:100}),hpBefore=v.hp,manaBefore=v.mana;
   v.maxHp=Math.min(10000,(Number(v.maxHp)||100)+5);v.maxMana=Math.min(10000,(Number(v.maxMana)||100)+5);
   v.hp=Math.min(v.maxHp,(Number(v.hp)||0)+5);v.mana=Math.min(v.maxMana,(Number(v.mana)||0)+5);
-  log(s,{action:"character_level_up",date:today(),title:"Lên Level "+s.level,level:s.level,xpDelta:0,statDelta:{HP:v.hp-hpBefore,"Max HP":5,Mana:v.mana-manaBefore,"Max Mana":5},reason:"Mỗi cấp nhân vật tăng giới hạn HP và Mana thêm 5, đồng thời hồi 5 điểm hiện tại."});
+  statDelta.HP=v.hp-hpBefore;statDelta["Max HP"]=5;statDelta.Mana=v.mana-manaBefore;statDelta["Max Mana"]=5;
+  log(s,{action:"character_level_up",date:today(),title:"Lên Level "+s.level,level:s.level,xpDelta:0,statDelta,reason:"Thưởng "+statReward+" điểm cho mỗi chỉ số nhân vật; phần thưởng tăng thêm 1 điểm mỗi 5 cấp. HP/Mana tối đa +5 và hồi +5."});
  }
  return gained;
 }
@@ -394,7 +398,7 @@ function showRPGReward(title,xp,statDelta,levelBefore,levelAfter){
  const toast=document.createElement("div");toast.id="rpg-reward-toast";toast.className="rpg-reward-toast";toast.setAttribute("role","status");toast.setAttribute("aria-live","polite");
  const stats=Object.entries(statDelta||{}).filter(([,v])=>Number(v)!==0).map(([k,v])=>'<span style="color:'+(Number(v)>0?'#8df0ad':'#ff9b9b')+'">'+(Number(v)>0?'+':'')+Number(v)+' '+esc(k)+'</span>').join("");
  const xpText=Number(xp)?'<span style="color:'+(Number(xp)>0?'#ffe079':'#ff9b9b')+'">'+(Number(xp)>0?'+':'')+Number(xp)+' XP</span>':"";
- const levelCount=Math.max(0,Number(levelAfter)-Number(levelBefore)),currentState=state(),newButtons=currentState.energyButtons.filter(b=>Number(b.unlockedAtLevel)>Number(levelBefore)&&Number(b.unlockedAtLevel)<=Number(levelAfter)).length,levelText=levelCount?'<span class="reward-level">✨ LEVEL UP · LEVEL '+Number(levelAfter)+' ✨<br>HP/Mana tối đa +'+(levelCount*5)+' · hồi +'+(levelCount*5)+' mỗi loại'+(newButtons?' · mở khóa '+newButtons+' nút năng lượng':'')+'</span>':"";
+ const levelCount=Math.max(0,Number(levelAfter)-Number(levelBefore)),currentState=state(),newButtons=currentState.energyButtons.filter(b=>Number(b.unlockedAtLevel)>Number(levelBefore)&&Number(b.unlockedAtLevel)<=Number(levelAfter)).length,levelStatTotal=Array.from({length:levelCount},(_,i)=>playerLevelStatReward(Number(levelBefore)+i+1)).reduce((sum,n)=>sum+n,0),levelText=levelCount?'<span class="reward-level">✨ LEVEL UP · LEVEL '+Number(levelAfter)+' ✨<br>6 Stats +'+levelStatTotal+' mỗi chỉ số · HP/Mana tối đa +'+(levelCount*5)+' · hồi +'+(levelCount*5)+' mỗi loại'+(newButtons?' · mở khóa '+newButtons+' nút năng lượng':'')+'</span>':"";
  toast.innerHTML='<strong>'+esc(title)+'</strong><div class="reward-values">'+(xpText+stats||'<span>Đã ghi vào lịch sử</span>')+'</div>'+levelText;document.body.appendChild(toast);
  window.setTimeout(()=>{if(toast.isConnected){toast.style.transition="opacity .3s,transform .3s";toast.style.opacity="0";toast.style.transform="translate(-50%,-10px)";window.setTimeout(()=>toast.remove(),350);}},2200);
 }
