@@ -10,7 +10,7 @@ const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth
 const now=()=>new Date().toISOString();
 const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))||fallback;}catch(_){return fallback;}};
-function fresh(){const old=read(PROFILE,{}),stats={};KEYS.forEach(k=>stats[k]=10);const level=Math.max(1,Number(old.level)||1),baseVital=Math.min(10000,100+5*(level-1));return{schemaVersion:4,currentDate:today(),user:{name:old.name||"Player",goals:[]},level,xp:Math.max(0,Number(old.xp)||0),stats,tasks:[],dailyTasks:[],taskRules:[],plans:[],activePlanId:null,planStart:null,planEnd:null,aiConversation:null,quests:[],history:[],preferences:{growthDays:7},bonuses:{},feedback:"",rvitEntries:[],vitals:{hp:baseVital,maxHp:baseVital,mana:baseVital,maxMana:baseVital},vitalsLevelApplied:level,sleepQualities:{},pendingSleepRecovery:null,energyButtons:defaultEnergyButtons(),energyEvents:[],energyCooldowns:{},luckyPoints:0,luckyObservation:null,luckyButton:{icon:"🍀",threshold:100,effects:{}},luckyEvents:[]};}
+function fresh(){const old=read(PROFILE,{}),stats={};KEYS.forEach(k=>stats[k]=10);const level=Math.max(1,Number(old.level)||1),baseVital=Math.min(10000,100+5*(level-1));return{schemaVersion:4,currentDate:today(),user:{name:old.name||"Player",goals:[]},level,xp:Math.max(0,Number(old.xp)||0),stats,tasks:[],dailyTasks:[],taskRules:[],plans:[],activePlanId:null,planStart:null,planEnd:null,aiConversation:null,quests:[],history:[],preferences:{growthDays:7},bonuses:{},feedback:"",rvitEntries:[],vitals:{hp:baseVital,maxHp:baseVital,mana:baseVital,maxMana:baseVital},vitalsLevelApplied:level,sleepQualities:{},pendingSleepRecovery:null,energyButtons:defaultEnergyButtons(),energyEvents:[],energyCooldowns:{},luckyStatProgress:0,luckyObservation:null,luckyButton:{icon:"🍀",threshold:10,effects:{}},luckyEvents:[]};}
 function defaultEnergyReason(title){return({"Tụt năng lượng":"Ghi nhận trạng thái kiệt sức để theo dõi điều làm giảm sức bền; điểm số có thể được cân bằng theo dữ liệu thực tế.","Đầy bụng":"Ghi nhận cảm giác khó chịu sau ăn để theo dõi ảnh hưởng tới thể lực và năng lượng.","Fap":"Ghi nhận hành vi để quan sát ảnh hưởng cá nhân tới sức bền; không mang ý nghĩa phán xét.","Uống nước":"Theo dõi việc bổ sung nước và cảm nhận hồi phục trong ngày.","Ăn hoa quả":"Theo dõi lựa chọn dinh dưỡng và ảnh hưởng tích cực tới sức khỏe mô phỏng."}[title]||"Mô tả lý do ảnh hưởng của nút này tới nhân vật.");}
 function defaultEnergyButtons(){return[{id:"energy-low",title:"Tụt năng lượng",icon:"🪫",effects:{EN:-1,EQ:-1},hp:-2,mana:-2,reason:defaultEnergyReason("Tụt năng lượng")},{id:"full-stomach",title:"Đầy bụng",icon:"🍽️",effects:{EN:-1},hp:-1,mana:-1,reason:defaultEnergyReason("Đầy bụng")},{id:"fap",title:"Fap",icon:"🫣",effects:{EN:-1,VIT:-1},hp:-1,mana:-1,reason:defaultEnergyReason("Fap")},{id:"drink-water",title:"Uống nước",icon:"💧",effects:{EN:1},hp:0,mana:1,reason:defaultEnergyReason("Uống nước")},{id:"eat-fruit",title:"Ăn hoa quả",icon:"🍎",effects:{EN:1,VIT:1},hp:1,mana:0,reason:defaultEnergyReason("Ăn hoa quả")}];}
 function state(){
@@ -25,7 +25,7 @@ function state(){
  let appliedLevel=Math.max(1,Number(raw.vitalsLevelApplied)||1);while(appliedLevel<s.level){const oldHp=s.vitals.hp,oldMana=s.vitals.mana;s.vitals.maxHp=Math.min(10000,s.vitals.maxHp+5);s.vitals.maxMana=Math.min(10000,s.vitals.maxMana+5);s.vitals.hp=Math.min(s.vitals.maxHp,s.vitals.hp+5);s.vitals.mana=Math.min(s.vitals.maxMana,s.vitals.mana+5);appliedLevel++;log(s,{action:"level_vitals_migration",date:today(),title:"Đồng bộ thưởng HP/Mana Level "+appliedLevel,level:appliedLevel,xpDelta:0,statDelta:{HP:s.vitals.hp-oldHp,"Max HP":5,Mana:s.vitals.mana-oldMana,"Max Mana":5},reason:"Bổ sung giới hạn HP/Mana cho cấp nhân vật đã đạt trước khi cơ chế này được bật."});}s.vitalsLevelApplied=appliedLevel;
  if(raw.dailyTaskMigrationDone!==true&&!s.dailyTasks.length){s.taskRules.filter(r=>r.status==="active").slice(0,3).forEach(r=>{const count=s.history.filter(e=>e.action==="completed"&&e.ruleId===r.id).length;s.dailyTasks.push({id:"daily-"+r.id,title:r.title,description:r.description||"",reason:r.reason||"Task cũ được chuyển sang Task chính lặp hàng ngày.",xp:Number(r.xp)||0,statEffects:r.statEffects||{},repeatPerDay:1,cooldownMinutes:0,totalCompletions:count,level:Math.floor(count/30)+1,createdAt:r.createdAt||now()});});}s.dailyTaskMigrationDone=true;
  s.energyCooldowns=raw.energyCooldowns&&typeof raw.energyCooldowns==="object"?raw.energyCooldowns:{};
- s.luckyButton=Object.assign({icon:"🍀",threshold:100,effects:{}},raw.luckyButton||{});s.luckyButton.threshold=Math.max(1,Math.min(10000,Math.round(Number(s.luckyButton.threshold)||100)));s.luckyButton.effects=Object.assign({},s.luckyButton.effects||{});KEYS.forEach(k=>s.luckyButton.effects[k]=Math.max(0,Math.min(5,Math.round(Number(s.luckyButton.effects[k])||0))));s.luckyPoints=Math.max(0,Number.isFinite(Number(raw.luckyPoints))?Number(raw.luckyPoints):Math.max(0,Number(s.xp)||0));s.luckyObservation=raw.luckyObservation&&Number(raw.luckyObservation.endsAt)>0?raw.luckyObservation:null;s.luckyEvents=Array.isArray(raw.luckyEvents)?raw.luckyEvents:[];
+ s.luckyButton=Object.assign({icon:"🍀",threshold:10,effects:{}},raw.luckyButton||{});s.luckyButton.threshold=Math.max(1,Math.min(10000,Math.round(Number(s.luckyButton.threshold)||10)));s.luckyButton.effects=Object.assign({},s.luckyButton.effects||{});KEYS.forEach(k=>s.luckyButton.effects[k]=Math.max(0,Math.min(5,Math.round(Number(s.luckyButton.effects[k])||0))));s.luckyStatProgress=Math.max(0,Number(raw.luckyStatProgress)||0);s.luckyObservation=raw.luckyObservation&&Number(raw.luckyObservation.endsAt)>0?raw.luckyObservation:null;s.luckyEvents=Array.isArray(raw.luckyEvents)?raw.luckyEvents:[];
  s.tasks.forEach(t=>{
   if(t.status==="skipped"&&!t.ruleId)t.status="pending";
   if(!t.taskType)t.taskType="one_time";
@@ -61,7 +61,7 @@ function state(){
 }
 function save(s){s.updatedAt=now();localStorage.setItem(STORE,JSON.stringify(s));const p=read(PROFILE,{});p.name=s.user.name||p.name||"Player";p.level=s.level;p.xp=s.xp;try{localStorage.setItem(PROFILE,JSON.stringify(p));}catch(_){}try{if(window.renderHero)window.renderHero();if(window.scheduleAutoSync)window.scheduleAutoSync();}catch(_){}}
 const MAX_HISTORY_EVENTS=10000;
-function log(s,event){s.history.push(Object.assign({id:"event-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),at:now()},event));if(s.history.length>MAX_HISTORY_EVENTS)s.history=s.history.slice(-MAX_HISTORY_EVENTS);}
+function log(s,event){const item=Object.assign({id:"event-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),at:now()},event);if(item.action!=="lucky_event"){s.luckyStatProgress=Math.max(0,Number(s.luckyStatProgress)||0)+KEYS.reduce((sum,k)=>sum+Math.max(0,Number(item.statDelta&&item.statDelta[k])||0),0);}s.history.push(item);if(s.history.length>MAX_HISTORY_EVENTS)s.history=s.history.slice(-MAX_HISTORY_EVENTS);}
 function summarizeHistory(entries,days=365){
  const end=today(),start=dateAdd(end,-Math.max(1,Number(days)||365)+1),rows=(Array.isArray(entries)?entries:[]).filter(e=>e&&e.date>=start&&e.date<=end).sort((a,b)=>String(a.at||"").localeCompare(String(b.at||""))),byAction={},byMonth={},byItem={},statDelta={};
  let xpDelta=0,completed=0,skipped=0;
@@ -77,7 +77,7 @@ function summarizeHistory(entries,days=365){
 function needed(level){return 100+Math.max(0,(Number(level)||1)-1)*50;}
 function playerLevelStatReward(level){return 1+levelStep(level);}
 function addXp(s,amount){
- const xpAmount=Number(amount)||0;s.xp=Math.max(0,s.xp+xpAmount);if(xpAmount>0)s.luckyPoints=Math.max(0,Number(s.luckyPoints)||0)+xpAmount;let gained=0;
+ const xpAmount=Number(amount)||0;s.xp=Math.max(0,s.xp+xpAmount);let gained=0;
  while(s.xp>=needed(s.level)){
   s.xp-=needed(s.level);s.level++;s.vitalsLevelApplied=s.level;gained++;
   const statReward=playerLevelStatReward(s.level),statDelta={};
@@ -523,20 +523,20 @@ function renderSettings(s){
 }
 function syncLuckyButton(){
  const button=document.querySelector("[data-lucky-button]");if(!button)return;
- const s=state(),threshold=Math.max(1,Number(s.luckyButton&&s.luckyButton.threshold)||100),observation=s.luckyObservation;
+ const s=state(),threshold=Math.max(1,Number(s.luckyButton&&s.luckyButton.threshold)||10),observation=s.luckyObservation;
  if(observation){
   const left=Math.max(0,Number(observation.endsAt)-Date.now());
   if(left===0){button.textContent="🍀 Ghi nhận Lucky";button.disabled=true;button.style.opacity=".7";button.title="Đã hết 24 giờ. Hãy ghi nhận kết quả.";openLuckyOutcome();return;}
   const total=Math.floor(left/1000),h=Math.floor(total/3600),m=Math.floor(total%3600/60),sec=total%60;
   button.textContent="🍀 Quan sát "+String(h).padStart(2,"0")+":"+String(m).padStart(2,"0")+":"+String(sec).padStart(2,"0");button.disabled=true;button.style.opacity=".7";button.title="Đang trong chu kỳ quan sát Lucky 24 giờ.";return;
  }
- const points=Math.floor(Number(s.luckyPoints)||0),ready=points>=threshold;
- button.disabled=!ready;button.style.opacity=ready?"1":".55";button.textContent=ready?"🍀 Lucky · Sẵn sàng":"🍀 Lucky · "+points+"/"+threshold;button.title=ready?"Bắt đầu quan sát Lucky trong 24 giờ.":"Cần tích lũy "+threshold+" điểm E để mở khóa.";
+ const points=Math.floor(Number(s.luckyStatProgress)||0),ready=points>=threshold;
+ button.disabled=!ready;button.style.opacity=ready?"1":".55";button.textContent=ready?"🍀 Lucky · Sẵn sàng":"🍀 Lucky · "+points+"/"+threshold;button.title=ready?"Bắt đầu quan sát Lucky trong 24 giờ.":"Cần tích lũy "+threshold+" điểm tăng trên 6 chỉ số để mở khóa.";
 }
 function recordLucky(){
- const s=state(),threshold=Math.max(1,Number(s.luckyButton&&s.luckyButton.threshold)||100);
+ const s=state(),threshold=Math.max(1,Number(s.luckyButton&&s.luckyButton.threshold)||10);
  if(s.luckyObservation||Number(s.luckyPoints||0)<threshold){syncLuckyButton();return;}
- s.luckyPoints=Math.max(0,Number(s.luckyPoints)||0)-threshold;
+ s.luckyStatProgress=Math.max(0,Number(s.luckyStatProgress)||0)-threshold;
  s.luckyObservation={startedAt:now(),endsAt:Date.now()+24*60*60*1000};
  save(s);syncLuckyButton();
 }
@@ -561,8 +561,8 @@ function saveLuckyOutcome(observedLucky,reason){
 }
 function renderLuckySettings(s,target){
  const options=Array.from({length:6},(_,n)=>'<option value="'+n+'">'+(n===0?"0":"+"+n)+'</option>').join("");
- target.innerHTML=style()+'<div class="rpg-wrap"><section class="rpg-panel"><h3>Mở khóa Lucky</h3><p class="rpg-muted">Tích lũy XP từ Task và nút năng lượng. Khi đủ điểm, Lucky sáng lên. Bấm để bắt đầu quan sát 24 giờ; phần thưởng chỉ áp dụng nếu ghi nhận có Lucky.</p><form id="lucky-config-form" class="rpg-grid"><label>Điểm cần tích lũy<input type="number" name="threshold" min="1" max="10000" step="1" required></label>'+KEYS.map(k=>'<label><b>'+k+'</b><select name="'+k+'">'+options+'</select></label>').join("")+'<button class="btn-primary" style="grid-column:1/-1">Lưu cài đặt Lucky</button></form></section></div>';
- const form=document.getElementById("lucky-config-form");form.elements.threshold.value=String(s.luckyButton&&s.luckyButton.threshold||100);KEYS.forEach(k=>form.elements[k].value=String(s.luckyButton&&s.luckyButton.effects&&s.luckyButton.effects[k]||0));
+ target.innerHTML=style()+'<div class="rpg-wrap"><section class="rpg-panel"><h3>Mở khóa Lucky</h3><p class="rpg-muted">Tích lũy điểm cộng trên 6 chỉ số từ Task, nút năng lượng và Level. Mỗi lần tăng dương được tính; Lucky không tự cộng tiến độ cho lần Lucky kế tiếp. Khi đủ điểm, bấm để quan sát 24 giờ. Mốc thử nghiệm ban đầu là +10 điểm, có thể chỉnh sau khi theo dõi thực tế.</p><form id="lucky-config-form" class="rpg-grid"><label>Điểm cần tích lũy<input type="number" name="threshold" min="1" max="10000" step="1" required></label>'+KEYS.map(k=>'<label><b>'+k+'</b><select name="'+k+'">'+options+'</select></label>').join("")+'<button class="btn-primary" style="grid-column:1/-1">Lưu cài đặt Lucky</button></form></section></div>';
+ const form=document.getElementById("lucky-config-form");form.elements.threshold.value=String(s.luckyButton&&s.luckyButton.threshold||10);KEYS.forEach(k=>form.elements[k].value=String(s.luckyButton&&s.luckyButton.effects&&s.luckyButton.effects[k]||0));
  form.onsubmit=e=>{e.preventDefault();const n=state(),f=e.currentTarget;n.luckyButton=n.luckyButton||{icon:"🍀",effects:{}};n.luckyButton.icon="🍀";n.luckyButton.threshold=Math.max(1,Math.min(10000,Math.round(Number(f.elements.threshold.value)||100)));n.luckyButton.effects={};KEYS.forEach(k=>n.luckyButton.effects[k]=Math.max(0,Math.min(5,Number(f.elements[k].value)||0)));save(n);renderLuckySettings(state(),target);syncLuckyButton();};
 }
 function openSettingsTool(tool){
