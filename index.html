@@ -2608,6 +2608,8 @@ function handleResetPoints(){
 
 function performDayRollover(opts={}){
   if(window.LifeRpg){ return window.LifeRpg.rollover(opts); }
+  // The RPG app owns XP and date rollover whenever its local state exists.
+  if(localStorage.getItem("tq_liferpg_state_v1")) return false;
   const auto=!!opts.auto;
   if(isRolloverRunning) return false;
   isRolloverRunning=true;
@@ -4193,7 +4195,7 @@ if(lbTimer===null){
 }
 </script>
 <script src="./life-rpg-engine.js?v=task-loop-1"></script>
-<script src="./life-rpg.js?v=task-count-display-20261011-1"></script>
+<script src="./life-rpg.js?v=missed-day-xp-guard-20261011-1"></script>
 <script src="./mori-ai.js?v=settings-backup-history-1"></script>
 </body>
 </html>
