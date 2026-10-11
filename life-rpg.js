@@ -523,19 +523,24 @@ function renderSettings(s){
 }
 function syncLuckyButton(){
  const button=document.querySelector("[data-lucky-button]");if(!button)return;
+ if(!document.getElementById("lucky-button-effects-style")){const css=document.createElement("style");css.id="lucky-button-effects-style";css.textContent=".hero-lucky.lucky-ready{background:linear-gradient(120deg,#27b7ff,#6d55ff,#31d9c5);background-size:220% 220%;color:#fff;border-color:rgba(255,255,255,.9);box-shadow:0 0 12px rgba(72,190,255,.8),0 0 26px rgba(115,82,255,.65);animation:lucky-shimmer 2s ease-in-out infinite}.hero-lucky.lucky-observing{background:linear-gradient(120deg,#13b981,#20c997,#0ea5e9);background-size:220% 220%;color:#fff;border-color:rgba(220,255,245,.95);box-shadow:0 0 14px rgba(22,201,151,.9),0 0 28px rgba(18,158,223,.65);animation:lucky-shimmer 2s ease-in-out infinite}.hero-lucky.lucky-observing:disabled{opacity:1!important;cursor:default}@keyframes lucky-shimmer{0%,100%{background-position:0% 50%;filter:brightness(1)}50%{background-position:100% 50%;filter:brightness(1.3)}}@media(prefers-reduced-motion:reduce){.hero-lucky.lucky-ready,.hero-lucky.lucky-observing{animation:none}}";document.head.appendChild(css);}
  const s=state(),threshold=Math.max(1,Number(s.luckyButton&&s.luckyButton.threshold)||10),observation=s.luckyObservation;
+ button.classList.remove("lucky-ready","lucky-observing");
  if(observation){
+  button.hidden=false;button.classList.add("lucky-observing");
   const left=Math.max(0,Number(observation.endsAt)-Date.now());
-  if(left===0){button.textContent="🍀 Ghi nhận Lucky";button.disabled=true;button.style.opacity=".7";button.title="Đã hết 24 giờ. Hãy ghi nhận kết quả.";openLuckyOutcome();return;}
+  if(left===0){button.textContent="🍀 Ghi nhận Lucky";button.disabled=true;button.style.opacity="1";button.title="Đã hết 24 giờ. Hãy ghi nhận kết quả.";openLuckyOutcome();return;}
   const total=Math.floor(left/1000),h=Math.floor(total/3600),m=Math.floor(total%3600/60),sec=total%60;
-  button.textContent="🍀 Quan sát "+String(h).padStart(2,"0")+":"+String(m).padStart(2,"0")+":"+String(sec).padStart(2,"0");button.disabled=true;button.style.opacity=".7";button.title="Đang trong chu kỳ quan sát Lucky 24 giờ.";return;
+  button.textContent="🍀 "+String(h).padStart(2,"0")+":"+String(m).padStart(2,"0")+":"+String(sec).padStart(2,"0");button.disabled=true;button.style.opacity="1";button.title="Đang quan sát Lucky trong 24 giờ.";return;
  }
  const points=Math.floor(Number(s.luckyStatProgress)||0),ready=points>=threshold;
- button.disabled=!ready;button.style.opacity=ready?"1":".55";button.textContent=ready?"🍀 Lucky · Sẵn sàng":"🍀 Lucky · "+points+"/"+threshold;button.title=ready?"Bắt đầu quan sát Lucky trong 24 giờ.":"Cần tích lũy "+threshold+" điểm tăng trên 6 chỉ số để mở khóa.";
+ button.hidden=!ready;button.disabled=!ready;button.style.opacity="1";
+ if(ready){button.classList.add("lucky-ready");button.textContent="🍀 Lucky";button.title="Bắt đầu quan sát Lucky trong 24 giờ.";}
+ else{button.textContent="🍀 Lucky";button.title="Cần tích lũy "+threshold+" điểm tăng trên 6 chỉ số để mở khóa.";}
 }
 function recordLucky(){
  const s=state(),threshold=Math.max(1,Number(s.luckyButton&&s.luckyButton.threshold)||10);
- if(s.luckyObservation||Number(s.luckyPoints||0)<threshold){syncLuckyButton();return;}
+ if(s.luckyObservation||Number(s.luckyStatProgress||0)<threshold){syncLuckyButton();return;}
  s.luckyStatProgress=Math.max(0,Number(s.luckyStatProgress)||0)-threshold;
  s.luckyObservation={startedAt:now(),endsAt:Date.now()+24*60*60*1000};
  save(s);syncLuckyButton();
